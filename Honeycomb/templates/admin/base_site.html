@@ -20,6 +20,13 @@ page. Use {% comment %} blocks, as here.
 {% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Honeycomb Admin{% endblock %}
 
 {% block extrahead %}{{ block.super }}
+{% comment %}
+Same mark the frontend serves from app/icon.svg, byte for byte, so the two tabs
+are indistinguishable in a tab strip. Unlike the header logo this one is a
+static file: a favicon that 404s costs nothing but a blank square, and inlining
+it as a data URI would repeat seven polygons on every admin page load.
+{% endcomment %}
+<link rel="icon" type="image/svg+xml" href="{% static 'honeycomb/icon.svg' %}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&display=swap">

@@ -86,6 +86,13 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Render injects the service's public hostname at run time. Adding it here
+# means a deploy needs no hand-maintained host list, and a service rename
+# cannot lock you out of your own API with a DisallowedHost.
+RENDER_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_HOSTNAME and RENDER_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_HOSTNAME)
+
 
 # Application definition
 
@@ -103,6 +110,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Directly below SecurityMiddleware, per WhiteNoise's own instruction.
+    # Render serves no static files itself, so without this the admin re-skin
+    # 404s in production and the admin renders as unstyled Django.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -372,6 +383,26 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
 ]
 
+# In production the browser talks only to the frontend's origin: Next.js
+# rewrites /api/* through to this service, so requests arrive same-site and the
+# Lax cookies above keep working. That origin still has to be trusted here,
+# because CsrfViewMiddleware checks the forwarded Origin header, not the host.
+# Comma-separated, each with its scheme: https://honeycomb-web.onrender.com
+for _origin in os.environ.get('DJANGO_PUBLIC_ORIGINS', '').split(','):
+    _origin = _origin.strip().rstrip('/')
+    if _origin and _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
+        # Harmless when the proxy makes every call same-origin; needed the
+        # moment anything calls the API directly.
+        if _origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_origin)
+
+# Render terminates TLS at its edge and forwards plain HTTP. Without this
+# Django sees an http:// request, so request.is_secure() is False, Secure
+# cookies are never set and SECURE_SSL_REDIRECT loops forever.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # False on purpose: the frontend has to read this cookie to echo it back in the
 # X-CSRFToken header. Knowing the token grants nothing by itself -- it only
 # proves the caller could read a cookie scoped to this site.
@@ -432,6 +463,19 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 # Where collectstatic gathers everything for a real deployment. Unused by
 # runserver, which serves from the directories above directly.
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Hashed filenames plus long-lived cache headers, and gzip/brotli siblings
+# built at collectstatic time. Only outside DEBUG: the manifest backend raises
+# on any file collectstatic has not seen, which would break runserver.
+if not DEBUG:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

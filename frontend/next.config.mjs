@@ -9,8 +9,26 @@ const apiOrigin = (function readApiOrigin() {
   try {
     return new URL(raw).origin;
   } catch (invalid) {
-    return "http://localhost:8000";
+    // A relative base ("/api") is not a URL and lands here. That is the
+    // deployed shape: the browser calls this origin and the rewrite below
+    // forwards to Django, so 'self' in connect-src already covers it.
+    return "";
   }
+})();
+
+/**
+ * Where the rewrite forwards /api/* in a deployment.
+ *
+ * Render exposes the API service as "host:port" via fromService, with no
+ * scheme, so one is added. Unset locally, where the browser talks to :8000
+ * directly and no rewrite is registered.
+ */
+const apiProxyTarget = (function readProxyTarget() {
+  const raw = (process.env.API_ORIGIN || "").trim().replace(/\/+$/, "");
+  if (raw === "") {
+    return null;
+  }
+  return /^https?:\/\//.test(raw) ? raw : "https://" + raw;
 })();
 
 /**
@@ -34,8 +52,8 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   isProduction
-    ? "connect-src 'self' " + apiOrigin
-    : "connect-src 'self' " + apiOrigin + " ws: wss:",
+    ? ("connect-src 'self' " + apiOrigin).trim()
+    : ("connect-src 'self' " + apiOrigin + " ws: wss:").replace(/\s+/g, " "),
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -73,6 +91,31 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+    ];
+  },
+
+  /**
+   * Same-origin proxy to Django.
+   *
+   * Every *.onrender.com subdomain is a separate site to a browser, because
+   * onrender.com sits on the Public Suffix List. Calling the API on its own
+   * subdomain would therefore be cross-site, and the SameSite=Lax auth cookies
+   * would never be sent -- sign-in would appear to work and every later request
+   * would 401. Routing /api/* through this server keeps the whole session
+   * same-origin, so Lax stays and CORS stops mattering.
+   *
+   * Registered only when API_ORIGIN is set. Locally it is not, and the browser
+   * talks to :8000 directly, which is same-site because both are localhost.
+   */
+  async rewrites() {
+    if (apiProxyTarget === null) {
+      return [];
+    }
+    return [
+      {
+        source: "/api/:path*",
+        destination: apiProxyTarget + "/api/:path*",
       },
     ];
   },

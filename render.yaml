@@ -1,0 +1,81 @@
+# Render blueprint. In the dashboard: New > Blueprint, point it at this repo.
+#
+# Three resources: a Postgres database, the Django API, and the Next.js
+# frontend. The frontend proxies /api/* through to the API (see
+# frontend/next.config.mjs), so the browser only ever talks to one origin --
+# which is what lets the auth cookies stay SameSite=Lax. *.onrender.com
+# subdomains are separate sites to a browser, so calling the API directly from
+# the frontend's origin would silently drop every cookie.
+
+databases:
+  - name: honeycomb-db
+    databaseName: honeycomb
+    user: honeycomb
+    plan: free
+
+services:
+  # ---- Django API ----
+  - type: web
+    name: honeycomb-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: Honeycomb
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn Honeycomb.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+    healthCheckPath: /api/auth/csrf/
+    envVars:
+      - key: PYTHON_VERSION
+        # psycopg 3.3 requires >=3.10. Pinned rather than left to Render's
+        # default so a base-image change cannot break the build.
+        value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: honeycomb-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_JWT_SIGNING_KEY
+        # Separate from SECRET_KEY so JWTs can be rotated (signing everyone
+        # out) without also invalidating sessions and CSRF tokens.
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_NUM_PROXIES
+        # Render's edge is a single proxy and it overwrites X-Forwarded-For,
+        # so the client IP is exactly one hop back. Wrong values here make
+        # every rate limit forgeable.
+        value: "1"
+      - key: DJANGO_DB_SSLMODE
+        value: require
+      - key: WEB_CONCURRENCY
+        value: "2"
+      # Set after the first deploy, once the frontend URL exists:
+      #   DJANGO_PUBLIC_ORIGINS=https://honeycomb-web.onrender.com
+      # Until it is set, CSRF rejects writes from the deployed frontend.
+      - key: DJANGO_PUBLIC_ORIGINS
+        sync: false
+
+  # ---- Next.js frontend ----
+  - type: web
+    name: honeycomb-web
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    startCommand: "npm run start -- --port $PORT"
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
+      # Server-side only. next.config.mjs proxies /api/* here, so this value
+      # never reaches the browser and needs no NEXT_PUBLIC_ prefix.
+      - key: API_ORIGIN
+        fromService:
+          name: honeycomb-api
+          type: web
+          property: hostport
+      # Empty on purpose: the client calls same-origin /api, and
+      # lib/api.ts already falls back to a relative base when this is unset.
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: "/api"
