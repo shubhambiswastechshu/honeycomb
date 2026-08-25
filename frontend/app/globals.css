@@ -251,53 +251,6 @@ body {
 }
 
 /* Right-aligned so the arrow reads as "forward" rather than as a stray dot. */
-.step-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 22px;
-}
-
-.button-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: var(--accent-contrast);
-  background: var(--amber-500);
-  border: 1px solid var(--amber-500);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease,
-    transform 0.12s ease, opacity 0.18s ease;
-}
-
-.button-arrow:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-.button-arrow:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.button-arrow:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.35);
-}
-
-.button-arrow:disabled {
-  opacity: 0.65;
-  cursor: default;
-}
-
-/* Replaces the arrow while a step is being checked, so the disabled button
-   still shows that something is happening. */
-.button-arrow-spinner {
-  animation: spin 0.9s linear infinite;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -543,13 +496,7 @@ body {
     animation: none;
   }
 
-  .button:active:not(:disabled),
-  .button-arrow:active:not(:disabled) {
+  .button:active:not(:disabled) {
     transform: none;
-  }
-
-  /* Slowed rather than stopped: a frozen spinner would read as a hang. */
-  .button-arrow-spinner {
-    animation-duration: 2.4s;
   }
 }

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
 import { AuthCard, ErrorBanner, Field } from "@/app/AuthCard";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { checkSignUpStep, ensureCsrf, signUp } from "@/lib/api";
@@ -153,6 +152,19 @@ export default function SignUpPage() {
   const copy = STEP_COPY[step];
   const isLastStep = step === STEP_COUNT - 1;
 
+  // Every step submits the same button; only the word changes. The two loading
+  // labels are not interchangeable: the last step is creating the workspace,
+  // while the earlier ones are only validating the field against
+  // /auth/signup/check/ -- calling that "Creating..." would claim more than has
+  // happened.
+  const submitLabel = isLastStep
+    ? loading
+      ? "Creating..."
+      : "Create workspace"
+    : loading
+      ? "Checking..."
+      : "Next";
+
   return (
     <AuthCard title={copy.title} subtitle={copy.subtitle} headingKey={step}>
       <StepIndicator step={step} />
@@ -230,33 +242,13 @@ export default function SignUpPage() {
           />
         ) : null}
 
-        {/* The commit action keeps its full-width label; the steps that only
-            move the wizard along get the arrow. */}
-        {isLastStep ? (
-          <button className="button" type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create workspace"}
-          </button>
-        ) : (
-          <div className="step-actions">
-            <button
-              className="button-arrow"
-              type="submit"
-              aria-label="Continue"
-              title="Continue"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2
-                  className="button-arrow-spinner"
-                  size={19}
-                  aria-hidden="true"
-                />
-              ) : (
-                <ArrowRight size={19} aria-hidden="true" />
-              )}
-            </button>
-          </div>
-        )}
+        {/* One button for every step. The intermediate steps used to get a
+            round icon-only arrow, which had to carry an aria-label and a title
+            to say what the word says by itself, and made the last step look
+            like a different control rather than the end of the same run. */}
+        <button className="button" type="submit" disabled={loading}>
+          {submitLabel}
+        </button>
       </form>
 
       {step > 0 ? (
