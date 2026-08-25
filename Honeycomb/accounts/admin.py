@@ -52,3 +52,12 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('email', 'full_name', 'tenant', 'role', 'password1', 'password2'),
         }),
     )
+
+
+# Branding. The template at templates/admin/base_site.html draws the mark and
+# reads site_header for the wordmark beside it; these three also carry into the
+# <title>, the breadcrumbs and the password-reset emails, which the template
+# never touches.
+admin.site.site_header = 'Honeycomb Admin'
+admin.site.site_title = 'Honeycomb Admin'
+admin.site.index_title = 'Workspaces and members'

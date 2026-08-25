@@ -1,0 +1,45 @@
+{% comment %}
+Icon paths for the rail, keyed by `icon` -- either a literal ("overview",
+"site") or a model's lowercased object_name.
+
+Paths only: the caller supplies the <svg> wrapper, so stroke width, size and
+colour are declared once rather than copied into every branch.
+
+These are the same Lucide glyphs the app rail uses (lucide-react in
+components/dashboard/IconRail.tsx), traced out as markup because the admin is
+server-rendered and pulling a React icon library into it to draw four shapes
+would be absurd. Keep them in step with the app's if those change.
+
+A model with no branch here falls through to the database glyph, so registering
+a new ModelAdmin gives a sensible rail item without touching this file.
+{% endcomment %}
+{% if icon == "overview" %}
+  <rect width="7" height="7" x="3" y="3" rx="1"/>
+  <rect width="7" height="7" x="14" y="3" rx="1"/>
+  <rect width="7" height="7" x="14" y="14" rx="1"/>
+  <rect width="7" height="7" x="3" y="14" rx="1"/>
+{% elif icon == "site" %}
+  <path d="M15 3h6v6"/>
+  <path d="M10 14 21 3"/>
+  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+{% elif icon == "tenant" %}
+  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>
+  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>
+  <path d="M10 6h4"/>
+  <path d="M10 10h4"/>
+  <path d="M10 14h4"/>
+  <path d="M10 18h4"/>
+{% elif icon == "user" %}
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+  <circle cx="9" cy="7" r="4"/>
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+{% elif icon == "group" %}
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+  <path d="m9 12 2 2 4-4"/>
+{% else %}
+  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+  <path d="M3 5v14a9 3 0 0 0 18 0V5"/>
+  <path d="M3 12a9 3 0 0 0 18 0"/>
+{% endif %}

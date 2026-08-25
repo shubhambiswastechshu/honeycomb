@@ -1,0 +1,37 @@
+{% load i18n %}
+{% comment %}
+Overrides django/contrib/admin/templates/admin/filter.html.
+
+One change from stock, and it is the whole point: the <details> no longer carries
+an unconditional `open`. The skin lays the filters out as a row of dropdown chips
+above the table, and stock's hardcoded `open` would render every filter's full
+list expanded at once -- a wall hundreds of pixels tall where a toolbar should
+be. CSS cannot close a <details>; only the attribute can.
+
+Everything else is stock, deliberately. This template is the ONLY hook for a
+filter's markup -- there is no per-app or per-model lookup for filter.html the
+way there is for change_list.html -- so anything invented here applies to every
+filter in the admin, forever.
+
+Context is exactly three names: `title`, `choices` and `spec`. admin_list_filter
+renders this with a bare dict, so there is no `cl`, no `request`, no `user` and
+no context processors in scope. Which choice is active therefore cannot be read
+here; the skin marks an active chip with `details:has(li.selected:not(:first-child))`
+in CSS instead.
+
+Django's own filters.js still drives the open/closed state from sessionStorage
+(key `django.admin.filtersState`, matched on data-filter-title), so a chip the
+reader opened stays open across pages. That is why the attribute is dropped
+rather than the script.
+{% endcomment %}
+<details data-filter-title="{{ title }}">
+  <summary>
+    {% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}
+  </summary>
+  <ul>
+  {% for choice in choices %}
+    <li{% if choice.selected %} class="selected"{% endif %}>
+    <a href="{{ choice.query_string|iriencode }}">{{ choice.display }}</a></li>
+  {% endfor %}
+  </ul>
+</details>

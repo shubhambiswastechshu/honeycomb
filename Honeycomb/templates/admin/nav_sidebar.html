@@ -1,0 +1,84 @@
+{% load i18n %}
+{% comment %}
+Replaces the admin's 275px text sidebar with the app's icon rail, so crossing
+from /dashboard into /admin does not change what navigation looks like.
+
+Three things follow from that and are deliberate:
+
+* The id is `hc-rail`, not `nav-sidebar`. Django's nav_sidebar.js looks up
+  `#nav-sidebar` and then `#nav-filter` unconditionally; renaming the element
+  makes that script bail on its first lookup instead of throwing on a filter box
+  this rail does not have. It also frees the rail from nav_sidebar.css, whose
+  every rule is keyed on that id.
+* There is no toggle. The rail is 60px of icons -- there is nothing to reclaim
+  by collapsing it, and a chrome element that can vanish is one the eye has to
+  re-find on every page.
+* Labels live in tooltips, matching components/dashboard/IconRail.tsx. Each item
+  still carries aria-label and title, so the name reaches assistive tech and the
+  native tooltip even when the CSS one is not shown.
+
+`available_apps` comes from AdminSite.each_context, so this works on every admin
+page without a view change.
+{% endcomment %}
+
+{% url 'admin:index' as admin_index_url %}
+
+<nav class="hc-rail" id="hc-rail" aria-label="{% translate 'Sections' %}">
+  <ul class="hc-rail-list">
+    <li class="hc-rail-cell">
+      <a class="hc-rail-item"
+         href="{{ admin_index_url }}"
+         title="{% translate 'Overview' %}"
+         aria-label="{% translate 'Overview' %}"
+         {% if request.path == admin_index_url %}aria-current="page"{% endif %}>
+        <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.75"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {% include "admin/hc_rail_icon.html" with icon="overview" %}
+        </svg>
+        <span class="hc-rail-tip" role="presentation">{% translate 'Overview' %}</span>
+      </a>
+    </li>
+
+    {% for app in available_apps %}
+      {% for model in app.models %}
+        {% if model.admin_url %}
+          <li class="hc-rail-cell">
+            <a class="hc-rail-item"
+               href="{{ model.admin_url }}"
+               title="{{ model.name }}"
+               aria-label="{{ model.name }}"
+               {% if model.admin_url in request.path|urlencode %}aria-current="page"{% endif %}>
+              <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="1.75"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                {% include "admin/hc_rail_icon.html" with icon=model.object_name|lower %}
+              </svg>
+              <span class="hc-rail-tip" role="presentation">{{ model.name }}</span>
+            </a>
+          </li>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </ul>
+
+  {% if site_url %}
+    <span class="hc-rail-divider" aria-hidden="true"></span>
+
+    <ul class="hc-rail-list">
+      <li class="hc-rail-cell">
+        <a class="hc-rail-item"
+           href="{{ site_url }}"
+           title="{% translate 'View site' %}"
+           aria-label="{% translate 'View site' %}">
+          <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.75"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            {% include "admin/hc_rail_icon.html" with icon="site" %}
+          </svg>
+          <span class="hc-rail-tip" role="presentation">{% translate 'View site' %}</span>
+        </a>
+      </li>
+    </ul>
+  {% endif %}
+</nav>

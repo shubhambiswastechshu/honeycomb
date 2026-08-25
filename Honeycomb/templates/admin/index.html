@@ -1,0 +1,23 @@
+{% extends "admin/index.html" %}
+
+{% comment %}
+Puts the navigation sidebar back on the dashboard.
+
+Stock admin/index.html blanks the nav-sidebar block outright -- the reasoning
+being that the dashboard already *is* the app list, so the sidebar would repeat
+it. That holds for a page you land on once, but the sidebar is how every other
+page in the admin is navigated, and having it appear and disappear as you cross
+the dashboard makes the whole chrome feel unstable. It stays.
+
+Extending a template by its own name is deliberate and supported: Django skips
+the template currently being rendered when resolving {% extends %}, so this
+picks up django.contrib.admin's copy rather than recursing into itself. It is
+the documented way to add to an admin template instead of replacing it, and it
+means everything else on this page keeps coming from Django.
+
+base.html has already wrapped this block in its own
+`{% if not is_popup and is_nav_sidebar_enabled %}`, so the include needs no
+guard of its own.
+{% endcomment %}
+
+{% block nav-sidebar %}{% include "admin/nav_sidebar.html" %}{% endblock %}

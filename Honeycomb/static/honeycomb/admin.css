@@ -1,0 +1,2129 @@
+/* ==========================================================================
+   Honeycomb admin skin
+
+   Loaded from templates/admin/base_site.html via {% block responsive %}, the
+   last stylesheet block base.html emits. That position is deliberate:
+   responsive.css re-declares layout inside two media queries, and a skin loaded
+   from extrastyle or extrahead loses those ties on source order. Loading last
+   means almost nothing here needs escalated specificity, and nothing needs
+   !important.
+
+   Three jobs:
+
+     1. Re-point the admin's CSS custom properties to the product's palette.
+        Every hue the stock admin ships is declared in base.css's variable
+        block, so overriding it moves the whole theme at once.
+     2. Restyle the components whose *shape* the variables cannot reach -- the
+        filled slab captions, the square corners, the cramped rows, the submit
+        row where three saves shout at each other.
+     3. Neutralise the fixed-colour SVGs. Around twenty icons under admin/img/
+        have their fill baked in (a green tick, a blue chevron, a white plus)
+        and no variable reaches inside a file; they are handled at the end.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Palette
+
+   The product's amber, brought back into the admin. The values are lifted
+   verbatim from frontend/app/globals.css so the two halves of the app cannot
+   drift: --amber-500 #ea9d3e, --ink #312f17, --bg #fffdf8, --border #e3d9bf,
+   --muted #7a7357, --accent-hover #d98c2d.
+
+   How the accent is spent matters more than the accent itself. Amber carries
+   the things you act on -- the primary button, the current row, focus, the
+   marker on the active rail item -- and nothing else. Structure stays warm
+   neutral, so the gold reads as emphasis rather than as a coat of paint. An
+   earlier pass filled the header bar with it and it looked like a warning
+   banner, not a brand.
+
+   Keyed on `html[data-theme="light"], :root` because base.css uses exactly that
+   pair. A bare `:root` loses to its `html[data-theme="light"]` half the moment
+   a visitor picks light explicitly -- which is when the stock teal would come
+   back.
+
+   Amber is a light hue: anything sitting on it takes the dark ink as its
+   foreground. White on #ea9d3e is about 1.9:1 and fails at any size.
+   -------------------------------------------------------------------------- */
+
+html[data-theme="light"],
+:root {
+  /* Brand, straight from the app. */
+  --hc-amber-500: #ea9d3e;
+  --hc-amber-400: #e5ac3f;
+  --hc-amber-300: #e5bd3f;
+  --hc-amber-200: #eec33d;
+  --hc-amber-deep: #d98c2d;
+  --hc-ink: #312f17;
+
+  /* Amber at low alpha, for tints that sit over both the paper ground and a
+     panel without banding. The app tints its rail the same way. */
+  --hc-tint-soft: rgba(234, 157, 62, 0.09);
+  --hc-tint: rgba(234, 157, 62, 0.14);
+  --hc-ring: rgba(234, 157, 62, 0.28);
+
+  --primary: #ea9d3e;
+  --secondary: #d98c2d;
+  /* base.css paints #branding h1 from --accent directly, not through
+     --header-branding-color, so this is the wordmark's colour. */
+  --accent: #312f17;
+  --primary-fg: #312f17;
+
+  --body-bg: #fffdf8;
+  --body-fg: #312f17;
+  --body-quiet-color: #7a7357;
+  --body-loud-color: #211f0f;
+
+  --header-color: #312f17;
+  --header-branding-color: #312f17;
+  --header-bg: #fffdf8;
+  --header-link-color: #5f5940;
+
+  --breadcrumbs-fg: #7a7357;
+  --breadcrumbs-link-fg: #312f17;
+  --breadcrumbs-bg: #fffdf8;
+
+  --link-fg: #8a5c1d;
+  --link-hover-color: #d98c2d;
+  --link-selected-fg: #8a5c1d;
+
+  --hairline-color: #efe8d6;
+  --border-color: #e3d9bf;
+
+  --error-fg: #9b3d22;
+  --message-success-bg: #f1f6ec;
+  --message-warning-bg: #fdf4e2;
+  --message-error-bg: #fbeee9;
+
+  --darkened-bg: #faf6ec;
+  --selected-bg: #f7eeda;
+  --selected-row: #fdf6e6;
+
+  --button-fg: #312f17;
+  --button-bg: #ea9d3e;
+  --button-hover-bg: #e5ac3f;
+  --default-button-bg: #ea9d3e;
+  --default-button-hover-bg: #e5ac3f;
+  --close-button-bg: #b3a986;
+  --close-button-hover-bg: #7a7357;
+  --delete-button-bg: #9b3d22;
+  --delete-button-hover-bg: #7f2f19;
+
+  --object-tools-fg: #312f17;
+  --object-tools-bg: #ea9d3e;
+  --object-tools-hover-bg: #e5ac3f;
+
+  /* The admin routes every font through this one variable, so a single
+     declaration re-faces the whole thing -- including widgets that build their
+     own markup in JS. Google Sans Flex is a 400-700 variable font; the fallback
+     stack is the admin's own, so a blocked fonts.googleapis.com costs a
+     different face and nothing else. */
+  --font-family-primary:
+    "Google Sans Flex",
+    "Google Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    system-ui,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    "Noto Color Emoji";
+
+  /* Skin-local. Not part of the admin's own contract.
+
+     Rounded again, gently. A flat pass squared everything off, which made the
+     admin look like a spreadsheet next to an app whose rail cells, cards and
+     inputs are all 9-12px. These match. */
+  --hc-radius: 12px;
+  --hc-radius-sm: 9px;
+  --hc-radius-xs: 7px;
+  --hc-panel-head-bg: #fdfaf1;
+  --hc-sidebar-bg: #fdfaf1;
+  --hc-shadow: 0 1px 2px rgba(49, 47, 23, 0.05);
+  --hc-popover-shadow: 0 8px 24px rgba(49, 47, 23, 0.13);
+  --hc-ease: 0.16s ease;
+  /* The page heading's own line box and the gap under it. The Add button is
+     pulled up by exactly their sum to sit on the heading's line -- see the
+     object-tools rule. Change either value and the button follows. */
+  --hc-title-line: 36px;
+  --hc-title-gap: 22px;
+  /* Recolours the fixed-fill SVGs. Split light/dark so the dark theme can
+     invert without every icon rule being written twice. */
+  --hc-icon-filter: grayscale(1) opacity(0.62);
+}
+
+html[data-theme="dark"] {
+  --hc-amber-500: #ea9d3e;
+  --hc-amber-400: #e5ac3f;
+  --hc-amber-300: #e5bd3f;
+  --hc-amber-200: #eec33d;
+  --hc-amber-deep: #d98c2d;
+  --hc-ink: #312f17;
+
+  --hc-tint-soft: rgba(234, 157, 62, 0.10);
+  --hc-tint: rgba(234, 157, 62, 0.16);
+  --hc-ring: rgba(234, 157, 62, 0.32);
+
+  --primary: #ea9d3e;
+  --secondary: #d98c2d;
+  --accent: #eec33d;
+  --primary-fg: #312f17;
+
+  --body-bg: #17160f;
+  --body-fg: #ece6d5;
+  --body-quiet-color: #a49b7e;
+  --body-loud-color: #fdf8ec;
+
+  --header-color: #ece6d5;
+  --header-branding-color: #eec33d;
+  --header-bg: #1b1911;
+  --header-link-color: #a49b7e;
+
+  --breadcrumbs-fg: #a49b7e;
+  --breadcrumbs-link-fg: #ece6d5;
+  --breadcrumbs-bg: #1b1911;
+
+  --link-fg: #e5bd3f;
+  --link-hover-color: #eec33d;
+  --link-selected-fg: #e5bd3f;
+
+  --hairline-color: #2a271b;
+  --border-color: #383322;
+
+  --error-fg: #e6907a;
+  --message-success-bg: #1d2416;
+  --message-warning-bg: #2c2413;
+  --message-error-bg: #2e1a14;
+
+  --darkened-bg: #1d1b13;
+  --selected-bg: #2a2517;
+  --selected-row: #221f14;
+
+  --button-fg: #312f17;
+  --button-bg: #ea9d3e;
+  --button-hover-bg: #e5ac3f;
+  --default-button-bg: #ea9d3e;
+  --default-button-hover-bg: #e5ac3f;
+  --close-button-bg: #4a442e;
+  --close-button-hover-bg: #6b6244;
+  --delete-button-bg: #a8452a;
+  --delete-button-hover-bg: #c05334;
+
+  --object-tools-fg: #312f17;
+  --object-tools-bg: #ea9d3e;
+  --object-tools-hover-bg: #e5ac3f;
+
+  --hc-panel-head-bg: #1d1b13;
+  --hc-sidebar-bg: #1b1911;
+  --hc-shadow: none;
+  --hc-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --hc-icon-filter: grayscale(1) invert(1) opacity(0.7);
+}
+
+/* data-theme="auto" follows the OS, and dark_mode.css covers that case with a
+   bare `:root` inside this same media query -- so every dark value has to be
+   repeated here, or auto-plus-dark-OS is the one combination still wearing the
+   stock palette. `:root` is included for the moment before the theme script has
+   stamped an attribute; an explicit light choice still outranks it. */
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"],
+  :root {
+    --hc-tint-soft: rgba(234, 157, 62, 0.10);
+    --hc-tint: rgba(234, 157, 62, 0.16);
+    --hc-ring: rgba(234, 157, 62, 0.32);
+
+    --primary: #ea9d3e;
+    --secondary: #d98c2d;
+    --accent: #eec33d;
+    --primary-fg: #312f17;
+
+    --body-bg: #17160f;
+    --body-fg: #ece6d5;
+    --body-quiet-color: #a49b7e;
+    --body-loud-color: #fdf8ec;
+
+    --header-color: #ece6d5;
+    --header-branding-color: #eec33d;
+    --header-bg: #1b1911;
+    --header-link-color: #a49b7e;
+
+    --breadcrumbs-fg: #a49b7e;
+    --breadcrumbs-link-fg: #ece6d5;
+    --breadcrumbs-bg: #1b1911;
+
+    --link-fg: #e5bd3f;
+    --link-hover-color: #eec33d;
+    --link-selected-fg: #e5bd3f;
+
+    --hairline-color: #2a271b;
+    --border-color: #383322;
+
+    --error-fg: #e6907a;
+    --message-success-bg: #1d2416;
+    --message-warning-bg: #2c2413;
+    --message-error-bg: #2e1a14;
+
+    --darkened-bg: #1d1b13;
+    --selected-bg: #2a2517;
+    --selected-row: #221f14;
+
+    --button-fg: #312f17;
+    --button-bg: #ea9d3e;
+    --button-hover-bg: #e5ac3f;
+    --default-button-bg: #ea9d3e;
+    --default-button-hover-bg: #e5ac3f;
+    --close-button-bg: #4a442e;
+    --close-button-hover-bg: #6b6244;
+    --delete-button-bg: #a8452a;
+    --delete-button-hover-bg: #c05334;
+
+    --object-tools-fg: #312f17;
+    --object-tools-bg: #ea9d3e;
+    --object-tools-hover-bg: #e5ac3f;
+
+    --hc-panel-head-bg: #1d1b13;
+    --hc-sidebar-bg: #1b1911;
+    --hc-shadow: none;
+    --hc-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --hc-icon-filter: grayscale(1) invert(1) opacity(0.7);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Type
+   -------------------------------------------------------------------------- */
+
+body {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#content > h1,
+.dashboard #content > h1 {
+  margin: 0 0 var(--hc-title-gap) 0;
+  /* 1.5rem at the body's 1.5 line-height is --hc-title-line exactly; the Add
+     button's pull-up is derived from it. */
+  font-size: 1.5rem;
+  line-height: 1.5;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--body-loud-color);
+}
+
+#content > h2,
+#content-main > h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--body-loud-color);
+}
+
+/* Django's .small / .quiet / .tiny are the same idea three times over. */
+.small,
+.quiet,
+.tiny,
+.mini {
+  color: var(--body-quiet-color);
+}
+
+/* --------------------------------------------------------------------------
+   Shell
+
+   A paper-coloured header on a paper-coloured page has nothing to separate it
+   from the content, so the hairline the stock coloured slab never needed
+   becomes load-bearing.
+   -------------------------------------------------------------------------- */
+
+#header {
+  padding: 14px 40px;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: none;
+}
+
+#site-name a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+/* The header shrinks its own text on narrow screens; the mark holds its size so
+   it stays legible next to it. */
+.hc-mark {
+  flex: none;
+}
+
+/* Stock renders these as uppercase 0.6875rem split by hard slashes -- six
+   shouted fragments for what is one quiet row of links. */
+#user-tools {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--body-quiet-color);
+}
+
+#user-tools a,
+#logout-form button {
+  border-bottom: none;
+  color: var(--body-quiet-color);
+  font-size: 0.8125rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#user-tools a:hover,
+#user-tools a:focus,
+#logout-form button:hover {
+  color: var(--body-loud-color);
+  text-decoration: underline;
+}
+
+div.breadcrumbs {
+  padding: 12px 40px;
+  border-bottom: 1px solid var(--hairline-color);
+  font-size: 0.8125rem;
+  color: var(--breadcrumbs-fg);
+}
+
+/* Keyboard users hit this first on every page; stock leaves it unstyled. */
+.skip-to-content-link {
+  border-radius: var(--hc-radius-sm);
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
+}
+
+/* --------------------------------------------------------------------------
+   Icon rail
+
+   Deliberately a copy of the app's rail (frontend/app/dashboard/dashboard.css,
+   `.dash-rail`) down to the 60px column, the 40px cells and the tooltip that
+   slides out on the right -- crossing from /dashboard into /admin should not
+   change what the navigation looks like.
+
+   Keyed on .hc-rail, not #nav-sidebar: templates/admin/nav_sidebar.html renames
+   the element so Django's nav_sidebar.js and nav_sidebar.css both let go of it.
+   Nothing collapses, so there is no toggle and no shifted/unshifted state.
+   -------------------------------------------------------------------------- */
+
+.hc-rail {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  flex: 0 0 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 60px;
+  /* One viewport tall and stuck to the top, so the rail is always fully in view
+     on a long change list without ever scrolling itself.
+
+     No overflow: a scroll container clips absolutely positioned children, so
+     `overflow: auto` here would put a scrollbar inside a 60px column *and* cut
+     every tooltip off at its edge. */
+  height: 100vh;
+  padding: 12px 0 16px 0;
+  border-right: 1px solid var(--border-color);
+  background: var(--hc-sidebar-bg);
+}
+
+.hc-rail-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hc-rail-cell {
+  display: block;
+}
+
+/* Pushes the trailing group to the far end of the rail. */
+.hc-rail-divider {
+  width: 26px;
+  height: 1px;
+  margin-top: auto;
+  margin-bottom: 12px;
+  background: var(--border-color);
+}
+
+.hc-rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--body-quiet-color);
+  text-decoration: none;
+  transition: background-color var(--hc-ease), color var(--hc-ease);
+}
+
+.hc-rail-item:hover {
+  background: var(--hc-tint-soft);
+  color: var(--body-loud-color);
+}
+
+.hc-rail-item:focus-visible {
+  outline: 2px solid var(--hc-amber-500);
+  outline-offset: 2px;
+}
+
+.hc-rail-item[aria-current="page"] {
+  background: var(--hc-tint);
+  color: var(--hc-amber-deep);
+}
+
+html[data-theme="dark"] .hc-rail-item[aria-current="page"] {
+  color: var(--hc-amber-300);
+}
+
+/* The marker against the rail's edge. */
+.hc-rail-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--hc-amber-500);
+  transform: translateY(-50%);
+}
+
+.hc-rail-icon {
+  flex: none;
+}
+
+/* Tooltip. The rail shows icons only, so this is the only place a section name
+   is visible -- it has to reach anyone who can see, including a keyboard user
+   on a touchscreen laptop where (pointer: fine) is false. So the box exists
+   unconditionally and appears on focus-visible unconditionally; only the hover
+   reveal is gated, which is what stops a tap leaving a label stuck open.
+
+   Absolutely positioned, so showing it can never move the rail. */
+.hc-rail-tip {
+  display: block;
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 30;
+  padding: 4px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-xs);
+  background: var(--body-bg);
+  color: var(--body-fg);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-4px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.hc-rail-item:focus-visible .hc-rail-tip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hc-rail-item:hover .hc-rail-tip {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* nav_sidebar.css sizes .content against the 275px sidebar it no longer sits
+   next to. */
+.main > #hc-rail + .content,
+.main.shifted > #hc-rail + .content {
+  max-width: calc(100% - 60px);
+}
+
+/* --------------------------------------------------------------------------
+   Panels
+
+   The stock dashboard puts each app in a table whose caption is a full-width
+   filled slab. Against any palette that slab is a saturated bar with text
+   fighting it -- the variables alone cannot fix it, because the fix is to stop
+   filling it at all.
+   -------------------------------------------------------------------------- */
+
+.module {
+  margin-bottom: 22px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--body-bg);
+  box-shadow: var(--hc-shadow);
+  overflow: hidden;
+}
+
+.module > h2,
+.module caption,
+.inline-group h2 {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.module caption a,
+.module > h2 a {
+  color: inherit;
+}
+
+.module table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.module table tr th,
+.module table tr td {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--hairline-color);
+  font-size: 0.875rem;
+}
+
+.module table tr:last-child th,
+.module table tr:last-child td {
+  border-bottom: none;
+}
+
+/* dashboard.css sizes these with two classes, so the skin has to match that
+   shape to land. */
+.dashboard .module table th,
+.dashboard .module table td {
+  padding: 11px 18px;
+}
+
+.dashboard .module table tr:hover td,
+.dashboard .module table tr:hover th {
+  background: var(--darkened-bg);
+}
+
+.dashboard .module table th a {
+  font-weight: 500;
+  color: var(--body-fg);
+}
+
+.dashboard .module table th a:hover {
+  color: var(--hc-amber-deep);
+}
+
+/* The add/change links sit at the row's end as quiet actions, not as two
+   competing coloured icons. */
+.dashboard .module table td a {
+  color: var(--body-quiet-color);
+  font-size: 0.8125rem;
+}
+
+.dashboard .module table td a:hover {
+  color: var(--body-loud-color);
+}
+
+/* Stock fills the sidebar column and blanks the panel inside it, the opposite
+   of every other panel on the page. Swapping the two makes Recent actions read
+   as the same card as the app lists beside it. These selectors carry the
+   #content-related prefix because the stock rules do -- an id beats any number
+   of classes regardless of source order. */
+#content-related {
+  background: none;
+}
+
+#content-related .module {
+  background: var(--body-bg);
+}
+
+#content-related .module h2 {
+  margin-bottom: 0;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#content-related h3 {
+  margin: 16px 18px 10px 18px;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--body-fg);
+}
+
+#content-related p,
+#content-related .actionlist {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+#content-related .actionlist {
+  margin: 0 0 16px 0;
+}
+
+#content-related .actionlist li {
+  padding-left: 0;
+  margin-bottom: 8px;
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+/* --------------------------------------------------------------------------
+   Controls
+
+   Three button roles and one shape between them, because the stock admin gives
+   every button in a submit row the same filled treatment -- Save, Save and add
+   another, Save and continue -- so three equal calls to action shout at each
+   other and none of them wins.
+
+     primary    amber fill, ink label. One per view: the thing you came to do.
+     secondary  outlined, transparent. Everything else.
+     danger     the delete red, and only ever on delete.
+
+   Django does not label them that way, so the selectors below map its markup
+   onto the roles: .default and .object-tools links are primary, a bare
+   .submit-row input is secondary, anything delete-flavoured is danger.
+   -------------------------------------------------------------------------- */
+
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+.submit-row a,
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--hc-radius-sm);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--hc-ease), border-color var(--hc-ease),
+    color var(--hc-ease);
+}
+
+/* Primary. */
+.button.default,
+input[type="submit"].default,
+.submit-row input.default {
+  background: var(--default-button-bg);
+  color: var(--button-fg);
+  font-weight: 600;
+  /* forms.css shouts only this one button, so a submit row ends up reading
+     SAVE / Save and add another / Save and continue editing. */
+  text-transform: none;
+}
+
+.button.default:hover,
+input[type="submit"].default:hover,
+.submit-row input.default:hover {
+  background: var(--default-button-hover-bg);
+}
+
+/* Secondary: outlined, so the primary keeps the only fill on the row. */
+.submit-row a.closelink,
+.submit-row input:not(.default):not([name="_delete"]),
+.button:not(.default):not(.deletelink) {
+  border-color: var(--border-color);
+  background: var(--body-bg);
+  color: var(--body-fg);
+}
+
+.submit-row a.closelink:hover,
+.submit-row input:not(.default):not([name="_delete"]):hover,
+.button:not(.default):not(.deletelink):hover {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+  color: var(--body-loud-color);
+}
+
+/* Danger. */
+.button.deletelink,
+.deletelink-box a,
+.submit-row a.deletelink,
+.delete-confirmation form input[type="submit"] {
+  height: 36px;
+  padding: 0 16px;
+  border-color: transparent;
+  border-radius: var(--hc-radius-sm);
+  background: var(--delete-button-bg);
+  color: #fffdf8;
+  line-height: 36px;
+}
+
+.button.deletelink:hover,
+.deletelink-box a:hover,
+.submit-row a.deletelink:hover,
+.delete-confirmation form input[type="submit"]:hover {
+  background: var(--delete-button-hover-bg);
+  color: #fffdf8;
+}
+
+/* The cancel beside a delete is stock-filled in the same weight as the delete
+   itself, so the destructive choice and the safe one look equally likely. */
+.delete-confirmation form .cancel-link {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  color: var(--body-fg);
+  line-height: 34px;
+}
+
+.delete-confirmation form .cancel-link:hover,
+.delete-confirmation form .cancel-link:focus {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+  color: var(--body-loud-color);
+}
+
+/* One focus treatment for everything focusable, in the brand amber. The admin
+   ships a mix of outlines and none at all. */
+.button:focus-visible,
+input[type="submit"]:focus-visible,
+input[type="button"]:focus-visible,
+a.button:focus-visible,
+.object-tools a:focus-visible,
+.hc-rail-item:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--hc-amber-500);
+  outline-offset: 2px;
+}
+
+.object-tools a,
+.object-tools a:link,
+.object-tools a:visited {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--hc-radius-sm);
+  background: var(--object-tools-bg);
+  color: var(--object-tools-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background-color var(--hc-ease);
+}
+
+.object-tools a:hover,
+.object-tools a:focus {
+  background: var(--object-tools-hover-bg);
+  color: var(--object-tools-fg);
+}
+
+/* ---- Fields ---- */
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="tel"],
+input[type="search"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select,
+.vTextField {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  color: var(--body-fg);
+  font-family: inherit;
+  font-size: 0.875rem;
+  transition: border-color var(--hc-ease), box-shadow var(--hc-ease);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="search"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus,
+.vTextField:focus {
+  outline: none;
+  border-color: var(--hc-amber-500);
+  box-shadow: 0 0 0 3px var(--hc-ring);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--body-quiet-color);
+}
+
+/* Native selects render in OS chrome, the one control that cannot be talked
+   into matching anything else.
+
+   :not([multiple]) on every chevron rule, including the dark ones. A multi
+   select has no closed state to point at, and `.selector select` later uses the
+   `background` shorthand -- which resets background-size to auto, so a
+   dark-theme rule that re-added only background-image scaled the arrow up to
+   fill the whole filter_horizontal box. */
+select:not([multiple]) {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7357' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+}
+
+select[multiple] {
+  height: auto;
+  padding: 6px;
+}
+
+html[data-theme="dark"] select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a49b7e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] select:not([multiple]),
+  :root select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a49b7e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}
+
+/* One line instead of a hand-drawn control: the native box keeps its focus
+   ring, its indeterminate state and its platform behaviour. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--hc-amber-500);
+}
+
+.help,
+div.help,
+p.help,
+.help-tooltip {
+  font-size: 0.75rem;
+  color: var(--body-quiet-color);
+}
+
+/* --------------------------------------------------------------------------
+   Change list
+
+   The busiest page in the admin and the one with the most stock furniture: a
+   search form, an action bar, the results table and -- in stock -- a 270px
+   filter gutter taken off the table at every width.
+
+   The filters move to a row of dropdown chips above the table. See the Filter
+   bar section for how, and why it takes four rules rather than one.
+   -------------------------------------------------------------------------- */
+
+/* #changelist is a flex container holding the results and the filters, and it
+   carries class="module" -- so the panel rules above drew one card around both.
+   The card belongs on the results container. */
+#changelist.module {
+  border: none;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+#changelist .changelist-form-container {
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--body-bg);
+  box-shadow: var(--hc-shadow);
+  overflow: hidden;
+}
+
+/* ---- Search ---- */
+
+#changelist #toolbar {
+  padding: 14px 18px;
+  border: none;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+}
+
+/* Stock lays the icon, the field and the button out as three inline siblings,
+   so the magnifier floats loose to the left of the box. Anchoring it over the
+   field is what makes this read as one control -- the same shape as the app's
+   top-bar search. */
+#changelist-search > div {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: none;
+}
+
+#changelist-search label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  display: flex;
+  transform: translateY(-50%);
+  /* Decoration on top of the input; the click belongs to the field under it. */
+  pointer-events: none;
+}
+
+#changelist-search label img {
+  width: 15px;
+  height: 15px;
+}
+
+/* responsive.css sets `#toolbar form #searchbar` at (2,0,1) inside its 1024px
+   query, so the skin matches that shape rather than the plain id. */
+#changelist #toolbar form #searchbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 36px;
+  margin: 0;
+  padding-left: 34px;
+}
+
+#changelist #toolbar input[type="submit"] {
+  flex: none;
+  height: 36px;
+  border-color: var(--border-color);
+  background: var(--body-bg);
+  color: var(--body-fg);
+}
+
+#changelist #toolbar input[type="submit"]:hover {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+}
+
+#toolbar #changelist-search .quiet {
+  color: var(--body-quiet-color);
+  font-size: 0.8125rem;
+}
+
+/* ---- Action bar ---- */
+
+.changelist-form-container .actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border: none;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--body-bg);
+}
+
+.changelist-form-container .actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--body-quiet-color);
+}
+
+.changelist-form-container .actions .button {
+  height: 34px;
+  padding: 0 14px;
+  border-color: var(--border-color);
+  background: var(--body-bg);
+  color: var(--body-fg);
+  font-size: 0.8125rem;
+}
+
+.changelist-form-container .actions .button:hover {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+}
+
+.changelist-form-container .actions .action-counter,
+.changelist-form-container .actions .all,
+.changelist-form-container .actions .question,
+.changelist-form-container .actions .clear {
+  font-size: 0.8125rem;
+  color: var(--body-quiet-color);
+}
+
+/* Django hides the bar until a row is ticked; without this the flex display
+   above would override that and leave a stray divider under the search box. */
+.changelist-form-container .actions.hidden {
+  display: none;
+}
+
+/* ---- Results ---- */
+
+#changelist table thead th {
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--hc-panel-head-bg);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--body-quiet-color);
+}
+
+/* The header cell's padding lives on the inner link so the whole cell is the
+   sort target rather than just the words. */
+#changelist table thead th > .text > a,
+#changelist table thead th > .text > span,
+#changelist table thead th > span,
+#changelist table thead th > a {
+  display: block;
+  padding: 11px 18px;
+}
+
+#changelist table thead th.action-checkbox-column {
+  width: 44px;
+}
+
+#changelist tbody td,
+#changelist tbody th {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hairline-color);
+  vertical-align: middle;
+}
+
+#changelist tbody tr:last-child > td,
+#changelist tbody tr:last-child > th {
+  border-bottom: none;
+}
+
+#changelist tbody tr:hover > td,
+#changelist tbody tr:hover > th {
+  background: var(--darkened-bg);
+}
+
+#changelist tbody tr.selected > td,
+#changelist tbody tr.selected > th {
+  background: var(--hc-tint-soft);
+}
+
+#changelist tbody th a,
+#changelist tbody td a {
+  font-weight: 500;
+}
+
+.paginator {
+  padding: 12px 18px;
+  border-top: 1px solid var(--hairline-color);
+  border-bottom: none;
+  background: var(--body-bg);
+  font-size: 0.8125rem;
+  color: var(--body-quiet-color);
+}
+
+.paginator a:link,
+.paginator a:visited,
+.paginator .this-page {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--hc-radius-xs);
+  background: none;
+  color: var(--body-fg);
+}
+
+.paginator a:hover {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+}
+
+.paginator .this-page {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Filter bar
+
+   Stock puts the filters in a rigid 240px column to the right of the table
+   (200px below 1024px) plus a 30px margin -- 270px taken off the table at every
+   width, for a control most people touch once. They move above the table as a
+   row of dropdown chips.
+
+   Getting them there takes four coordinated rules, not one:
+
+     order: -1        The real lever. changelists.css:136 sets `order: 1`, which
+                      pins the filters LAST whatever the direction is. Stock's
+                      own <=767px breakpoint already sets flex-direction: column
+                      and the filters still land under the table -- proof that
+                      direction alone does nothing.
+     flex: 0 0 auto   In a column-direction flex container flex-basis maps to
+                      HEIGHT, so the stock `flex: 0 0 240px` becomes a 240px
+                      tall slab.
+     align-items      Column direction makes align-items govern the horizontal
+                      axis, so the stock `flex-start` shrink-wraps both children
+                      and the table stops being full-bleed. Must be stretch.
+     min-height: 0    `.change-list .filtered { min-height: 400px }` sits on this
+                      same element, and with justify-content: space-between it
+                      pushes a gap between the bar and the table.
+
+   The chips are <details>/<summary>, a disclosure widget already -- no script
+   needed to open and close them. templates/admin/filter.html drops stock's
+   unconditional `open` so they start closed.
+   -------------------------------------------------------------------------- */
+
+#changelist,
+.change-list .filtered {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 0;
+}
+
+#changelist #changelist-filter {
+  order: -1;
+  flex: 0 0 auto;
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: none;
+  margin: 0 0 16px 0;
+  padding: 0;
+  border: none;
+  background: none;
+  overflow: visible;
+}
+
+/* "Filter" becomes a quiet label at the head of the row rather than a slab. */
+#changelist #changelist-filter h2 {
+  margin: 0 4px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#changelist #changelist-filter > details {
+  position: relative;
+  margin: 0;
+  border: none;
+}
+
+/* The chip. */
+#changelist #changelist-filter details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--body-bg);
+  color: var(--body-fg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+  transition: border-color var(--hc-ease), background-color var(--hc-ease);
+}
+
+#changelist #changelist-filter details > summary:hover,
+#changelist #changelist-filter details[open] > summary {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint-soft);
+}
+
+/* A chip whose active choice is not the leading "All" is a filter actually
+   doing something. :has() reads that off the markup, which is the only way to
+   know it here -- filter.html renders with a bare three-name context and cannot
+   see the request. Browsers without :has() simply do not get the highlight. */
+#changelist #changelist-filter details:has(li.selected:not(:first-child)) > summary {
+  border-color: var(--hc-amber-500);
+  background: var(--hc-tint);
+  color: var(--body-loud-color);
+  font-weight: 600;
+}
+
+/* Stock's indicator is a literal arrow character in the link-hover colour,
+   which lands in whatever the body font has for that code point and swaps glyph
+   when the section opens. A rotated corner is the same shape in every font and
+   it can animate. Stock's [open] rule is (1,1,1), so this one matches it or the
+   arrow comes back. */
+#changelist #changelist-filter details > summary::before {
+  content: "";
+  flex: none;
+  order: 2;
+  width: 5px;
+  height: 5px;
+  margin-left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px);
+  opacity: 0.6;
+  transition: transform var(--hc-ease);
+}
+
+#changelist #changelist-filter details[open] > summary::before {
+  content: "";
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+#changelist #changelist-filter details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The popover. */
+#changelist #changelist-filter details > ul,
+#changelist #changelist-filter details > ul:last-child {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 190px;
+  max-width: 320px;
+  max-height: 300px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  box-shadow: var(--hc-popover-shadow);
+  overflow-y: auto;
+}
+
+#changelist #changelist-filter li {
+  margin: 0;
+  padding: 0;
+  border: none;
+  list-style: none;
+}
+
+#changelist #changelist-filter li a {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--hc-radius-xs);
+  color: var(--body-fg);
+  font-size: 0.8125rem;
+  word-break: break-word;
+}
+
+#changelist #changelist-filter li a:hover,
+#changelist #changelist-filter li a:focus {
+  background: var(--hc-tint-soft);
+  color: var(--body-loud-color);
+}
+
+/* Stock marks the selection with a 5px border and margin-left: -15px, poking
+   deliberately outside the old column's padding. Inside a rounded popover that
+   bar hangs off the edge. */
+#changelist #changelist-filter li.selected {
+  border-left: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+#changelist #changelist-filter li.selected a {
+  background: var(--hc-tint);
+  color: var(--body-loud-color);
+  font-weight: 600;
+}
+
+/* "Clear all filters" -- stock's highest-specificity selector in that file, two
+   ids, so it takes two here as well. */
+#changelist #changelist-filter #changelist-filter-clear {
+  margin: 0;
+  padding: 0;
+}
+
+#changelist #changelist-filter #changelist-filter-clear a {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--body-quiet-color);
+  font-size: 0.8125rem;
+}
+
+#changelist #changelist-filter #changelist-filter-clear a:hover {
+  border-color: var(--border-color);
+  background: var(--darkened-bg);
+  color: var(--body-loud-color);
+}
+
+/* ---- Add button ---- */
+
+/* Stock floats this right with a -48px top margin to sit it level with the h1.
+   The float is the problem: #changelist is its own formatting context, so it
+   shrinks away from the float instead of running under it, pulling the whole
+   card narrower than the page. Without the float the card gets its width back,
+   and the row still sits on the heading's line. */
+#content-main > .object-tools {
+  float: none;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 14px 0;
+}
+
+/* Pulled up level with the heading, and only on the change list -- there the h1
+   is the last thing above the button. A change form puts the object's name in an
+   h2 between the two, so the same pull-up would land the button on that instead;
+   it keeps its own row there.
+
+   The distance is not a guess. #content-main is floated, so no margins collapse
+   between the h1 and this row: the button's top is the h1's top plus the
+   heading's line box plus the gap under it. Cancelling exactly that sum puts the
+   two on the same line, and both terms are declared above rather than baked in
+   here -- an earlier -46px left the button 12px low and clipping the card. */
+.change-list #content-main > .object-tools {
+  margin-top: calc(-1 * (var(--hc-title-line) + var(--hc-title-gap)));
+}
+
+/* base.css floats each tool and hangs a 5px left margin off it, which inside a
+   flex row shows up as an uneven gap before the first button. */
+.object-tools li {
+  float: none;
+  height: auto;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Change form
+   -------------------------------------------------------------------------- */
+
+.form-row {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--hairline-color);
+}
+
+fieldset.module .form-row:last-child {
+  border-bottom: none;
+}
+
+.aligned label {
+  font-weight: 500;
+  color: var(--body-fg);
+}
+
+.aligned .form-row input,
+.aligned .form-row select,
+.aligned .form-row textarea {
+  max-width: 100%;
+}
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  margin: 22px 0 0 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--hc-panel-head-bg);
+}
+
+/* Stock pushes delete to the right with a float; a flex row does it without one
+   and keeps the vertical alignment honest. */
+.submit-row a.deletelink,
+.submit-row .deletelink-box {
+  margin-left: auto;
+}
+
+.errornote {
+  display: block;
+  padding: 12px 16px;
+  border: 1px solid var(--error-fg);
+  border-radius: var(--hc-radius-sm);
+  background: var(--message-error-bg);
+  color: var(--error-fg);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+ul.errorlist {
+  margin: 0 0 8px 0;
+  padding: 0;
+  color: var(--error-fg);
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.form-row.errors {
+  background: var(--message-error-bg);
+}
+
+/* The little add/change/delete/view links beside a related field. */
+.related-widget-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.related-widget-wrapper-link {
+  opacity: 0.75;
+  transition: opacity var(--hc-ease);
+}
+
+.related-widget-wrapper-link:hover {
+  opacity: 1;
+}
+
+/* ---- Inlines ---- */
+
+.inline-group {
+  margin-bottom: 22px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--body-bg);
+  overflow: hidden;
+}
+
+.inline-related h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.inline-related h3 span.delete {
+  margin-left: auto;
+  font-weight: 400;
+}
+
+.inline-group .tabular tr.add-row td,
+.inline-group ul.tools a.add {
+  padding: 10px 18px;
+  background: var(--darkened-bg);
+  font-size: 0.8125rem;
+}
+
+.inline-group .tabular td.original p {
+  color: var(--body-quiet-color);
+  font-size: 0.75rem;
+}
+
+/* --------------------------------------------------------------------------
+   Widgets
+
+   Everything below is drawn by a script at runtime, so the class names come
+   from calendar.js / DateTimeShortcuts.js / SelectFilter2.js rather than from a
+   template. Getting one wrong fails silently.
+   -------------------------------------------------------------------------- */
+
+/* ---- Calendar and clock popups ---- */
+
+.calendarbox,
+.clockbox {
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  box-shadow: var(--hc-popover-shadow);
+  overflow: hidden;
+}
+
+/* widgets.css paints this from --accent with a hardcoded #333 label. --accent is
+   the wordmark colour in this skin -- dark ink in light mode -- so left alone
+   the caption is dark text on a dark bar. */
+.calendar caption,
+.calendarbox h2 {
+  padding: 8px 0;
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.calendar th {
+  padding: 6px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.calendar td a,
+.timelist a {
+  padding: 6px;
+  border-radius: var(--hc-radius-xs);
+  color: var(--body-fg);
+}
+
+.calendar td a:hover,
+.timelist a:hover,
+.calendar td a:active,
+.timelist a:active {
+  background: var(--hc-tint);
+  color: var(--body-loud-color);
+}
+
+.calendar td.selected a {
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
+}
+
+.calendar td.today a {
+  font-weight: 700;
+  color: var(--hc-amber-deep);
+}
+
+.calendar td.nonday {
+  background: var(--darkened-bg);
+}
+
+.calendarnav,
+.calendar-shortcuts {
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.75rem;
+}
+
+.calendar-cancel,
+.calendar-cancel a {
+  background: var(--darkened-bg);
+  color: var(--body-fg);
+}
+
+.calendar-cancel:hover,
+.calendar-cancel:focus {
+  background: var(--hc-tint-soft);
+}
+
+/* ---- filter_horizontal ---- */
+
+.selector-available,
+.selector-chosen {
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  overflow: hidden;
+}
+
+.selector-available h2,
+.selector-chosen h2 {
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.selector .selector-filter {
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--body-bg);
+}
+
+.selector select {
+  border: none;
+  border-radius: 0;
+  background: var(--body-bg);
+}
+
+.selector-add,
+.selector-remove,
+.selector-chooseall,
+.selector-clearall {
+  border-radius: var(--hc-radius-xs);
+}
+
+/* ---- Autocomplete (select2) ---- */
+
+/* select2's sheet is vendored and uses none of Django's variables, so every
+   surface it paints has to be named here or the dropdown stays white-on-white
+   in dark mode. Both theme namespaces are covered: Django's widgets set
+   data-theme="admin-autocomplete", but select2 initialised by any other code
+   falls back to --default. */
+.select2-container--admin-autocomplete .select2-selection,
+.select2-container--default .select2-selection {
+  min-height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  color: var(--body-fg);
+}
+
+.select2-container--admin-autocomplete.select2-container--focus .select2-selection,
+.select2-container--default.select2-container--focus .select2-selection {
+  border-color: var(--hc-amber-500);
+  box-shadow: 0 0 0 3px var(--hc-ring);
+}
+
+.select2-container--admin-autocomplete .select2-selection__rendered,
+.select2-container--default .select2-selection__rendered {
+  color: var(--body-fg);
+  line-height: 34px;
+}
+
+.select2-dropdown {
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-sm);
+  background: var(--body-bg);
+  box-shadow: var(--hc-popover-shadow);
+}
+
+.select2-container--admin-autocomplete .select2-results__option--highlighted[aria-selected],
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background: var(--hc-tint);
+  color: var(--body-loud-color);
+}
+
+.select2-container--admin-autocomplete .select2-results__option[aria-selected="true"],
+.select2-container--default .select2-results__option[aria-selected="true"] {
+  background: var(--selected-bg);
+  color: var(--body-loud-color);
+}
+
+.select2-search--dropdown .select2-search__field {
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius-xs);
+  background: var(--body-bg);
+  color: var(--body-fg);
+}
+
+.select2-container--admin-autocomplete .select2-selection--multiple .select2-selection__choice,
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+  border: 1px solid var(--hc-amber-500);
+  border-radius: var(--hc-radius-xs);
+  background: var(--hc-tint);
+  color: var(--body-fg);
+}
+
+/* --------------------------------------------------------------------------
+   Messages, delete confirmation, history
+   -------------------------------------------------------------------------- */
+
+ul.messagelist {
+  padding: 0;
+}
+
+/* Stock hangs a fixed-colour icon in the background of each level. A coloured
+   left edge says the same thing and survives a palette change. */
+ul.messagelist li {
+  display: flex;
+  align-items: center;
+  margin: 0 40px 12px 40px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--hc-amber-500);
+  border-radius: var(--hc-radius-sm);
+  background: var(--darkened-bg);
+  background-image: none;
+  color: var(--body-fg);
+  font-size: 0.875rem;
+}
+
+ul.messagelist li.warning {
+  border-left-color: var(--hc-amber-300);
+  background: var(--message-warning-bg);
+  background-image: none;
+}
+
+ul.messagelist li.error {
+  border-left-color: var(--error-fg);
+  background: var(--message-error-bg);
+  background-image: none;
+  color: var(--error-fg);
+}
+
+/* Scoped to #content: the header's logout control is also a <form>, and a bare
+   `.delete-confirmation form` dressed it up as a panel in the top right. */
+.delete-confirmation #content form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  margin-top: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--hc-panel-head-bg);
+}
+
+.delete-confirmation #content form .cancel-link {
+  margin: 0;
+}
+
+/* The history table is a plain .module table; it only needs its head to match
+   the change list's. */
+#change-history thead th {
+  padding: 11px 18px;
+  background: var(--hc-panel-head-bg);
+  color: var(--body-quiet-color);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#change-history tbody td {
+  padding: 12px 18px;
+}
+
+/* --------------------------------------------------------------------------
+   Login and password change
+
+   One centred card. Stock gives it a 28em box; without the coloured strip it
+   needs its own border to read as a card at all.
+   -------------------------------------------------------------------------- */
+
+body.login {
+  background: var(--darkened-bg);
+}
+
+body.login #container {
+  width: 25rem;
+  max-width: calc(100vw - 32px);
+  min-width: 0;
+  margin-top: 8vh;
+  border: 1px solid var(--border-color);
+  border-radius: var(--hc-radius);
+  background: var(--body-bg);
+  box-shadow: var(--hc-shadow);
+  overflow: hidden;
+}
+
+body.login #header {
+  padding: 20px 28px;
+  justify-content: center;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--body-bg);
+}
+
+body.login #content {
+  padding: 24px 28px 28px 28px;
+}
+
+body.login .form-row {
+  padding: 0 0 16px 0;
+  border-bottom: none;
+}
+
+body.login .form-row label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+body.login .form-row input,
+body.login .form-row #id_username,
+body.login .form-row #id_password {
+  width: 100%;
+  box-sizing: border-box;
+  height: 38px;
+}
+
+body.login .submit-row {
+  display: block;
+  padding: 4px 0 0 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+/* Django's login submit carries no .default class, so the outlined secondary
+   rule claimed the one button on the page that is unambiguously primary. */
+body.login .submit-row input[type="submit"] {
+  width: 100%;
+  height: 40px;
+  border-color: transparent;
+  background: var(--default-button-bg);
+  color: var(--button-fg);
+  font-weight: 600;
+  text-transform: none;
+}
+
+body.login .submit-row input[type="submit"]:hover {
+  background: var(--default-button-hover-bg);
+}
+
+body.login .password-reset-link {
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
+/* --------------------------------------------------------------------------
+   Icons
+
+   Around twenty SVGs under admin/img/ have their fill baked in -- a green tick
+   (#70bf2b), a red cross (#dd4646), blue chevrons (#447e9b), a white plus
+   (#ffffff). No custom property reaches inside a file, so each one is either
+   dropped or filtered to a neutral that works on both grounds.
+
+   `filter` rather than `mask`: these are background-images on elements that
+   also carry text, and a mask would clip the text with them. Filter on an
+   icon-only element is exact; on a text-bearing one the image comes off
+   instead.
+   -------------------------------------------------------------------------- */
+
+/* Text links that carried a coloured glyph: the words already say it. */
+.addlink,
+.changelink,
+.inlinechangelink,
+.deletelink,
+.viewlink,
+.inlineviewlink,
+.dashboard .module table td a.addlink,
+.dashboard .module table td a.changelink {
+  padding-left: 0;
+  background-image: none;
+}
+
+/* tooltag-add.svg and tooltag-arrowright.svg are pure white glyphs that only
+   ever worked against stock's grey object-tools bar. On amber they vanish. */
+.object-tools a.addlink,
+.object-tools a.viewsitelink {
+  padding-right: 16px;
+  background-image: none;
+}
+
+/* Icon-only controls: filtered in place. */
+.sortoptions a,
+.selector-add,
+.selector-remove,
+.selector-chooseall,
+.selector-clearall,
+.selector .help-icon,
+.datetimeshortcuts .clock-icon,
+.datetimeshortcuts .date-icon,
+.inline-deletelink,
+.calendarnav-previous,
+.calendarnav-next,
+.related-widget-wrapper-link,
+#changelist-search label img {
+  filter: var(--hc-icon-filter);
+}
+
+.sortoptions a:hover,
+.selector-add:hover,
+.selector-remove:hover,
+.inline-deletelink:hover,
+.datetimeshortcuts a:hover .clock-icon,
+.datetimeshortcuts a:hover .date-icon {
+  filter: grayscale(1) opacity(1);
+}
+
+html[data-theme="dark"] .sortoptions a:hover,
+html[data-theme="dark"] .selector-add:hover,
+html[data-theme="dark"] .selector-remove:hover,
+html[data-theme="dark"] .inline-deletelink:hover {
+  filter: grayscale(1) invert(1) opacity(1);
+}
+
+/* Booleans keep their tick and cross -- the shapes carry the meaning -- but not
+   their green and red, the only two hues on the page belonging to no palette. */
+td img[src*="/admin/img/icon-"] {
+  width: 14px;
+  height: 14px;
+  filter: var(--hc-icon-filter);
+}
+
+/* icon-alert.svg is already #efb80b, near enough to the brand amber to keep. */
+td img[src$="icon-alert.svg"],
+ul.messagelist img {
+  filter: none;
+}
+
+/* --------------------------------------------------------------------------
+   Loading cover
+
+   The same seven-cell ripple the app shows while /auth/me/ is in flight.
+
+   Two earlier versions were both wrong, and how they were wrong is the reason
+   for the shape below:
+
+     * Fading in on click and letting the browser destroy the page mid-fade read
+       as cover / blank / new page -- a flash on every click.
+     * Covering the incoming document as well fixed the seam but put a curtain
+       over every load, including the ones that finish in 15ms. That is a flick:
+       a cover nobody needed, fading out of the way.
+
+   So the cover belongs to the outgoing page only, and it waits before showing.
+   Under SHOW_AFTER_MS (admin-loading.js) nothing appears at all and the
+   browser's own page swap is the transition -- which on localhost is every
+   navigation. Past it, the ripple fades up and holds until the new document
+   replaces it.
+   -------------------------------------------------------------------------- */
+
+.hc-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--body-bg);
+  /* visibility is delayed to the end of the fade so the cover cannot swallow
+     clicks on its way out. */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+
+html.hc-leaving .hc-loading-overlay {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, visibility 0s linear 0s;
+}
+
+/* Nothing behind the cover should scroll while it is up. */
+html.hc-leaving {
+  overflow: hidden;
+}
+
+.hc-loader {
+  /* Pointy-top hexagons: height is width * 2/sqrt(3). */
+  --hex-w: 15px;
+  --hex-h: 17.3px;
+  --hex-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hc-hex-row {
+  display: flex;
+  gap: var(--hex-gap);
+}
+
+/* Rows interlock: each one rides up into the notches of the row above. */
+.hc-hex-row + .hc-hex-row {
+  margin-top: calc(var(--hex-h) * -0.25 + var(--hex-gap) * 0.5);
+}
+
+.hc-cell {
+  width: var(--hex-w);
+  height: var(--hex-h);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background-color: transparent;
+  animation: 1.5s hc-ripple ease infinite;
+}
+
+/* Ripple spreads from the centre cell outward around the ring. */
+.hc-cell.hc-d-0 { animation-delay: 0ms;   --cell-color: #ea9d3e; }
+.hc-cell.hc-d-1 { animation-delay: 120ms; --cell-color: #e8a23f; }
+.hc-cell.hc-d-2 { animation-delay: 200ms; --cell-color: #e5ac3f; }
+.hc-cell.hc-d-3 { animation-delay: 280ms; --cell-color: #e5b53f; }
+.hc-cell.hc-d-4 { animation-delay: 360ms; --cell-color: #e5bd3f; }
+.hc-cell.hc-d-5 { animation-delay: 440ms; --cell-color: #ecc23d; }
+.hc-cell.hc-d-6 { animation-delay: 520ms; --cell-color: #eec33d; }
+
+@keyframes hc-ripple {
+  0%   { background-color: transparent; }
+  30%  { background-color: var(--cell-color); }
+  60%  { background-color: transparent; }
+  100% { background-color: transparent; }
+}
+
+.hc-loading-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--body-quiet-color);
+}
+
+/* --------------------------------------------------------------------------
+   Motion and narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  /* The ripple is the whole animation, so there is nothing to slow down -- the
+     cells hold their colour and the label carries the meaning instead. */
+  .hc-cell {
+    animation: none;
+    background-color: var(--cell-color);
+  }
+
+  .hc-loading-overlay,
+  .hc-rail-item,
+  .hc-rail-tip,
+  .button,
+  input[type="submit"],
+  input[type="text"],
+  textarea,
+  select,
+  #changelist-filter details > summary,
+  #changelist-filter details > summary::before {
+    transition: none;
+  }
+}
+
+@media (max-width: 767px) {
+  #header,
+  div.breadcrumbs {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  ul.messagelist li {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  /* The heading wraps at this width, so there is no single line left to share
+     with the Add button. */
+  #content-main > .object-tools {
+    margin-top: 0;
+  }
+
+  /* responsive.css re-stacks #changelist here and resets the filter's margin;
+     the chip bar has to keep its place above the table through both. */
+  #changelist #changelist-filter {
+    order: -1;
+    margin: 0 0 14px 0;
+  }
+
+  .submit-row {
+    flex-wrap: wrap;
+  }
+}
