@@ -1,0 +1,555 @@
+:root {
+  color-scheme: light;
+
+  /* Brand palette */
+  --amber-500: #ea9d3e;
+  --amber-400: #e5ac3f;
+  --amber-300: #e5bd3f;
+  --amber-200: #eec33d;
+  --ink: #312f17;
+
+  --bg: #fffdf8;
+  --border: #e3d9bf;
+  --text: var(--ink);
+  --muted: #7a7357;
+  --accent: var(--amber-500);
+  --accent-hover: #d98c2d;
+  --accent-contrast: var(--ink);
+  --error-text: #9b3d22;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Footer sits below the fold of a short page rather than floating mid-screen. */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.page-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+}
+
+/* No card chrome: the form sits directly on the page. */
+.card {
+  width: 100%;
+  max-width: 360px;
+  animation: rise 0.34s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+/* Entrance for the column, and for each state it swaps to (form ->
+   signed-in panel), since React remounts the subtree on that change. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Full-width site footer ---- */
+
+.site-footer {
+  width: 100%;
+  border-top: 1px solid var(--border);
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 32px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 18px 40px;
+}
+
+.site-footer-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.site-footer-nav {
+  display: flex;
+  gap: 24px;
+}
+
+.site-footer-nav a {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-footer-nav a {
+  transition: color 0.15s ease;
+}
+
+.site-footer-nav a:hover {
+  color: var(--accent);
+}
+
+/* Pushed to the far edge; wraps under on narrow screens. */
+.site-footer-legal {
+  margin: 0 0 0 auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .site-footer-inner {
+    padding: 18px 24px;
+  }
+
+  .site-footer-legal {
+    margin-left: 0;
+  }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 24px;
+}
+
+.logo-mark {
+  display: block;
+  flex: none;
+}
+
+.logo-text {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.card-heading {
+  animation: fade 0.2s ease both;
+}
+
+.title {
+  margin: 0 0 6px 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0 0 32px 0;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+
+.field {
+  margin-bottom: 18px;
+}
+
+/* ---- Signup wizard ---- */
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.step-pips {
+  display: flex;
+  gap: 5px;
+}
+
+.step-pip {
+  width: 9px;
+  height: 10.4px;
+  background: var(--border);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  transition: background-color 0.25s ease;
+}
+
+.step-pip.is-filled {
+  background: var(--amber-500);
+}
+
+.step-count {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* Each step slides in from the side it came from. */
+.step {
+  animation: step-in 0.24s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+.step[data-direction="back"] {
+  animation-name: step-in-back;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Right-aligned so the arrow reads as "forward" rather than as a stray dot. */
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.button-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--accent-contrast);
+  background: var(--amber-500);
+  border: 1px solid var(--amber-500);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    transform 0.12s ease, opacity 0.18s ease;
+}
+
+.button-arrow:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.button-arrow:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button-arrow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.35);
+}
+
+.button-arrow:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+/* Replaces the arrow while a step is being checked, so the disabled button
+   still shows that something is happening. */
+.button-arrow-spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.link-button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.link-button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.link-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.input:hover:not(:focus):not(:disabled) {
+  border-color: #cfc4a4;
+}
+
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.22);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.button {
+  width: 100%;
+  margin-top: 22px;
+  padding: 12px 16px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-contrast);
+  background: var(--amber-500);
+  border: 1px solid var(--amber-500);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    transform 0.12s ease, opacity 0.18s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.35);
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.error {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--error-text);
+  animation: rise 0.22s ease both;
+}
+
+.footnote {
+  margin: 20px 0 0 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.footnote a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footnote a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* The .panel / .panel-title / .panel-list / .panel-row rules that used to sit
+   here belonged to AuthCard's SignedInPanel, which was removed once the
+   dashboard existed. Deleting them also retires the unprefixed .panel name,
+   which the dashboard's own .dash .panel would otherwise have had to keep
+   out-specifying. */
+
+/* ---- Loader (components/ui/loader-4.tsx) ---- */
+
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 60vh;
+  animation: fade 0.3s ease both;
+}
+
+.loading-label {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.loader {
+  /* Pointy-top hexagons: height is width * 2/sqrt(3). */
+  --hex-w: 15px;
+  --hex-h: 17.3px;
+  --hex-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hex-row {
+  display: flex;
+  gap: var(--hex-gap);
+}
+
+/* Rows interlock: each one rides up into the notches of the row above. */
+.hex-row + .hex-row {
+  margin-top: calc(var(--hex-h) * -0.25 + var(--hex-gap) * 0.5);
+}
+
+.cell {
+  width: var(--hex-w);
+  height: var(--hex-h);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background-color: transparent;
+  animation: 1.5s ripple ease infinite;
+}
+
+/* Ripple spreads from the center cell outward around the ring. */
+.cell.d-0 {
+  animation-delay: 0ms;
+  --cell-color: #ea9d3e;
+}
+
+.cell.d-1 {
+  animation-delay: 120ms;
+  --cell-color: #e8a23f;
+}
+
+.cell.d-2 {
+  animation-delay: 200ms;
+  --cell-color: #e5ac3f;
+}
+
+.cell.d-3 {
+  animation-delay: 280ms;
+  --cell-color: #e5b53f;
+}
+
+.cell.d-4 {
+  animation-delay: 360ms;
+  --cell-color: #e5bd3f;
+}
+
+.cell.d-5 {
+  animation-delay: 440ms;
+  --cell-color: #ecc23d;
+}
+
+.cell.d-6 {
+  animation-delay: 520ms;
+  --cell-color: #eec33d;
+}
+
+@keyframes ripple {
+  0% {
+    background-color: transparent;
+  }
+
+  30% {
+    background-color: var(--cell-color);
+  }
+
+  60% {
+    background-color: transparent;
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    animation-duration: 3s;
+  }
+
+  /* Entrances collapse to nothing; hover/focus color changes still apply. */
+  .card,
+  .card-heading,
+  .error,
+  .loading-screen,
+  .step {
+    animation: none;
+  }
+
+  .button:active:not(:disabled),
+  .button-arrow:active:not(:disabled) {
+    transform: none;
+  }
+
+  /* Slowed rather than stopped: a frozen spinner would read as a hang. */
+  .button-arrow-spinner {
+    animation-duration: 2.4s;
+  }
+}

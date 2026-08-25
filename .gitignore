@@ -1,0 +1,47 @@
+# ---- Secrets and local state (NEVER commit) ----
+.env
+.env.*
+!.env.example
+!frontend/.env.local.example
+*.pem
+*.key
+
+# The dev database holds real accounts and password hashes.
+*.sqlite3
+*.sqlite3-journal
+
+# ---- Python ----
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django
+/Honeycomb/staticfiles/
+/Honeycomb/media/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+.next-build/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+.npm
+npm-debug.log*
+yarn-error.log*
+
+# ---- Editors and OS ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
