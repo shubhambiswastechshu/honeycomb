@@ -14,7 +14,7 @@ separate access — from a single deployment.
 |---|---|---|
 | Backend | Django 4.2 + DRF 3.16 | Custom `User`, email login, row-level tenancy |
 | Auth | simplejwt in httpOnly cookies | CSRF-enforced, no tokens in JS |
-| Database | SQLite (dev) | Portable to PostgreSQL, no Postgres-only features used |
+| Database | PostgreSQL 14+ | Set `DJANGO_DB_ENGINE=sqlite` for a throwaway run |
 | Frontend | Next.js 14 App Router, TypeScript | Plain CSS, no Tailwind |
 | Icons | lucide-react | |
 
@@ -22,7 +22,21 @@ separate access — from a single deployment.
 
 ## Quick start
 
-Requires Python 3.9+ and Node 18+.
+Requires Python 3.9+, Node 18+ and PostgreSQL 14+.
+
+**Database**, once:
+
+```bash
+psql -U postgres -c "CREATE ROLE honeycomb LOGIN PASSWORD 'honeycomb_dev_pw'"
+psql -U postgres -c "CREATE DATABASE honeycomb OWNER honeycomb"
+cp .env.example .env    # then fill in DJANGO_DB_PASSWORD
+```
+
+`settings.py` reads `.env` from the repo root itself, so no `python-dotenv`
+and no `export` needed. A real environment variable always beats the file.
+
+No Postgres to hand? `DJANGO_DB_ENGINE=sqlite` falls back to a local file —
+nothing in this project uses a Postgres-only feature.
 
 **Backend** (port 8000):
 
@@ -51,8 +65,9 @@ cd Honeycomb && ../.venv/bin/python manage.py createsuperuser
 ## How multi-tenancy works
 
 Shared-schema, **row-level** tenancy: every tenant-owned row carries a `tenant`
-foreign key. There is no schema-per-tenant and no `django-tenants` — that
-approach needs PostgreSQL schemas, and this runs on SQLite.
+foreign key. There is no schema-per-tenant and no `django-tenants`: one schema
+per tenant multiplies migrations by the tenant count, and every schema-per-
+tenant migration becomes an outage risk that grows with the customer list.
 
 - `Tenant` — an organization. `slug` is auto-derived and **stable**; renaming the
   organization never changes it, because the slug disambiguates sign-in.

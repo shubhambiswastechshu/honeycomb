@@ -19,6 +19,37 @@ from corsheaders.defaults import default_headers as cors_default_headers
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+REPO_ROOT = BASE_DIR.parent
+
+
+def _load_dotenv(path):
+    """Read KEY=value lines from `path` into os.environ.
+
+    Deliberately not python-dotenv: this needs to parse a handful of flat
+    assignments, and a dependency that ships in every deployment to do that is
+    not worth it.
+
+    A real environment variable always wins over the file, so a deployment that
+    injects config properly is never silently overridden by a stale `.env` left
+    in the image.
+    """
+    try:
+        lines = path.read_text(encoding='utf-8').splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv(REPO_ROOT / '.env')
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -90,7 +121,11 @@ ROOT_URLCONF = 'Honeycomb.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # Project-level overrides, searched before any app's own templates.
+        # templates/admin/base_site.html brands the admin -- it must win over
+        # the copy django.contrib.admin ships, and APP_DIRS templates cannot
+        # override another app's, so the directory has to be listed here.
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -108,13 +143,79 @@ WSGI_APPLICATION = 'Honeycomb.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+#
+# PostgreSQL is the target. Row-level tenancy means every request filters on
+# `tenant_id`, and SQLite serialises the whole database behind one writer lock,
+# so concurrent tenants queue behind each other. Postgres also gives real
+# partial indexes -- the `User` email uniqueness rules depend on them.
+#
+# Nothing in this project is Postgres-only, so SQLite still works for a
+# throwaway run: set DJANGO_DB_ENGINE=sqlite.
+#
+# Configure with a single URL:
+#   DATABASE_URL=postgres://user:password@host:5432/dbname
+# or with the discrete DJANGO_DB_* variables below. DATABASE_URL wins when
+# both are present.
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DB_ENGINE = os.environ.get('DJANGO_DB_ENGINE', 'postgres').lower()
+
+if DB_ENGINE in ('sqlite', 'sqlite3'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    _db_url = os.environ.get('DATABASE_URL')
+    if _db_url:
+        from urllib.parse import unquote, urlparse
+
+        _parsed = urlparse(_db_url)
+        _db = {
+            'NAME': unquote(_parsed.path.lstrip('/')),
+            'USER': unquote(_parsed.username or ''),
+            'PASSWORD': unquote(_parsed.password or ''),
+            'HOST': _parsed.hostname or 'localhost',
+            'PORT': str(_parsed.port or 5432),
+        }
+    else:
+        _db = {
+            'NAME': os.environ.get('DJANGO_DB_NAME', 'honeycomb'),
+            'USER': os.environ.get('DJANGO_DB_USER', 'honeycomb'),
+            'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', ''),
+            'HOST': os.environ.get('DJANGO_DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DJANGO_DB_PORT', '5432'),
+        }
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            # Reuse connections instead of opening one per request. Postgres
+            # forks a backend process per connection, so per-request connects
+            # are the single most expensive thing a small Django app does.
+            'CONN_MAX_AGE': int(os.environ.get('DJANGO_DB_CONN_MAX_AGE', '60')),
+            # Persistent connections can outlive the server on the other end
+            # (deploy, failover, idle timeout). Without this the first request
+            # after that hits a dead socket and 500s.
+            'CONN_HEALTH_CHECKS': True,
+            'OPTIONS': {
+                # Fail fast rather than hanging a worker on an unreachable host.
+                'connect_timeout': int(
+                    os.environ.get('DJANGO_DB_CONNECT_TIMEOUT', '10')
+                ),
+            },
+            **_db,
+        }
+    }
+
+    # Encryption in transit is not optional once the database is on another
+    # host. Local development talks over loopback, where there is nothing to
+    # intercept, so this only tightens outside DEBUG.
+    if not DEBUG:
+        DATABASES['default']['OPTIONS']['sslmode'] = os.environ.get(
+            'DJANGO_DB_SSLMODE', 'require'
+        )
 
 
 # Cache
@@ -322,6 +423,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Project-level assets, on top of whatever the installed apps ship. The admin
+# skin lives here rather than inside `accounts` because it belongs to no app --
+# it restyles django.contrib.admin, which cannot hold it.
+STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Where collectstatic gathers everything for a real deployment. Unused by
+# runserver, which serves from the directories above directly.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
