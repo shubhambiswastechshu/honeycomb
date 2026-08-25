@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import SessionProvider from "@/components/dashboard/SessionProvider";
 import IconRail from "@/components/dashboard/IconRail";
 import TopBar from "@/components/dashboard/TopBar";
+import DashFooter from "@/components/dashboard/DashFooter";
 import "./dashboard.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <IconRail />
           <main className="dash-main">{children}</main>
         </div>
+        <DashFooter />
       </div>
     </SessionProvider>
   );

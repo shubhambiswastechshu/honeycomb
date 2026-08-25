@@ -749,3 +749,42 @@
     animation-duration: 2.4s;
   }
 }
+
+/* ==========================================================================
+   APPENDED BLOCK -- dashboard status bar (DashFooter)
+   Owned by the fixed-chrome work; nothing above this line was changed.
+
+   The shell was already built so that only .dash-main scrolls: .dash is a
+   100dvh flex column with overflow hidden, and .dash-topbar / .dash-rail are
+   flex: none. The footer is the third fixed edge and follows the same rule --
+   a flex: none sibling of .dash-body, not `position: fixed`. Position-fixed
+   would take it out of flow, so it would overlap the scrolling content instead
+   of shortening it, and the last panel on every page would sit under the bar.
+   ========================================================================== */
+
+.dash-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dash-footer-legal {
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 719px) {
+  /* Below this width .dash-rail is already a 58px bottom bar. A second bar
+     under it would cost a fifth of the viewport on a phone and stack two
+     borders on the same edge, so the status bar yields the edge to the rail. */
+  .dash-footer {
+    display: none;
+  }
+}
