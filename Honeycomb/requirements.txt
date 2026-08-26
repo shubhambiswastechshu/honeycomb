@@ -3,5 +3,14 @@ djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 psycopg[binary]==3.3.4
+
+# Serving. WhiteNoise because Render serves no static files itself, so without
+# it the re-skinned admin renders as unstyled Django.
 whitenoise[brotli]==6.11.0
 gunicorn==23.0.0
+
+# MySQL data sources. cryptography is not optional: MySQL 8 defaults to
+# caching_sha2_password, and PyMySQL needs it to complete that handshake
+# over an unencrypted connection.
+PyMySQL==1.1.2
+cryptography>=42

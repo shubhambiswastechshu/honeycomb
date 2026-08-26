@@ -554,3 +554,364 @@ export function updateTenant(payload: UpdateTenantPayload): Promise<Tenant> {
     authenticated: true,
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Product resources                                                   */
+/*                                                                     */
+/* Four tenant-scoped collections, each backed by its own Django app:  */
+/*                                                                     */
+/*   GET/POST         /workspaces/   workspaces.Workspace              */
+/*   GET/POST/DELETE  /sources/      datasources.DataSource            */
+/*   GET/POST/DELETE  /queries/      sqlconsole.SavedQuery             */
+/*   GET/POST         /runs/         sqlconsole.QueryRun               */
+/*   GET/POST/DELETE  /scripts/      notebooks.PythonScript            */
+/*   GET/POST/DELETE  /pipelines/    pipelines.Pipeline                */
+/*                                                                     */
+/* Every row already belongs to the caller's organization -- the       */
+/* server filters on request.user.tenant and stamps the same tenant on */
+/* create -- so nothing here sends or receives a tenant id. A client    */
+/* that could name a tenant would be a client that could get it wrong. */
+/* ------------------------------------------------------------------ */
+
+export interface WorkspaceCounts {
+  data_sources: number;
+  queries: number;
+  pipelines: number;
+}
+
+export interface Workspace {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  counts: WorkspaceCounts;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DataSource {
+  id: number;
+  workspace: number;
+  workspace_name: string;
+  name: string;
+  kind: string;
+  kind_display: string;
+  host: string;
+  port: number | null;
+  database: string;
+  username: string;
+  secret_name: string;
+  /** Whether a password is reachable under `secret_name`. Never the secret. */
+  secret_configured: boolean;
+  /** The variable the default backend reads, so the fix is copy-pasteable. */
+  secret_env_var: string;
+  status: string;
+  status_display: string;
+  last_checked_at: string | null;
+  last_error: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedQuery {
+  id: number;
+  workspace: number;
+  workspace_name: string;
+  data_source: number | null;
+  data_source_name: string | null;
+  name: string;
+  description: string;
+  sql: string;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Pipeline {
+  id: number;
+  workspace: number;
+  workspace_name: string;
+  source: number | null;
+  source_name: string | null;
+  name: string;
+  description: string;
+  destination: string;
+  schedule: string;
+  status: string;
+  status_display: string;
+  last_outcome: string;
+  last_outcome_display: string;
+  last_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Narrows a list endpoint's response to an array. DRF pagination is off. */
+function asList<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+export async function listWorkspaces(): Promise<Workspace[]> {
+  return asList<Workspace>(
+    await request<unknown>("/workspaces/", { method: "GET", authenticated: true })
+  );
+}
+
+export function createWorkspace(body: {
+  name: string;
+  description?: string;
+}): Promise<Workspace> {
+  return request<Workspace>("/workspaces/", {
+    method: "POST",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function deleteWorkspace(id: number): Promise<void> {
+  await request<unknown>("/workspaces/" + id + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+/** `workspace` narrows the list server-side; omit it for everything. */
+export async function listDataSources(workspace?: number): Promise<DataSource[]> {
+  const query = workspace === undefined ? "" : "?workspace=" + workspace;
+  return asList<DataSource>(
+    await request<unknown>("/sources/" + query, {
+      method: "GET",
+      authenticated: true,
+    })
+  );
+}
+
+export function createDataSource(body: Record<string, unknown>): Promise<DataSource> {
+  return request<DataSource>("/sources/", {
+    method: "POST",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function deleteDataSource(id: number): Promise<void> {
+  await request<unknown>("/sources/" + id + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+export async function listQueries(workspace?: number): Promise<SavedQuery[]> {
+  const query = workspace === undefined ? "" : "?workspace=" + workspace;
+  return asList<SavedQuery>(
+    await request<unknown>("/queries/" + query, {
+      method: "GET",
+      authenticated: true,
+    })
+  );
+}
+
+export function createQuery(body: Record<string, unknown>): Promise<SavedQuery> {
+  return request<SavedQuery>("/queries/", {
+    method: "POST",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function deleteQuery(id: number): Promise<void> {
+  await request<unknown>("/queries/" + id + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+export async function listPipelines(workspace?: number): Promise<Pipeline[]> {
+  const query = workspace === undefined ? "" : "?workspace=" + workspace;
+  return asList<Pipeline>(
+    await request<unknown>("/pipelines/" + query, {
+      method: "GET",
+      authenticated: true,
+    })
+  );
+}
+
+export function createPipeline(body: Record<string, unknown>): Promise<Pipeline> {
+  return request<Pipeline>("/pipelines/", {
+    method: "POST",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function deletePipeline(id: number): Promise<void> {
+  await request<unknown>("/pipelines/" + id + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* SQL console                                                         */
+/*                                                                     */
+/* A run is a record, not a request: POST /runs/ executes the          */
+/* statement and answers with the row it wrote, so the result and the  */
+/* history entry are the same object and cannot disagree.              */
+/*                                                                     */
+/* A failed query comes back 200 with state "FAILED" and the database  */
+/* error in `error`. That is not sloppiness about status codes -- the  */
+/* HTTP request succeeded, and a 4xx would be swallowed by the generic */
+/* error handling above instead of showing the person what PostgreSQL  */
+/* actually said, which is the only useful part.                       */
+/* ------------------------------------------------------------------ */
+
+export interface ResultColumn {
+  name: string;
+  type: string;
+}
+
+export interface QueryRun {
+  id: number;
+  workspace: number;
+  workspace_name: string;
+  data_source: number | null;
+  data_source_name: string | null;
+  saved_query: number | null;
+  saved_query_name: string | null;
+  sql: string;
+  preview: string;
+  state: "SUCCEEDED" | "FAILED";
+  state_display: string;
+  result_columns: ResultColumn[];
+  result_rows: unknown[][];
+  row_count: number;
+  truncated: boolean;
+  notice: string;
+  duration_ms: number;
+  error: string;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+/** A history entry: the same row without its rows or its full statement. */
+export type QueryRunSummary = Omit<
+  QueryRun,
+  "result_columns" | "result_rows" | "sql"
+>;
+
+export interface RunRequest {
+  workspace: number;
+  data_source: number;
+  sql: string;
+  saved_query?: number | null;
+  limit?: number;
+}
+
+export interface SchemaColumn {
+  name: string;
+  type: string;
+}
+
+export interface SchemaTable {
+  schema: string;
+  name: string;
+  qualified: string;
+  kind: string;
+  columns: SchemaColumn[];
+}
+
+export interface PythonScript {
+  id: number;
+  workspace: number;
+  workspace_name: string;
+  name: string;
+  description: string;
+  code: string;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Tables and columns for a source, read live. Rejects with the connector's message. */
+export async function fetchSchema(sourceId: number): Promise<SchemaTable[]> {
+  const body = await request<{ tables?: SchemaTable[] }>(
+    "/sources/" + sourceId + "/schema/",
+    { method: "GET", authenticated: true }
+  );
+  return Array.isArray(body.tables) ? body.tables : [];
+}
+
+/** Dial the source and record the outcome on it. */
+export function testDataSource(sourceId: number): Promise<DataSource & { detail: string }> {
+  return request<DataSource & { detail: string }>("/sources/" + sourceId + "/test/", {
+    method: "POST",
+    authenticated: true,
+  });
+}
+
+export function runQuery(payload: RunRequest): Promise<QueryRun> {
+  return request<QueryRun>("/runs/", {
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+    authenticated: true,
+  });
+}
+
+export async function listRuns(workspace?: number): Promise<QueryRunSummary[]> {
+  const query = workspace === undefined ? "" : "?workspace=" + workspace;
+  return asList<QueryRunSummary>(
+    await request<unknown>("/runs/" + query, { method: "GET", authenticated: true })
+  );
+}
+
+/** One run with its rows. The list omits them; this is what opening an entry costs. */
+export function getRun(id: number): Promise<QueryRun> {
+  return request<QueryRun>("/runs/" + id + "/", {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+export function updateQuery(
+  id: number,
+  body: Record<string, unknown>
+): Promise<SavedQuery> {
+  return request<SavedQuery>("/queries/" + id + "/", {
+    method: "PATCH",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function listScripts(workspace?: number): Promise<PythonScript[]> {
+  const query = workspace === undefined ? "" : "?workspace=" + workspace;
+  return asList<PythonScript>(
+    await request<unknown>("/scripts/" + query, { method: "GET", authenticated: true })
+  );
+}
+
+export function createScript(body: Record<string, unknown>): Promise<PythonScript> {
+  return request<PythonScript>("/scripts/", {
+    method: "POST",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export function updateScript(
+  id: number,
+  body: Record<string, unknown>
+): Promise<PythonScript> {
+  return request<PythonScript>("/scripts/" + id + "/", {
+    method: "PATCH",
+    body: body,
+    authenticated: true,
+  });
+}
+
+export async function deleteScript(id: number): Promise<void> {
+  await request<unknown>("/scripts/" + id + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}

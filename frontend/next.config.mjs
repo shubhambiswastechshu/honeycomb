@@ -32,6 +32,31 @@ const apiProxyTarget = (function readProxyTarget() {
 })();
 
 /**
+ * Where the Python console fetches its runtime from.
+ *
+ * Pyodide is a WebAssembly build of CPython, and it is roughly 40MB of
+ * artefacts across the interpreter and whatever packages a script imports. It
+ * is served from jsDelivr rather than from `public/`, and that is the one
+ * concession this policy makes to a third-party origin, so it is worth being
+ * plain about what it costs and what the alternative is.
+ *
+ * The cost: a script from this host runs inside this origin. A compromise of
+ * jsDelivr, or of the Pyodide release on it, would be a compromise of the
+ * dashboard. The URL is version-pinned (see lib/pyodide.ts) so the bytes only
+ * change when someone changes them here, which turns "silently updated" into
+ * "shows up in a diff" -- but a pinned path on someone else's CDN is still
+ * someone else's CDN.
+ *
+ * The alternative, if that trade stops being acceptable: vendor the Pyodide
+ * core into `public/pyodide/` (about 12MB), point `indexURL` at it, and delete
+ * this constant -- `script-src 'self'` then covers it and no third party is
+ * involved. The reason it is not done that way here is that packages like
+ * numpy and pandas are fetched on demand by name, and vendoring the ones
+ * anyone might import means vendoring most of the distribution.
+ */
+const pyodideOrigin = "https://cdn.jsdelivr.net";
+
+/**
  * Content-Security-Policy.
  *
  * script-src carries 'unsafe-inline' because the App Router bootstraps its
@@ -39,21 +64,37 @@ const apiProxyTarget = (function readProxyTarget() {
  * per request in middleware.ts and threading it through, which is a larger
  * change than this one. Everything else is locked down: no plugins, no
  * framing, no <base> rewriting, no form posts off-origin, and connect-src
- * limited to this origin plus the API. 'unsafe-eval' and the HMR websocket are
- * dev-only -- the production build needs neither.
+ * limited to this origin, the API, and the Pyodide CDN. 'unsafe-eval' and the
+ * HMR websocket are dev-only -- the production build needs neither.
+ *
+ * 'wasm-unsafe-eval' is what lets the browser compile WebAssembly, and it is
+ * deliberately not 'unsafe-eval': it permits WASM compilation and nothing
+ * else, so eval() and new Function() on arbitrary strings stay blocked in
+ * production. Without it the Python console cannot start.
  */
 const contentSecurityPolicy = [
   "default-src 'self'",
   isProduction
-    ? "script-src 'self' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' " + pyodideOrigin
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' " +
+      pyodideOrigin,
   // React style props and Next's injected <style> blocks are inline styles.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
+  // The runtime's .wasm, its stdlib archive and any package a script imports
+  // all arrive as fetches, so the CDN has to be named here as well as in
+  // script-src.
   isProduction
-    ? ("connect-src 'self' " + apiOrigin).trim()
-    : ("connect-src 'self' " + apiOrigin + " ws: wss:").replace(/\s+/g, " "),
+    // apiOrigin is empty when the API is reached through the rewrite on
+    // this same origin, which would otherwise leave a double space in the
+    // directive. Collapsing is cheaper than branching on it.
+    ? ("connect-src 'self' " + apiOrigin + " " + pyodideOrigin)
+        .replace(/\s+/g, " ")
+        .trim()
+    : ("connect-src 'self' " + apiOrigin + " " + pyodideOrigin + " ws: wss:")
+        .replace(/\s+/g, " ")
+        .trim(),
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

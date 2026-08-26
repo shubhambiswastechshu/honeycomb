@@ -788,3 +788,409 @@
     display: none;
   }
 }
+
+/* ==========================================================================
+   APPENDED BLOCK -- product surfaces (tiles + resource boards)
+   Owned by the workspaces/sources/SQL/pipelines work; nothing above this line
+   was changed.
+
+   Everything is prefixed .tile-* or .board-* and, where it leans on an
+   existing class, scoped under .dash -- .panel and .empty already belong to
+   the shell above.
+   ========================================================================== */
+
+/* ---- Overview tiles ---- */
+
+.tile-grid {
+  display: grid;
+  /* Explicit columns, not auto-fill. An auto track count kept changing how
+     many tiles shared a row as the description text changed length, and a
+     grid that reflows when someone edits a sentence is not a grid. Two
+     columns give each tile a full sentence per line. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile-cell {
+  display: block;
+}
+
+/* The whole card is the link. A 248px box with a 90px target in the middle of
+   it is the usual reason a tile grid feels imprecise. */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    transform 0.12s ease;
+}
+
+.tile:hover {
+  border-color: var(--amber-400);
+  background: rgba(234, 157, 62, 0.05);
+}
+
+.tile:active {
+  transform: translateY(1px);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(234, 157, 62, 0.12);
+  color: var(--amber-500);
+}
+
+.tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tile-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tile-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Pushed to the card's bottom edge so the counts line up across a row however
+   long each description runs. */
+.tile-meta {
+  margin-top: auto;
+  padding-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.tile-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 16px 0 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---- Resource boards ---- */
+
+.dash .board-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dash .board-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--amber-500);
+  border-radius: 9px;
+  background: var(--amber-500);
+  color: var(--accent-contrast);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.dash .board-add:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.dash .board-add:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.dash .board-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.dash .board-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash .board-textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.dash .board-help {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dash .board-submit {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  margin-top: 0;
+}
+
+.dash .board-spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+.dash .board-error {
+  margin: 0 0 14px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(155, 61, 34, 0.3);
+  border-radius: 9px;
+  background: rgba(155, 61, 34, 0.06);
+  font-size: 12.5px;
+  color: var(--error-text);
+}
+
+.dash .board-note {
+  margin: 0 0 18px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dash .board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .board-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.dash .board-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* min-width lets a long SQL line ellipsize instead of pushing the delete
+     button off the row. */
+  min-width: 0;
+  flex: 1;
+}
+
+.dash .board-row-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dash .board-row-text {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.dash .board-row-code {
+  display: block;
+  overflow: hidden;
+  max-height: 3.2em;
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dash .board-row-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Quiet until the row is hovered: a delete button that is always the loudest
+   thing on a list invites the click it should discourage. */
+.dash .board-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.dash .board-row:hover .board-delete {
+  opacity: 1;
+}
+
+.dash .board-delete:hover {
+  border-color: rgba(155, 61, 34, 0.3);
+  color: var(--error-text);
+}
+
+.dash .board-delete:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Wide enough for four across without cramping the copy. */
+@media (min-width: 1600px) {
+  /* Three, not four. There are five tiles: four across leaves one alone on
+     its own row, three across fills the first row and pairs the rest. */
+  .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 719px) {
+  .dash .board-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .dash .board-add,
+  .dash .board-delete {
+    transition: none;
+  }
+
+  .tile:active {
+    transform: none;
+  }
+
+  /* Slowed rather than stopped: a frozen spinner would read as a hang. */
+  .dash .board-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---- Data source test ----
+   Sits between the row body and the delete button, so it is a column of its
+   own rather than something laid over the row's text. The result note wraps
+   under the button because a connection error is a sentence, not a word. */
+
+.source-test {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 340px;
+}
+
+.source-test-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.source-test-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.source-test-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.source-test-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.source-test-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0;
+  color: var(--error-text);
+  font-size: 11.5px;
+  line-height: 1.5;
+  /* Left-aligned inside a right-aligned column. Right-aligning the text too
+     gives a wrapped sentence a ragged left edge and floats the icon away from
+     the words it belongs to. */
+  text-align: left;
+}
+
+.source-test-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.source-test-ok {
+  color: #3f7d3a;
+}

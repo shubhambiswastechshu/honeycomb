@@ -12,9 +12,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Boxes,
   Database,
+  GitBranch,
   LayoutGrid,
+  Plug,
   Settings,
+  SquareTerminal,
+  Terminal,
   UserRound,
   Users,
 } from "lucide-react";
@@ -33,6 +38,14 @@ interface RailItem {
 
 const MAIN_ITEMS: RailItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid, exact: true },
+  // The four product areas, in the order work moves through them: make a
+  // workspace, connect something to it, query it in SQL or Python, then
+  // schedule the query.
+  { href: "/dashboard/workspaces", label: "Workspaces", icon: Boxes },
+  { href: "/dashboard/sources", label: "Connect data", icon: Plug },
+  { href: "/dashboard/sql", label: "SQL", icon: Terminal },
+  { href: "/dashboard/python", label: "Python", icon: SquareTerminal },
+  { href: "/dashboard/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/dashboard/data", label: "Data", icon: Database },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/team", label: "Team", icon: Users },

@@ -106,6 +106,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'accounts',
+    # Product apps. Each owns one tenant-scoped table and its API; every model
+    # in them inherits accounts.TenantOwnedModel, which is what keeps the
+    # shared-schema tenancy enforceable.
+    'workspaces',
+    'datasources',
+    'sqlconsole',
+    'notebooks',
+    'pipelines',
 ]
 
 MIDDLEWARE = [
@@ -322,8 +330,46 @@ REST_FRAMEWORK = {
         # One per expired access token, plus retries. An access token lives an
         # hour, so anything near this rate is a loop, not a user.
         'refresh': '30/min',
+        # The product CRUD. Read on every dashboard page and written by hand,
+        # so this is sized for a person clicking rather than for a client that
+        # polls -- high enough never to be felt, low enough that a runaway
+        # effect loop in the frontend shows up as 429s instead of as load.
+        'workspaces': '120/min',
+        # Running a query is not CRUD. Each call opens a socket to a
+        # customer's warehouse and can hold a request thread for the whole
+        # statement timeout, so this is sized for a person thinking between
+        # queries rather than for a person clicking.
+        'sql_run': '30/min',
     },
 }
+
+
+# SQL console
+#
+# Ceilings for a query run, all enforced in datasources/connectors.py. They
+# are limits rather than targets: every one of them exists because the
+# alternative is an unbounded amount of somebody else's data arriving in this
+# process.
+#
+#   MAX_ROWS         rows kept from a result set; the rest are discarded and
+#                    the answer is marked truncated.
+#   TIMEOUT_MS       PostgreSQL statement_timeout, set on the connection, so
+#                    a runaway query is killed at the server rather than
+#                    abandoned by the client while it keeps burning.
+#   MAX_BYTES        rough ceiling on a serialized result, so one wide text
+#                    column cannot do what the row cap prevents.
+#   CONNECT_TIMEOUT  seconds to wait for a socket, so an unreachable host
+#                    fails fast instead of holding a worker.
+HONEYCOMB_SQL_MAX_ROWS = int(os.environ.get('HONEYCOMB_SQL_MAX_ROWS', '1000'))
+HONEYCOMB_SQL_TIMEOUT_MS = int(os.environ.get('HONEYCOMB_SQL_TIMEOUT_MS', '30000'))
+HONEYCOMB_SQL_MAX_BYTES = int(os.environ.get('HONEYCOMB_SQL_MAX_BYTES', str(4 * 1024 * 1024)))
+HONEYCOMB_SQL_CONNECT_TIMEOUT = int(os.environ.get('HONEYCOMB_SQL_CONNECT_TIMEOUT', '8'))
+
+# Where a DataSource's `secret_name` is looked up. Empty means the built-in
+# environment backend (HONEYCOMB_SECRET_<HANDLE>); set it to a dotted path to
+# a callable taking the handle and returning the secret to use Vault, AWS
+# Secrets Manager, or anything else. See datasources/secrets.py.
+HONEYCOMB_SECRET_BACKEND = os.environ.get('HONEYCOMB_SECRET_BACKEND', '')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

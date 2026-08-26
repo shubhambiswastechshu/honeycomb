@@ -23,4 +23,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/', include(tenant_urlpatterns)),
+    # Product APIs. Each app registers its own router, so the collection names
+    # (workspaces/, sources/, queries/, runs/, scripts/, pipelines/) live next
+    # to the viewsets
+    # that serve them rather than in one list here.
+    path('api/', include('workspaces.urls')),
+    path('api/', include('datasources.urls')),
+    path('api/', include('sqlconsole.urls')),
+    path('api/', include('notebooks.urls')),
+    path('api/', include('pipelines.urls')),
 ]
