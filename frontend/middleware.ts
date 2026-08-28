@@ -4,13 +4,21 @@ import type { NextRequest } from "next/server";
 /**
  * URL-level route guard.
  *
- * IMPORTANT, and deliberately so: this middleware only checks whether the
- * "hc_access" cookie is PRESENT. It does not verify the JWT signature, does
- * not check its expiry and does not talk to the backend. Django is the real
- * authority -- every API call is authenticated and authorised server-side, and
- * a forged or expired cookie gets nothing from it. The guard exists to stop
- * the flash of protected chrome (and the pointless round trip) when a signed
- * out visitor types a /dashboard URL. It is not the security boundary.
+ * IMPORTANT, and deliberately so: this middleware only checks whether an auth
+ * cookie is PRESENT. It does not verify the JWT signature, does not check its
+ * expiry and does not talk to the backend. Django is the real authority --
+ * every API call is authenticated and authorised server-side, and a forged or
+ * expired cookie gets nothing from it. The guard exists to stop the flash of
+ * protected chrome (and the pointless round trip) when a signed out visitor
+ * types a /dashboard URL. It is not the security boundary.
+ *
+ * It checks for EITHER cookie, and the "either" matters. An access token lasts
+ * an hour and a session lasts weeks, so there is a normal, expected state
+ * where the access cookie is stale or gone and the refresh cookie is perfectly
+ * good. Redirecting on the access cookie alone signed people out an hour after
+ * they arrived: this runs at the edge, so it fired before any page script
+ * could do the 401-then-refresh dance that would have renewed them silently.
+ * If both are gone there is nothing left to renew from, and sign-in is right.
  *
  * Middleware runs on the server, which is why it can read an httpOnly cookie
  * at all -- client JavaScript cannot, and that is the point of keeping the
@@ -18,6 +26,7 @@ import type { NextRequest } from "next/server";
  */
 
 const ACCESS_COOKIE = "hc_access";
+const REFRESH_COOKIE = "hc_refresh";
 const SIGN_IN_PATH = "/signin";
 const SIGN_UP_PATH = "/signup";
 const DASHBOARD_PATH = "/dashboard";
@@ -40,7 +49,9 @@ function isDashboardPath(pathname: string): boolean {
 
 export function middleware(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname;
-  const signedIn = request.cookies.get(ACCESS_COOKIE) !== undefined;
+  const signedIn =
+    request.cookies.get(ACCESS_COOKIE) !== undefined ||
+    request.cookies.get(REFRESH_COOKIE) !== undefined;
 
   // Protected area: bounce to sign in and remember where they were headed.
   if (isDashboardPath(pathname) && !signedIn) {

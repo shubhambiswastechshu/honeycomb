@@ -45,6 +45,7 @@ import type { CodeEditorHandle, SqlSchema } from "@/components/ide/CodeEditor";
 import ResultTable from "@/components/ide/ResultTable";
 import SchemaTree from "@/components/ide/SchemaTree";
 import SplitPane from "@/components/ide/SplitPane";
+import Loader from "@/components/ui/loader-4";
 import {
   createQuery,
   deleteQuery,
@@ -69,6 +70,24 @@ import type {
 const STARTER = "select 1;\n";
 const DRAFT_KEY = "honeycomb.sql.draft.";
 const ROW_LIMITS = [100, 1000, 5000];
+
+/*
+ * The loader is bounded at both ends, because a flicker can come from either.
+ *
+ * LOADER_AFTER_MS -- how long a query may run before the loader appears.
+ * Measured from the browser against this stack, a trivial statement has a
+ * median of 46ms and a cold-start tail to ~350ms: every run opens a fresh
+ * connection, so even `select 1` is not instant. A threshold inside that tail
+ * is the worst possible choice, because it then fires on queries that are, to
+ * a person, immediate. 450ms sits clear of it.
+ *
+ * LOADER_MIN_MS -- how long it stays once it has appeared. Without this, a
+ * query finishing at 360ms paints the loader for ten frames and removes it,
+ * which the eye reads as a glitch rather than as progress. Anything slow
+ * enough to reach here is slow enough that a moment more costs nothing.
+ */
+const LOADER_AFTER_MS = 450;
+const LOADER_MIN_MS = 420;
 
 function message(caught: unknown): string {
   return caught instanceof Error
@@ -151,6 +170,8 @@ export default function SqlConsolePage() {
 
   const [run, setRun] = useState<QueryRun | null>(null);
   const [running, setRunning] = useState(false);
+  // Separate from `running`: the button reacts immediately, the loader waits.
+  const [busy, setBusy] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
 
   const [history, setHistory] = useState<QueryRunSummary[]>([]);
@@ -351,6 +372,12 @@ export default function SqlConsolePage() {
       setRunning(true);
       setRunError(null);
       setPane("results");
+      let shownAt: number | null = null;
+      const armLoader = window.setTimeout(function show() {
+        shownAt = Date.now();
+        setBusy(true);
+      }, LOADER_AFTER_MS);
+
       try {
         const result = await runQuery({
           workspace: workspaceId,
@@ -360,11 +387,31 @@ export default function SqlConsolePage() {
           limit: limit,
         });
         setRun(result);
-        const runs = await listRuns(workspaceId);
-        setHistory(runs);
+        // History is not part of the answer. Awaiting it here kept the button
+        // saying "Running" through a second round trip, after the rows were
+        // already on screen -- so the spinner outlived the wait it described.
+        listRuns(workspaceId)
+          .then(function keep(runs) {
+            setHistory(runs);
+          })
+          .catch(function ignore() {
+            /* The result is already shown; a stale history list can wait. */
+          });
       } catch (caught) {
         setRunError(message(caught));
       } finally {
+        window.clearTimeout(armLoader);
+        if (shownAt !== null) {
+          // Hold it to its minimum. `running` is held with it so the button
+          // and the overlay never disagree about whether work is happening.
+          const remaining = LOADER_MIN_MS - (Date.now() - shownAt);
+          if (remaining > 0) {
+            await new Promise(function wait(resolve) {
+              window.setTimeout(resolve, remaining);
+            });
+          }
+        }
+        setBusy(false);
         setRunning(false);
       }
     },
@@ -617,20 +664,28 @@ export default function SqlConsolePage() {
             {savedFlash ? "Saved" : "Save"}
           </button>
 
+          {/* Disabled by `running` so a second click cannot fire, but dressed
+              by `busy` so it does not visibly change for a query that finishes
+              in 40ms. Driving the label and the dimming off `running` made the
+              button swap text and drop to 45% opacity for two frames on every
+              run, which is the flicker -- measured at 32ms. */}
           <button
             type="button"
-            className="ide-button ide-button-primary"
+            className={
+              "ide-button ide-button-primary" + (busy ? " ide-button-busy" : "")
+            }
             onClick={function onRun() {
               void execute();
             }}
             disabled={!canRun}
+            aria-busy={running}
           >
-            {running ? (
+            {busy ? (
               <Loader2 size={15} className="ide-spin" aria-hidden="true" />
             ) : (
               <Play size={15} strokeWidth={2} aria-hidden="true" />
             )}
-            {running ? "Running" : "Run"}
+            {busy ? "Running" : "Run"}
             <kbd className="ide-kbd">⌘↵</kbd>
           </button>
         </div>
@@ -862,7 +917,8 @@ export default function SqlConsolePage() {
                   ) : null}
                 </div>
 
-                <div className="ide-output-body">
+                <div className="ide-output-stage">
+                  <div className="ide-output-body">
                   {pane === "results" ? (
                     <>
                       {runError !== null ? (
@@ -968,6 +1024,14 @@ export default function SqlConsolePage() {
                       })}
                     </ul>
                   )}
+                  </div>
+
+                  {busy ? (
+                    <div className="ide-busy" role="status">
+                      <Loader />
+                      <p className="ide-busy-label">Running the query</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             }

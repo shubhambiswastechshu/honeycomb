@@ -137,7 +137,29 @@
   cursor: not-allowed;
 }
 
+/* "Disabled because it is working" is not "disabled because you cannot use
+   it". Both need the click blocked; only the second should look unavailable.
+   Dimming for the former made the button blink on every fast query. */
+.ide-button[aria-busy="true"]:disabled {
+  opacity: 1;
+  /* Deliberately unchanged from the idle cursor. The pointer is sitting on
+     this button at the moment of the click, so swapping it to `progress` and
+     back inside 50ms is a flicker happening under the user's own hand -- the
+     one place a 50ms change is guaranteed to be seen. */
+  cursor: pointer;
+}
+
+/* Once the wait is long enough to have earned the loader, the cursor may say
+   so too: by then it is describing a real wait rather than blinking. */
+.ide-button.ide-button-busy:disabled {
+  cursor: progress;
+}
+
 .ide-button-primary {
+  /* Wide enough for "Running", so swapping the label does not resize the
+     button and shove the toolbar sideways mid-query. */
+  min-width: 116px;
+  justify-content: center;
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-contrast);
@@ -791,10 +813,73 @@
   min-height: 0;
 }
 
+/* Holds the results and the loader on top of them. The overlay cannot live
+   inside .ide-output-body: that scrolls, and an overlay that scrolls away
+   from the thing it covers is worse than none. */
+.ide-output-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
 .ide-output-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+/* Sits over the previous result rather than replacing it. Blanking the pane
+   first would make every run flash empty before the new rows land, which is
+   two changes where one will do. */
+.ide-busy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(255, 253, 248, 0.82);
+  animation: ide-fade-in 0.18s ease both;
+}
+
+.ide-busy-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The result itself arrives rather than snapping in. Short and small: a long
+   or large movement on every query becomes something to sit through. */
+.ide-result,
+.ide-fail {
+  animation: ide-rise 0.22s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+@keyframes ide-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ide-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .ide-status {
@@ -1188,6 +1273,14 @@
 @media (prefers-reduced-motion: reduce) {
   .ide-spin {
     animation-duration: 2.4s;
+  }
+
+  /* The overlay still appears -- it carries information -- but nothing moves
+     to announce it, and the result stops sliding. */
+  .ide-busy,
+  .ide-result,
+  .ide-fail {
+    animation: none;
   }
 
   .ide-button,

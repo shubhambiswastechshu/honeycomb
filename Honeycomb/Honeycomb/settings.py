@@ -371,9 +371,23 @@ HONEYCOMB_SQL_CONNECT_TIMEOUT = int(os.environ.get('HONEYCOMB_SQL_CONNECT_TIMEOU
 # Secrets Manager, or anything else. See datasources/secrets.py.
 HONEYCOMB_SECRET_BACKEND = os.environ.get('HONEYCOMB_SECRET_BACKEND', '')
 
+# How long someone stays signed in without being asked again. This is a
+# *sliding* window: /auth/refresh/ issues a new refresh token on every renewal,
+# so the clock restarts whenever the app is used, and only an absence longer
+# than this signs someone out. That is what "stay signed in until I sign out"
+# means in practice -- a fixed window logs out an everyday user the moment it
+# elapses, however active they were.
+#
+# The cost is stated plainly: a stolen refresh cookie is useful for this long,
+# and with no token blacklist installed, signing out clears the browser's
+# cookies without revoking the token server-side. Shorten this, or install
+# 'rest_framework_simplejwt.token_blacklist' and turn on rotation with
+# blacklisting, if that trade is wrong for a deployment.
+HC_SESSION_DAYS = int(os.environ.get('DJANGO_SESSION_DAYS', '30'))
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=HC_SESSION_DAYS),
     # Rotation is off deliberately. With BLACKLIST_AFTER_ROTATION False it is a
     # pure no-op: the rotated-away token stays valid for its full 7 days, so
     # the only effect would be extra cookie writes. Enabling real revocation

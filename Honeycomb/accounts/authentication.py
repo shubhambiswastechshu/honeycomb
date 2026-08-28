@@ -61,12 +61,38 @@ def issue_tokens(user):
     return refresh
 
 
+def session_seconds():
+    """How long a browser should keep the auth cookies.
+
+    The *session* lasts as long as a refresh token can renew it, which is not
+    the same as how long an access token is valid. Both cookies therefore carry
+    the refresh lifetime.
+    """
+    return _lifetime_seconds('REFRESH_TOKEN_LIFETIME', 604800)
+
+
 def set_access_cookie(response, access_token):
+    """Write the access cookie.
+
+    `max_age` is the *session* length, deliberately not the access token's own
+    60 minutes. Those are different clocks and conflating them was a bug: the
+    browser deleted this cookie an hour after sign-in, and because the Next.js
+    middleware gates /dashboard on the cookie being present, the visitor was
+    bounced to /signin -- while a refresh token good for another six days sat
+    untouched in the next cookie along. The redirect happens at the edge, so
+    the client never got as far as the 401-then-refresh path that would have
+    renewed it silently.
+
+    The cookie outliving the token it carries is safe: presence is not
+    authority. Django verifies the JWT's signature and expiry on every request,
+    so a stale cookie buys exactly one 401, which the client answers with a
+    refresh.
+    """
     kwargs = _cookie_security()
     response.set_cookie(
         access_cookie_name(),
         str(access_token),
-        max_age=_lifetime_seconds('ACCESS_TOKEN_LIFETIME', 3600),
+        max_age=session_seconds(),
         httponly=True,
         **kwargs
     )
@@ -77,11 +103,16 @@ def set_auth_cookies(response, user):
     """Attach a freshly minted access/refresh pair for ``user`` to ``response``."""
     refresh = issue_tokens(user)
     set_access_cookie(response, refresh.access_token)
+    set_refresh_cookie(response, refresh)
+    return response
+
+
+def set_refresh_cookie(response, refresh_token):
     kwargs = _cookie_security()
     response.set_cookie(
         refresh_cookie_name(),
-        str(refresh),
-        max_age=_lifetime_seconds('REFRESH_TOKEN_LIFETIME', 604800),
+        str(refresh_token),
+        max_age=session_seconds(),
         httponly=True,
         **kwargs
     )

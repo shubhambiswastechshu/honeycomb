@@ -43,6 +43,7 @@ import {
 import CodeEditor from "@/components/ide/CodeEditor";
 import type { CodeEditorHandle } from "@/components/ide/CodeEditor";
 import SplitPane from "@/components/ide/SplitPane";
+import Loader from "@/components/ui/loader-4";
 import {
   createScript,
   deleteScript,
@@ -657,6 +658,7 @@ export default function PythonConsolePage() {
               void execute();
             }}
             disabled={running || code.trim() === ""}
+            aria-busy={running}
             title={ready ? "Run" : "First run downloads the Python runtime (~10MB)"}
           >
             {running ? (
@@ -844,6 +846,7 @@ export default function PythonConsolePage() {
                     </span>
                   ) : null}
                 </div>
+                <div className="ide-output-stage">
                 <div className="ide-output-body ide-console" ref={outputRef}>
                   {lines.length === 0 ? (
                     <div className="ide-blank">
@@ -864,6 +867,16 @@ export default function PythonConsolePage() {
                       })}
                     </pre>
                   )}
+                </div>
+
+                {booting ? (
+                  <div className="ide-busy" role="status">
+                    <Loader />
+                    <p className="ide-busy-label">
+                      Downloading Python &middot; about 10MB, once per browser
+                    </p>
+                  </div>
+                ) : null}
                 </div>
               </div>
             }

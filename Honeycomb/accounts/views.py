@@ -15,8 +15,10 @@ from .authentication import (
     CookieJWTAuthentication,
     clear_auth_cookies,
     enforce_csrf,
+    issue_tokens,
     set_access_cookie,
     set_auth_cookies,
+    set_refresh_cookie,
 )
 from .exceptions import (
     AMBIGUOUS_ORGANIZATION_DETAIL,
@@ -180,11 +182,22 @@ class SignInView(PublicAPIView):
 
 class CookieTokenRefreshView(PublicAPIView):
     """
-    Exchanges the hc_refresh cookie for a fresh hc_access cookie.
+    Exchanges the hc_refresh cookie for a fresh access *and* refresh cookie.
 
     Neither token is ever in the body: the refresh token arrives as a cookie
-    and the new access token leaves as one, so no part of the pair is exposed
-    to page JavaScript.
+    and the new pair leaves as cookies, so no part of it is exposed to page
+    JavaScript.
+
+    Renewing the refresh token too is what makes the session slide. Handing
+    back only an access token leaves the original refresh token's expiry
+    untouched, so someone using the app every day is still signed out the
+    moment the window elapses -- from their side, being logged out at random.
+    Minting a new one restarts the clock on every renewal.
+
+    Without the blacklist app the replaced token stays valid until its own
+    expiry rather than being revoked, which is the same trade the
+    ROTATE_REFRESH_TOKENS note in settings describes. Nothing here is worse
+    than that; it just now happens on purpose.
     """
 
     throttle_scope = 'refresh'
@@ -218,7 +231,7 @@ class CookieTokenRefreshView(PublicAPIView):
         # get_user() is the same lookup CookieJWTAuthentication performs, so
         # refresh accepts exactly the subjects /auth/me/ would.
         try:
-            CookieJWTAuthentication().get_user(access)
+            user = CookieJWTAuthentication().get_user(access)
         except AuthenticationFailed:
             response = Response(
                 {'detail': 'Refresh token is invalid or expired.'},
@@ -226,7 +239,12 @@ class CookieTokenRefreshView(PublicAPIView):
             )
             return clear_auth_cookies(response)
         response = Response({'ok': True}, status=status.HTTP_200_OK)
-        return set_access_cookie(response, access)
+        set_access_cookie(response, access)
+        # A brand new refresh token, not the one that arrived: its expiry is
+        # baked into the JWT, so re-sending the same string with a later cookie
+        # max_age would extend the cookie and not the session.
+        set_refresh_cookie(response, issue_tokens(user))
+        return response
 
 
 class LogoutView(PublicAPIView):
