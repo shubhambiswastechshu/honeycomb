@@ -18,18 +18,42 @@ from django.contrib import admin
 from django.urls import include, path
 
 from accounts.urls import tenant_urlpatterns
+from foraging.urls import console_urlpatterns as forager_console_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/', include(tenant_urlpatterns)),
-    # Product APIs. Each app registers its own router, so the collection names
-    # (workspaces/, sources/, queries/, runs/, scripts/, pipelines/) live next
-    # to the viewsets
-    # that serve them rather than in one list here.
-    path('api/', include('workspaces.urls')),
-    path('api/', include('datasources.urls')),
-    path('api/', include('sqlconsole.urls')),
-    path('api/', include('notebooks.urls')),
-    path('api/', include('pipelines.urls')),
+    # The MCP portal's control plane: the connector catalogue, a tenant's
+    # configured connections, and the tool toggles, API keys and activity log
+    # hanging off each one. Cookie-authenticated and CSRF-protected like every
+    # other /api/ route, because it is the browser that calls it.
+    #
+    # Two includes. `connections` owns the catalogue, the instances and their
+    # tool toggles; `mcp` owns the bearer keys minted against an instance,
+    # because the key model and the data plane that validates it belong
+    # together. `connectors` contributes no routes at all -- it is a registry,
+    # not an app with tables.
+    #
+    # `mcp.urls` is only the *control* plane for keys. The MCP data plane
+    # itself, /mcp/**, is deliberately not routed here. See below.
+    path('api/', include('connections.urls')),
+    path('api/', include('mcp.urls')),
+    # Forager. The /api/forager/agent/** half is the worker plane -- a machine
+    # elsewhere polling for crawl jobs on a bearer token, with no session and
+    # therefore no CSRF surface. The rest is the console the dashboard reads.
+    path('api/forager/', include('foraging.urls')),
+    # The live console page. Server-rendered so it works with no frontend build
+    # -- which is exactly the situation you are in when a crawl is misbehaving.
+    path('', include((forager_console_urlpatterns, 'foraging'), namespace='foraging-console')),
 ]
+
+# /mcp/** is absent from this file on purpose, and adding it would be a
+# regression rather than a tidy-up. It is served by the FastAPI app composed
+# beside Django in Honeycomb/asgi.py, so it never reaches ROOT_URLCONF and
+# never passes through MIDDLEWARE. Routing it here would put CsrfViewMiddleware
+# and APPEND_SLASH in front of a bearer-authenticated JSON-RPC endpoint, and
+# the 301 that CommonMiddleware issues for a slashless POST drops the body --
+# which an MCP client reports to the user as "Session terminated". The
+# reasoning is written out at the top of asgi.py and in settings.py under
+# "Two auth planes".

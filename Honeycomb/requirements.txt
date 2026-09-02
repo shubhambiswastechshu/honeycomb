@@ -12,5 +12,24 @@ gunicorn==23.0.0
 # MySQL data sources. cryptography is not optional: MySQL 8 defaults to
 # caching_sha2_password, and PyMySQL needs it to complete that handshake
 # over an unencrypted connection.
+#
+# It is no longer only PyMySQL's transitive need, either: connections/crypto.py
+# imports Fernet from it directly to encrypt stored connector credentials at
+# rest. Dropping PyMySQL would not make this line removable.
 PyMySQL==1.1.2
 cryptography>=42
+
+# MCP data plane. FastAPI serves /mcp/* as its own ASGI app, mounted beside
+# Django in Honeycomb/asgi.py rather than behind it: Django's middleware chain
+# contains sync-only code (WhiteNoise), so routing MCP traffic through it would
+# wrap every JSON-RPC call in a thread hop for no benefit. uvicorn is here for
+# its worker class -- gunicorn runs `Honeycomb.asgi:application` through
+# uvicorn.workers.UvicornWorker in production (see render.yaml) -- and its
+# [standard] extras carry the C-accelerated HTTP and websocket parsers.
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+
+# Connector HTTP. async and HTTP/2-capable, which a sync client cannot be
+# inside the FastAPI event loop; connectors/shims/http.py owns the one shared
+# client and its retry policy.
+httpx==0.28.1

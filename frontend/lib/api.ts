@@ -555,363 +555,458 @@ export function updateTenant(payload: UpdateTenantPayload): Promise<Tenant> {
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* Product resources                                                   */
+/* ================================================================== */
+/* Connectors                                                          */
 /*                                                                     */
-/* Four tenant-scoped collections, each backed by its own Django app:  */
+/* The control plane for the MCP portal. Everything below is           */
+/* tenant-scoped by the server: not one of these calls sends a tenant  */
+/* id, because the backend reads it from request.user and would ignore */
+/* the field anyway. A client that could name a tenant would be a      */
+/* cross-tenant read waiting to happen, so the shape of this section   */
+/* is deliberate -- there is no parameter here to get wrong.           */
 /*                                                                     */
-/*   GET/POST         /workspaces/   workspaces.Workspace              */
-/*   GET/POST/DELETE  /sources/      datasources.DataSource            */
-/*   GET/POST/DELETE  /queries/      sqlconsole.SavedQuery             */
-/*   GET/POST         /runs/         sqlconsole.QueryRun               */
-/*   GET/POST/DELETE  /scripts/      notebooks.PythonScript            */
-/*   GET/POST/DELETE  /pipelines/    pipelines.Pipeline                */
+/* Every one of these endpoints requires a signed-in user, so they all */
+/* pass authenticated: true and inherit request()'s single refresh and */
+/* replay. Without it a dashboard whose hc_access cookie expired while */
+/* the tab sat open would show an error instead of quietly renewing.   */
 /*                                                                     */
-/* Every row already belongs to the caller's organization -- the       */
-/* server filters on request.user.tenant and stamps the same tenant on */
-/* create -- so nothing here sends or receives a tenant id. A client    */
-/* that could name a tenant would be a client that could get it wrong. */
-/* ------------------------------------------------------------------ */
+/* Contract:                                                           */
+/*   GET    /connectors/                     -> ConnectorSpec[]        */
+/*   GET    /connectors/<slug>/              -> ConnectorDetail        */
+/*   GET    /connections/?connector=<slug>   -> Connection[]           */
+/*   POST   /connections/                    -> Connection             */
+/*   GET    /connections/<id>/               -> Connection             */
+/*   PATCH  /connections/<id>/               -> Connection             */
+/*   DELETE /connections/<id>/               -> 204                    */
+/*   GET    /connections/<id>/tools/         -> ConnectorTool[]        */
+/*   POST   /connections/<id>/tools/         -> ConnectorTool[]        */
+/*   GET    /connections/<id>/keys/          -> McpKeyRow[]            */
+/*   POST   /connections/<id>/keys/          -> McpKeyRow & {token}    */
+/*   DELETE /connections/<id>/keys/<key_id>/ -> 204                    */
+/*   GET    /connections/<id>/activity/      -> ActivityRow[]          */
+/* ================================================================== */
 
-export interface WorkspaceCounts {
-  data_sources: number;
-  queries: number;
-  pipelines: number;
-}
-
-export interface Workspace {
-  id: number;
-  name: string;
+/**
+ * One entry in the marketplace: a connector the server knows how to speak,
+ * whether or not this tenant has connected it.
+ *
+ * connected_count is the number of connections this tenant already has for the
+ * connector, and it is the only tenant-specific value on the type. The
+ * marketplace leans on it for the honest card state -- "Connect" at zero,
+ * "N connected" above it -- which is also why a card must never render a count
+ * before this list has arrived. Zero and "not loaded yet" are different facts.
+ *
+ * cred_fields names the credentials a connect form has to collect. It is the
+ * connector's own list, so the form stays data-driven and a newly registered
+ * connector becomes connectable without a frontend change.
+ */
+export interface ConnectorSpec {
   slug: string;
+  label: string;
+  auth: string;
   description: string;
-  counts: WorkspaceCounts;
-  created_at: string;
-  updated_at: string;
+  category: string;
+  cred_fields: string[];
+  tool_count: number;
+  connected_count: number;
 }
 
-export interface DataSource {
-  id: number;
-  workspace: number;
-  workspace_name: string;
+/**
+ * One tool a connector exposes over MCP.
+ *
+ * write is the connector author's declaration that the tool changes remote
+ * state; the UI uses it to warn, not to block. enabled is present only when the
+ * tool is read through a connection (GET/POST /connections/<id>/tools/),
+ * because enablement belongs to the connection rather than the connector -- the
+ * catalogue listing has no per-tenant answer for it, so the field is optional
+ * instead of defaulting to a value that would be a guess.
+ */
+export interface ConnectorTool {
   name: string;
-  kind: string;
-  kind_display: string;
-  host: string;
-  port: number | null;
-  database: string;
-  username: string;
-  secret_name: string;
-  /** Whether a password is reachable under `secret_name`. Never the secret. */
-  secret_configured: boolean;
-  /** The variable the default backend reads, so the fix is copy-pasteable. */
-  secret_env_var: string;
+  description: string;
+  write: boolean;
+  enabled?: boolean;
+}
+
+/** A connector plus its full tool list, from GET /connectors/<slug>/. */
+export interface ConnectorDetail extends ConnectorSpec {
+  tools: ConnectorTool[];
+}
+
+/**
+ * One configured instance of a connector for this tenant.
+ *
+ * Credentials are write-only by design and never appear here: they are
+ * encrypted at rest and the serializer has no outbound field for them. If you
+ * find yourself wanting a creds property, the answer is no -- send new values
+ * through updateConnection() rather than reading the old ones back.
+ *
+ * endpoint_slug is generated once, at creation, and is never regenerated: it is
+ * embedded in mcp_url, which people paste into MCP clients. Treat both as
+ * stable identifiers, not as display detail that can be refreshed.
+ */
+export interface Connection {
+  id: number;
+  connector: string;
+  connector_label: string;
+  name: string;
   status: string;
-  status_display: string;
-  last_checked_at: string | null;
   last_error: string;
+  endpoint_slug: string;
+  mcp_url: string;
+  disabled_tools: string[];
+  tool_count: number;
+  key_count: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface SavedQuery {
+/**
+ * A minted MCP key, as it is listed afterwards.
+ *
+ * There is no token field here on purpose. The plaintext token exists exactly
+ * once, in the response to mintKey(); the server keeps only a sha256 hash, so
+ * nothing can ever hand it back. Any UI that shows a key shows it at mint time
+ * or not at all.
+ */
+export interface McpKeyRow {
   id: number;
-  workspace: number;
-  workspace_name: string;
-  data_source: number | null;
-  data_source_name: string | null;
-  name: string;
-  description: string;
-  sql: string;
-  created_by_name: string | null;
+  label: string;
+  key_prefix: string;
   created_at: string;
-  updated_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 }
 
-export interface Pipeline {
+/** One row of the tools/call audit trail for a connection. */
+export interface ActivityRow {
   id: number;
-  workspace: number;
-  workspace_name: string;
-  source: number | null;
-  source_name: string | null;
-  name: string;
-  description: string;
-  destination: string;
-  schedule: string;
+  connector: string;
+  tool_name: string;
   status: string;
-  status_display: string;
-  last_outcome: string;
-  last_outcome_display: string;
-  last_run_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Narrows a list endpoint's response to an array. DRF pagination is off. */
-function asList<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-export async function listWorkspaces(): Promise<Workspace[]> {
-  return asList<Workspace>(
-    await request<unknown>("/workspaces/", { method: "GET", authenticated: true })
-  );
-}
-
-export function createWorkspace(body: {
-  name: string;
-  description?: string;
-}): Promise<Workspace> {
-  return request<Workspace>("/workspaces/", {
-    method: "POST",
-    body: body,
-    authenticated: true,
-  });
-}
-
-export async function deleteWorkspace(id: number): Promise<void> {
-  await request<unknown>("/workspaces/" + id + "/", {
-    method: "DELETE",
-    authenticated: true,
-  });
-}
-
-/** `workspace` narrows the list server-side; omit it for everything. */
-export async function listDataSources(workspace?: number): Promise<DataSource[]> {
-  const query = workspace === undefined ? "" : "?workspace=" + workspace;
-  return asList<DataSource>(
-    await request<unknown>("/sources/" + query, {
-      method: "GET",
-      authenticated: true,
-    })
-  );
-}
-
-export function createDataSource(body: Record<string, unknown>): Promise<DataSource> {
-  return request<DataSource>("/sources/", {
-    method: "POST",
-    body: body,
-    authenticated: true,
-  });
-}
-
-export async function deleteDataSource(id: number): Promise<void> {
-  await request<unknown>("/sources/" + id + "/", {
-    method: "DELETE",
-    authenticated: true,
-  });
-}
-
-export async function listQueries(workspace?: number): Promise<SavedQuery[]> {
-  const query = workspace === undefined ? "" : "?workspace=" + workspace;
-  return asList<SavedQuery>(
-    await request<unknown>("/queries/" + query, {
-      method: "GET",
-      authenticated: true,
-    })
-  );
-}
-
-export function createQuery(body: Record<string, unknown>): Promise<SavedQuery> {
-  return request<SavedQuery>("/queries/", {
-    method: "POST",
-    body: body,
-    authenticated: true,
-  });
-}
-
-export async function deleteQuery(id: number): Promise<void> {
-  await request<unknown>("/queries/" + id + "/", {
-    method: "DELETE",
-    authenticated: true,
-  });
-}
-
-export async function listPipelines(workspace?: number): Promise<Pipeline[]> {
-  const query = workspace === undefined ? "" : "?workspace=" + workspace;
-  return asList<Pipeline>(
-    await request<unknown>("/pipelines/" + query, {
-      method: "GET",
-      authenticated: true,
-    })
-  );
-}
-
-export function createPipeline(body: Record<string, unknown>): Promise<Pipeline> {
-  return request<Pipeline>("/pipelines/", {
-    method: "POST",
-    body: body,
-    authenticated: true,
-  });
-}
-
-export async function deletePipeline(id: number): Promise<void> {
-  await request<unknown>("/pipelines/" + id + "/", {
-    method: "DELETE",
-    authenticated: true,
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/* SQL console                                                         */
-/*                                                                     */
-/* A run is a record, not a request: POST /runs/ executes the          */
-/* statement and answers with the row it wrote, so the result and the  */
-/* history entry are the same object and cannot disagree.              */
-/*                                                                     */
-/* A failed query comes back 200 with state "FAILED" and the database  */
-/* error in `error`. That is not sloppiness about status codes -- the  */
-/* HTTP request succeeded, and a 4xx would be swallowed by the generic */
-/* error handling above instead of showing the person what PostgreSQL  */
-/* actually said, which is the only useful part.                       */
-/* ------------------------------------------------------------------ */
-
-export interface ResultColumn {
-  name: string;
-  type: string;
-}
-
-export interface QueryRun {
-  id: number;
-  workspace: number;
-  workspace_name: string;
-  data_source: number | null;
-  data_source_name: string | null;
-  saved_query: number | null;
-  saved_query_name: string | null;
-  sql: string;
-  preview: string;
-  state: "SUCCEEDED" | "FAILED";
-  state_display: string;
-  result_columns: ResultColumn[];
-  result_rows: unknown[][];
-  row_count: number;
-  truncated: boolean;
-  notice: string;
-  duration_ms: number;
-  error: string;
-  created_by_name: string | null;
+  duration_ms: number | null;
+  error_message: string;
   created_at: string;
 }
 
-/** A history entry: the same row without its rows or its full statement. */
-export type QueryRunSummary = Omit<
-  QueryRun,
-  "result_columns" | "result_rows" | "sql"
->;
-
-export interface RunRequest {
-  workspace: number;
-  data_source: number;
-  sql: string;
-  saved_query?: number | null;
-  limit?: number;
-}
-
-export interface SchemaColumn {
+export interface CreateConnectionPayload {
+  connector: string;
   name: string;
-  type: string;
+  creds: Record<string, string>;
 }
 
-export interface SchemaTable {
-  schema: string;
-  name: string;
-  qualified: string;
-  kind: string;
-  columns: SchemaColumn[];
+export interface UpdateConnectionPayload {
+  name?: string;
+  creds?: Record<string, string>;
 }
 
-export interface PythonScript {
-  id: number;
-  workspace: number;
-  workspace_name: string;
-  name: string;
-  description: string;
-  code: string;
-  created_by_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Tables and columns for a source, read live. Rejects with the connector's message. */
-export async function fetchSchema(sourceId: number): Promise<SchemaTable[]> {
-  const body = await request<{ tables?: SchemaTable[] }>(
-    "/sources/" + sourceId + "/schema/",
-    { method: "GET", authenticated: true }
-  );
-  return Array.isArray(body.tables) ? body.tables : [];
-}
-
-/** Dial the source and record the outcome on it. */
-export function testDataSource(sourceId: number): Promise<DataSource & { detail: string }> {
-  return request<DataSource & { detail: string }>("/sources/" + sourceId + "/test/", {
-    method: "POST",
-    authenticated: true,
-  });
-}
-
-export function runQuery(payload: RunRequest): Promise<QueryRun> {
-  return request<QueryRun>("/runs/", {
-    method: "POST",
-    body: payload as unknown as Record<string, unknown>,
-    authenticated: true,
-  });
-}
-
-export async function listRuns(workspace?: number): Promise<QueryRunSummary[]> {
-  const query = workspace === undefined ? "" : "?workspace=" + workspace;
-  return asList<QueryRunSummary>(
-    await request<unknown>("/runs/" + query, { method: "GET", authenticated: true })
-  );
-}
-
-/** One run with its rows. The list omits them; this is what opening an entry costs. */
-export function getRun(id: number): Promise<QueryRun> {
-  return request<QueryRun>("/runs/" + id + "/", {
+/** The whole catalogue, including connectors this tenant has never touched. */
+export function listConnectors(): Promise<ConnectorSpec[]> {
+  return request<ConnectorSpec[]>("/connectors/", {
     method: "GET",
     authenticated: true,
   });
 }
 
-export function updateQuery(
-  id: number,
-  body: Record<string, unknown>
-): Promise<SavedQuery> {
-  return request<SavedQuery>("/queries/" + id + "/", {
-    method: "PATCH",
-    body: body,
-    authenticated: true,
-  });
-}
-
-export async function listScripts(workspace?: number): Promise<PythonScript[]> {
-  const query = workspace === undefined ? "" : "?workspace=" + workspace;
-  return asList<PythonScript>(
-    await request<unknown>("/scripts/" + query, { method: "GET", authenticated: true })
+/** One connector with its tools. The slug is path data, so it is encoded. */
+export function getConnector(slug: string): Promise<ConnectorDetail> {
+  return request<ConnectorDetail>(
+    "/connectors/" + encodeURIComponent(slug) + "/",
+    { method: "GET", authenticated: true }
   );
 }
 
-export function createScript(body: Record<string, unknown>): Promise<PythonScript> {
-  return request<PythonScript>("/scripts/", {
+/**
+ * This tenant's connections, optionally narrowed to one connector.
+ *
+ * The filter is a query parameter rather than a path segment, so an absent or
+ * empty slug simply asks for everything instead of sending
+ * "/connections/?connector=" and making the server decide what an empty filter
+ * is supposed to mean.
+ */
+export function listConnections(connector?: string): Promise<Connection[]> {
+  let path = "/connections/";
+  if (typeof connector === "string" && connector.length > 0) {
+    path += "?connector=" + encodeURIComponent(connector);
+  }
+  return request<Connection[]>(path, { method: "GET", authenticated: true });
+}
+
+/**
+ * Create a connection. creds travels up in the body and never comes back down;
+ * the caller should drop its copy the moment this resolves rather than keeping
+ * a secret alive in component state for the life of the page.
+ */
+export function createConnection(
+  body: CreateConnectionPayload
+): Promise<Connection> {
+  return request<Connection>("/connections/", {
     method: "POST",
-    body: body,
+    body: {
+      connector: body.connector,
+      name: body.name,
+      creds: body.creds,
+    },
     authenticated: true,
   });
 }
 
-export function updateScript(
+/**
+ * Rename a connection, replace its credentials, or both.
+ *
+ * Each key is included only when the caller actually supplied it. An undefined
+ * creds would serialize away to nothing anyway, but an empty object would reach
+ * the server as "clear the credentials" and silently break a live MCP endpoint
+ * during what the user thought was a rename.
+ */
+export function updateConnection(
   id: number,
-  body: Record<string, unknown>
-): Promise<PythonScript> {
-  return request<PythonScript>("/scripts/" + id + "/", {
+  body: UpdateConnectionPayload
+): Promise<Connection> {
+  const payload: Record<string, unknown> = {};
+  if (typeof body.name === "string") {
+    payload["name"] = body.name;
+  }
+  if (body.creds !== undefined) {
+    payload["creds"] = body.creds;
+  }
+  return request<Connection>("/connections/" + id + "/", {
     method: "PATCH",
-    body: body,
+    body: payload,
     authenticated: true,
   });
 }
 
-export async function deleteScript(id: number): Promise<void> {
-  await request<unknown>("/scripts/" + id + "/", {
+/**
+ * Delete a connection. Its keys go with it, so every MCP client pointed at that
+ * URL stops working the instant this resolves. Confirm before calling it.
+ */
+export async function deleteConnection(id: number): Promise<void> {
+  await request<null>("/connections/" + id + "/", {
     method: "DELETE",
     authenticated: true,
   });
+}
+
+/** The connector's tools with this connection's enabled flag resolved. */
+export function listConnectionTools(id: number): Promise<ConnectorTool[]> {
+  return request<ConnectorTool[]>("/connections/" + id + "/tools/", {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+/**
+ * Enable or disable one tool on one connection.
+ *
+ * The server answers with the whole refreshed list rather than the single row,
+ * so the caller replaces its state wholesale instead of patching one entry in
+ * place. That keeps the UI honest when the server disagreed with the request --
+ * a tool the connector no longer exposes, say -- and it is why this resolves to
+ * ConnectorTool[] rather than void.
+ */
+export function toggleConnectionTool(
+  id: number,
+  tool: string,
+  enabled: boolean
+): Promise<ConnectorTool[]> {
+  return request<ConnectorTool[]>("/connections/" + id + "/tools/", {
+    method: "POST",
+    body: { tool: tool, enabled: enabled },
+    authenticated: true,
+  });
+}
+
+/** Keys minted for this connection. Prefixes only -- see McpKeyRow. */
+export function listKeys(id: number): Promise<McpKeyRow[]> {
+  return request<McpKeyRow[]>("/connections/" + id + "/keys/", {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+/**
+ * Mint a key. The resolved value carries token, the full "hc_" secret, and this
+ * is the only moment it will ever exist -- the server stores a sha256 hash and
+ * nothing else. Show it once, offer a copy, and persist it nowhere: not browser
+ * storage, not a URL, not a logged object.
+ */
+export function mintKey(
+  id: number,
+  label: string
+): Promise<McpKeyRow & { token: string }> {
+  return request<McpKeyRow & { token: string }>(
+    "/connections/" + id + "/keys/",
+    {
+      method: "POST",
+      body: { label: label },
+      authenticated: true,
+    }
+  );
+}
+
+/** Revoke a key. The row survives with revoked_at stamped; the token dies. */
+export async function revokeKey(id: number, keyId: number): Promise<void> {
+  await request<null>("/connections/" + id + "/keys/" + keyId + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+/**
+ * Recent tools/call rows for a connection, newest first.
+ *
+ * limit is sent only when the caller asked for one, so the server's own default
+ * stays the single source of truth for what "recent" means instead of being
+ * duplicated as a magic number on this side of the wire.
+ */
+export function listConnectionActivity(
+  id: number,
+  limit?: number
+): Promise<ActivityRow[]> {
+  let path = "/connections/" + id + "/activity/";
+  if (typeof limit === "number" && limit > 0) {
+    path += "?limit=" + String(Math.floor(limit));
+  }
+  return request<ActivityRow[]>(path, { method: "GET", authenticated: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Google OAuth                                                        */
+/*                                                                     */
+/*   GET /connectors/<slug>/oauth/start/ -> {authorize_url}            */
+/*                                                                     */
+/* Connectors whose auth is "google_oauth" have no credentials to      */
+/* paste: the connection is created by the callback, not by this       */
+/* client. So there is deliberately no matching finish() call here --  */
+/* Google redirects to the server, the server redirects back to the    */
+/* connector page with ?connected=1 or ?error=<message>, and the page  */
+/* reads that instead of polling for a result it cannot see.           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ask the server where to send the browser to start the Google consent
+ * screen. Each call mints a fresh one-time state nonce, so the URL is good for
+ * exactly one attempt and must be navigated to rather than stored or reused.
+ *
+ * Rejects with the server's own message when Google is not configured on this
+ * deployment; that message names the redirect URI an admin has to register, so
+ * it must be shown verbatim rather than replaced with a friendlier sentence.
+ */
+export function startGoogleOAuth(
+  slug: string
+): Promise<{ authorize_url: string }> {
+  return request<{ authorize_url: string }>(
+    "/connectors/" + encodeURIComponent(slug) + "/oauth/start/",
+    { method: "GET", authenticated: true }
+  );
+}
+
+/* ================================================================== */
+/* Activity                                                            */
+/*                                                                     */
+/* The workspace-wide view of the audit trail that                     */
+/* listConnectionActivity() reads one connection at a time. Both are   */
+/* needed and neither replaces the other: the connector page asks      */
+/* "what has this connection been doing", the Overview asks "what has  */
+/* been happening here at all".                                        */
+/*                                                                     */
+/* The Overview's answer is a server query rather than a fan-out over  */
+/* listConnectionActivity(), for two reasons. A client-side merge      */
+/* would cost one request per connection to build a list of twelve     */
+/* rows, and it would silently lose every call made through a          */
+/* connection that has since been deleted -- the activity row outlives */
+/* its connection, so those rows belong to the tenant, not to any      */
+/* connection that could still be listed.                              */
+/*                                                                     */
+/* Both calls are tenant-scoped by the server, like everything above:  */
+/* there is no tenant parameter here to get wrong.                     */
+/*                                                                     */
+/* Contract:                                                           */
+/*   GET /activity/?limit=<n>        -> ActivityEvent[]  newest first  */
+/*   GET /activity/summary/?days=<n> -> ActivitySummary                */
+/* ================================================================== */
+
+/**
+ * One tools/call across the whole workspace.
+ *
+ * The per-connection ActivityRow's wider sibling: it names the connection as
+ * well as the connector, because a list that spans connections has to say
+ * which one a call went through.
+ *
+ * connection and connection_name are BOTH null for exactly one
+ * reason -- the connection was deleted after the call was made. The row is
+ * kept anyway, since an audit trail that forgets what happened the moment
+ * someone removes a connection is not an audit trail. Render such a row
+ * without a link rather than linking to a connection that is gone.
+ *
+ * status is "ok" or "error", and duration_ms is null when the call failed
+ * before it could be timed. Both are typed as they arrive rather than as a
+ * union or a number, because narrowing a value that comes off the wire is a
+ * promise this file cannot keep.
+ */
+export interface ActivityEvent {
+  id: number;
+  connector: string;
+  connector_label: string;
+  connection: number | null;
+  // Null, not "", once the connection has been deleted -- the server nulls
+  // this and `connection` together. Declaring it non-nullable is what let a
+  // null-unsafe read of it compile clean.
+  connection_name: string | null;
+  tool_name: string;
+  status: string;
+  duration_ms: number | null;
+  error_message: string;
+  created_at: string;
+}
+
+/**
+ * One day's calls, split by outcome. date is the calendar day in ISO
+ * "YYYY-MM-DD" form; ok and error are counts, so ok + error is that day's
+ * total and there is no third state to account for.
+ */
+export interface ActivityDay {
+  date: string;
+  ok: number;
+  error: number;
+}
+
+/**
+ * The counts behind a sparkline.
+ *
+ * days is dense: the server emits an entry for every day in the window,
+ * including the quiet ones at zero, so a chart can plot it straight without
+ * inventing the gaps. total and errors are the server's own sums over that
+ * same window -- read them rather than re-adding days, so the number under a
+ * chart can never disagree with the chart.
+ */
+export interface ActivitySummary {
+  days: ActivityDay[];
+  total: number;
+  errors: number;
+}
+
+/**
+ * The most recent tool calls in this workspace, newest first.
+ *
+ * limit travels only when the caller asked for one, leaving the server's
+ * default as the single definition of "recent" instead of duplicating a magic
+ * number on this side of the wire.
+ */
+export function listActivity(limit?: number): Promise<ActivityEvent[]> {
+  let path = "/activity/";
+  if (typeof limit === "number" && limit > 0) {
+    path += "?limit=" + String(Math.floor(limit));
+  }
+  return request<ActivityEvent[]>(path, { method: "GET", authenticated: true });
+}
+
+/** Per-day call counts for the trailing window. days is omitted the same way. */
+export function activitySummary(days?: number): Promise<ActivitySummary> {
+  let path = "/activity/summary/";
+  if (typeof days === "number" && days > 0) {
+    path += "?days=" + String(Math.floor(days));
+  }
+  return request<ActivitySummary>(path, { method: "GET", authenticated: true });
 }

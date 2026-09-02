@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The 56px top bar: brand on the left, one search field, nothing else.
+ * The 56px top bar: brand on the left, the search field on the true centre,
+ * and the account controls on the right.
  *
  * The search input is deliberately inert for now -- it holds its own value and
  * has no submit handler and no results UI, because there is nothing to search
@@ -10,8 +11,12 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
+import SignOutButton from "@/components/dashboard/SignOutButton";
+import { useSession } from "@/components/dashboard/SessionProvider";
 
 /** True for the platforms whose modifier is actually Command. */
 function usesCommandKey(): boolean {
@@ -23,8 +28,26 @@ function usesCommandKey(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(platform);
 }
 
+/** First visible character of the name, falling back to the address. */
+function monogram(fullName: string, email: string): string {
+  const name = fullName.trim();
+  if (name.length > 0) {
+    return name.charAt(0).toUpperCase();
+  }
+  const address = email.trim();
+  return address.length > 0 ? address.charAt(0).toUpperCase() : "?";
+}
+
 export default function TopBar() {
+  const { session } = useSession();
+  const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The avatar shows only a letter, so the name has to reach a screen reader
+  // some other way -- it is the label and the tooltip.
+  const displayName =
+    session.user.full_name.trim().length > 0
+      ? session.user.full_name
+      : session.user.email;
   const [query, setQuery] = useState<string>("");
   // The handler below accepts Meta *or* Control, so the hint has to say which
   // one this machine has. Empty until the effect runs: the server cannot know
@@ -101,6 +124,25 @@ export default function TopBar() {
             {shortcutHint}
           </span>
         ) : null}
+      </div>
+
+      {/* The account controls. They were in the rail's foot, which put the
+          two things a person reaches for least in the column reserved for
+          the things they reach for most. */}
+      <div className="dash-account">
+        <Link
+          href="/dashboard/profile"
+          className="dash-account-link"
+          title={displayName + " — profile"}
+          aria-label={displayName + " — profile"}
+          aria-current={pathname === "/dashboard/profile" ? "page" : undefined}
+        >
+          <span className="dash-account-mark" aria-hidden="true">
+            {monogram(session.user.full_name, session.user.email)}
+          </span>
+          <span className="dash-account-name">{displayName}</span>
+        </Link>
+        <SignOutButton />
       </div>
     </header>
   );

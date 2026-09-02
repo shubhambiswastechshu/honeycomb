@@ -22,7 +22,19 @@ services:
     region: oregon
     rootDir: Honeycomb
     buildCommand: "./build.sh"
-    startCommand: "gunicorn Honeycomb.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+    # ASGI, not WSGI. /mcp/* is a FastAPI app composed beside Django in
+    # Honeycomb/asgi.py; served through Honeycomb.wsgi it simply would not
+    # exist. gunicorn stays as the process manager (restarts, worker
+    # supervision) and uvicorn supplies the worker class underneath it.
+    #
+    # --timeout 120 against HONEYCOMB_MCP_TOOL_TIMEOUT=45: gunicorn kills a
+    # worker it thinks is wedged, and a connector legitimately spending its
+    # full 45s waiting on a slow third-party API is not wedged. At the old 60
+    # there was 15s of headroom for everything else the worker was doing --
+    # including other concurrent requests, since one async worker handles many
+    # at once. A killed worker returns nothing an MCP client can parse, which
+    # the user reads as the session dying rather than as one slow tool.
+    startCommand: "gunicorn Honeycomb.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
     healthCheckPath: /api/auth/csrf/
     envVars:
       - key: PYTHON_VERSION
@@ -55,6 +67,35 @@ services:
       # Until it is set, CSRF rejects writes from the deployed frontend.
       - key: DJANGO_PUBLIC_ORIGINS
         sync: false
+      # Fernet keys for connector credentials at rest, comma separated, newest
+      # first. Not generateValue: Render emits a random hex string, and Fernet
+      # requires 32 url-safe base64 bytes, so it would fail at first decrypt
+      # rather than at boot. Generate and paste:
+      #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      # Rotating means PREPENDING a new key and leaving the old one until every
+      # row has been re-saved. Losing the last key that encrypted a row loses
+      # that credential permanently.
+      - key: HONEYCOMB_CRED_KEYS
+        sync: false
+      # The origin an AI client dials, used to build every mcp_url the portal
+      # hands out. This one is THIS service's own public URL, not the
+      # frontend's -- the single-origin proxying above exists to keep browser
+      # cookies SameSite=Lax, and an MCP client is not a browser and carries no
+      # cookie, so it can talk to the API directly. (Point it at the frontend
+      # instead only if next.config.mjs is given an /mcp/* rewrite too.)
+      #
+      # Set after the first deploy, alongside DJANGO_PUBLIC_ORIGINS. Render has
+      # no blueprint property that yields a full https:// URL, hence sync:false
+      # rather than fromService. No trailing slash. Treat it as permanent:
+      # users paste the URLs built from it into Claude or Cursor, and changing
+      # it silently breaks every config already out there.
+      #   HONEYCOMB_PUBLIC_BASE=https://honeycomb-api.onrender.com
+      - key: HONEYCOMB_PUBLIC_BASE
+        sync: false
+      # Ceiling on one tools/call. Must stay well under gunicorn's --timeout
+      # above; raise both together or neither.
+      - key: HONEYCOMB_MCP_TOOL_TIMEOUT
+        value: "45"
 
   # ---- Next.js frontend ----
   - type: web

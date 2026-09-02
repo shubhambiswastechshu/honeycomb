@@ -34,8 +34,10 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  /* The variable is set by next/font in layout.tsx; the stack after it is what
+     renders for the moment before the file lands, and if it never does. */
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -54,6 +56,121 @@ body {
   align-items: center;
   justify-content: center;
   padding: 64px 24px;
+}
+
+/* ---- Auth split ----
+   The form on the left, the honeycomb on the right. The image is decorative,
+   so it is a background rather than an <img>: nothing is lost to a screen
+   reader when it is not announced, and it disappears cleanly below 900px
+   where there is no room for two columns and the form is the whole point. */
+
+/* .page-main centres a narrow column and pads it. The split wants the whole
+   pane instead, so it cancels both -- scoped with :has so every other page
+   that uses .page-main keeps the centred column it was built for. */
+.page-main:has(> .auth-split) {
+  padding: 0;
+  align-items: stretch;
+}
+
+.auth-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+/* The form keeps its own measure and its own breathing room inside the
+   column, which is what the pane's padding used to give it. */
+.auth-split > .card {
+  justify-self: center;
+  align-self: center;
+  padding: 64px 24px;
+  max-width: calc(360px + 48px);
+}
+
+.auth-art {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .auth-split {
+    grid-template-columns: 1fr minmax(420px, 46%);
+  }
+
+  .auth-art {
+    display: block;
+    position: relative;
+    background-image: url("/auth-honeycomb.jpg");
+    background-size: cover;
+    background-position: center;
+
+    /* The seam is fixed by fading the IMAGE, not by laying cream over it.
+       An overlay can only ever reach opaque cream at the panel's own left
+       edge -- the edge is still there, and the eye finds it as a straight
+       vertical line however soft the gradient above it is.
+       A mask makes those pixels transparent instead, so the photograph
+       genuinely dissolves into the page and there is no boundary left to see.
+
+       No background-color: a colour behind the image would be revealed by the
+       mask exactly where the image is meant to be disappearing, which puts the
+       hard edge straight back. */
+    /* `to right`, NOT an angle. An angled gradient's 0% line is perpendicular
+       to its own axis and starts outside the box's corner, so at the element's
+       actual left edge the mask was already partly opaque -- which is a hard
+       edge, exactly the line this mask exists to remove. Measured at the
+       element boundary: a visible step at 100deg, none at 90. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      transparent 6%,
+      rgba(0, 0, 0, 0.06) 18%,
+      rgba(0, 0, 0, 0.3) 36%,
+      rgba(0, 0, 0, 0.72) 58%,
+      #000 78%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      transparent 6%,
+      rgba(0, 0, 0, 0.06) 18%,
+      rgba(0, 0, 0, 0.3) 36%,
+      rgba(0, 0, 0, 0.72) 58%,
+      #000 78%
+    );
+  }
+
+  /* The column reaches back under the form so the fade has room to happen
+     across real distance rather than being squeezed into the panel's own
+     width. It is behind the form and pointer-events-free, so it cannot
+     interfere with the inputs. */
+  .auth-art {
+    margin-left: -18vw;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .auth-split > .card {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Only the horizontal edges now -- the mask handles the vertical one. Kept
+     light: this is a wash to settle the picture into the page's temperature,
+     not a scrim with anything to make legible. */
+  .auth-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 252, 244, 0.34) 0%,
+        transparent 20%,
+        transparent 78%,
+        rgba(255, 252, 244, 0.38) 100%
+      ),
+      linear-gradient(200deg, rgba(234, 157, 62, 0.1), transparent 55%);
+  }
 }
 
 /* No card chrome: the form sits directly on the page. */

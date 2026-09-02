@@ -15,7 +15,11 @@ interface AuthCardProps {
   headingKey?: string | number;
 }
 
-/** Single centered column shared by the sign in and sign up pages. */
+/**
+ * The sign-in / sign-up shell: the form column, and the honeycomb beside it on
+ * a wide screen. The art is a sibling of the form rather than a background on
+ * the page, so the form keeps its own centred measure whatever the window does.
+ */
 export function AuthCard({
   title,
   subtitle,
@@ -23,14 +27,17 @@ export function AuthCard({
   headingKey,
 }: AuthCardProps) {
   return (
-    <main className="card">
-      <Logo />
-      <header key={headingKey} className="card-heading">
-        <h1 className="title">{title}</h1>
-        <p className="subtitle">{subtitle}</p>
-      </header>
-      {children}
-    </main>
+    <div className="auth-split">
+      <main className="card">
+        <Logo />
+        <header key={headingKey} className="card-heading">
+          <h1 className="title">{title}</h1>
+          <p className="subtitle">{subtitle}</p>
+        </header>
+        {children}
+      </main>
+      <div className="auth-art" role="presentation" />
+    </div>
   );
 }
 

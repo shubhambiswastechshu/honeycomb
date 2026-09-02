@@ -1,26 +1,27 @@
 "use client";
 
 /**
- * The narrow left rail: icons only, no visible text labels. Each item carries
- * an aria-label and a title, plus a CSS-only tooltip that slides out to the
- * right on pointer devices (absolutely positioned, so it never shifts layout).
+ * The left rail: an icon above a short text label, one per section.
  *
- * Under 720px the rail turns into a bottom bar; see dashboard.css.
+ * The labels are visible rather than hidden behind a hover tooltip. An icon
+ * rail only works when every glyph is unambiguous, and this product's sections
+ * are not -- "Data", "Activity" and "Connectors" are three abstractions that
+ * no icon distinguishes reliably, so the tooltip was carrying meaning that
+ * belongs on the screen. The tooltip markup stays for the collapsed bottom-bar
+ * layout under 720px, where there is no room for a label.
+ *
+ * The account controls are NOT here. They live in the top bar's right-hand
+ * column, next to the person's own name.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
-  Boxes,
   Database,
-  GitBranch,
   LayoutGrid,
-  Plug,
+  Blocks,
   Settings,
-  SquareTerminal,
-  Terminal,
-  UserRound,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -38,25 +39,15 @@ interface RailItem {
 
 const MAIN_ITEMS: RailItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid, exact: true },
-  // The four product areas, in the order work moves through them: make a
-  // workspace, connect something to it, query it in SQL or Python, then
-  // schedule the query.
-  { href: "/dashboard/workspaces", label: "Workspaces", icon: Boxes },
-  { href: "/dashboard/sources", label: "Connect data", icon: Plug },
-  { href: "/dashboard/sql", label: "SQL", icon: Terminal },
-  { href: "/dashboard/python", label: "Python", icon: SquareTerminal },
-  { href: "/dashboard/pipelines", label: "Pipelines", icon: GitBranch },
+  /* Second, directly under Overview: connecting a data source is the primary
+     action of the product, and /dashboard/connectors/<slug> is a child route,
+     so this entry stays lit while a single connector is open. */
+  { href: "/dashboard/connectors", label: "MCPs", icon: Blocks },
   { href: "/dashboard/data", label: "Data", icon: Database },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
-
-const PROFILE_ITEM: RailItem = {
-  href: "/dashboard/profile",
-  label: "Profile",
-  icon: UserRound,
-};
 
 function isActive(pathname: string, item: RailItem): boolean {
   if (item.exact === true) {
@@ -72,11 +63,16 @@ function RailLink({ item, active }: { item: RailItem; active: boolean }) {
       <Link
         href={item.href}
         className="rail-item"
-        aria-label={item.label}
         title={item.label}
         aria-current={active ? "page" : undefined}
       >
-        <Icon size={19} strokeWidth={1.75} aria-hidden="true" />
+        {/* The box is a child rather than the link's own background: the
+            label sits outside it, so the current section reads as a
+            highlighted icon with a caption, not as a filled block of text. */}
+        <span className="rail-box">
+          <Icon size={19} strokeWidth={1.75} aria-hidden="true" />
+        </span>
+        <span className="rail-name">{item.label}</span>
         <span className="rail-tip" role="presentation">
           {item.label}
         </span>
@@ -102,11 +98,7 @@ export default function IconRail() {
         })}
       </ul>
 
-      <span className="rail-divider" aria-hidden="true" />
 
-      <ul className="rail-list rail-list-foot">
-        <RailLink item={PROFILE_ITEM} active={isActive(pathname, PROFILE_ITEM)} />
-      </ul>
     </nav>
   );
 }

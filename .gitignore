@@ -45,3 +45,15 @@ yarn-error.log*
 Thumbs.db
 *.swp
 *~
+
+# Google OAuth client downloads. The secret lives in .env; this file is the
+# raw download and must never be committed.
+*Credentials*.json
+client_secret*.json
+
+# Sibling projects that live in this working copy but are not part of the
+# Honeycomb app. They carry their own venvs and multi-hundred-megabyte
+# databases; nothing here imports them.
+/crawler/
+/crawler-go/
+/bench/

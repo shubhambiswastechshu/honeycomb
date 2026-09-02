@@ -37,7 +37,7 @@ export default function SettingsPage() {
         Settings for {session.tenant.name}.
       </p>
 
-      <div className="panel-body acct-stack">
+      <div className="panel-body acct-stack panel-form">
         <OrganizationForm />
         <WorkspaceSummary />
       </div>

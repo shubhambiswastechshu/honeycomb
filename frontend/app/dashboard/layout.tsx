@@ -5,9 +5,6 @@ import IconRail from "@/components/dashboard/IconRail";
 import TopBar from "@/components/dashboard/TopBar";
 import DashFooter from "@/components/dashboard/DashFooter";
 import "./dashboard.css";
-// After dashboard.css: the consoles take over the shell's main pane, and
-// .dash-main:has(> .ide) has to win over the padding set there.
-import "./ide.css";
 
 export const metadata: Metadata = {
   title: "Dashboard | Honeycomb",

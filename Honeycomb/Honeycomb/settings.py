@@ -106,14 +106,25 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'accounts',
-    # Product apps. Each owns one tenant-scoped table and its API; every model
-    # in them inherits accounts.TenantOwnedModel, which is what keeps the
-    # shared-schema tenancy enforceable.
-    'workspaces',
-    'datasources',
-    'sqlconsole',
-    'notebooks',
-    'pipelines',
+    # The MCP portal, split three ways because the three halves have genuinely
+    # different lifecycles.
+    #
+    # `connectors` owns no models and will never have a migration: it is a
+    # registry of third-party integrations plus the thin shims a ported
+    # connector module is allowed to import. It is an installed app purely so
+    # ConnectorsConfig.ready() gets a chance to import every module under
+    # connectors/catalog/, which is how a connector registers itself. Drop it
+    # from this list and the catalog is silently empty at runtime.
+    #
+    # `connections` owns the tenant's configured instances and the encrypted
+    # credentials behind them. `mcp` owns the API keys, the activity log, and
+    # the FastAPI data plane described under "Two auth planes" below.
+    'connectors',
+    'connections',
+    'mcp',
+    # Forager: the crawl queue and the results a worker machine streams back.
+    # It owns tables, so unlike `connectors` it is a real app with migrations.
+    'foraging',
 ]
 
 MIDDLEWARE = [
@@ -157,7 +168,18 @@ TEMPLATES = [
     },
 ]
 
+# Both entry points are real and both are kept.
+#
+# WSGI_APPLICATION stays because it is what management commands and any
+# sync-only tooling expect to find, and because nothing about the portal
+# requires the whole project to run async.
+#
+# ASGI_APPLICATION is what a deployment actually serves: Honeycomb/asgi.py
+# composes Django and the FastAPI data plane into one callable, dispatching on
+# the path prefix. Serving Honeycomb.wsgi:application instead still runs the
+# portal correctly -- it just means /mcp/* does not exist.
 WSGI_APPLICATION = 'Honeycomb.wsgi.application'
+ASGI_APPLICATION = 'Honeycomb.asgi.application'
 
 
 # Database
@@ -330,46 +352,28 @@ REST_FRAMEWORK = {
         # One per expired access token, plus retries. An access token lives an
         # hour, so anything near this rate is a loop, not a user.
         'refresh': '30/min',
-        # The product CRUD. Read on every dashboard page and written by hand,
-        # so this is sized for a person clicking rather than for a client that
-        # polls -- high enough never to be felt, low enough that a runaway
-        # effect loop in the frontend shows up as 429s instead of as load.
-        'workspaces': '120/min',
-        # Running a query is not CRUD. Each call opens a socket to a
-        # customer's warehouse and can hold a request thread for the whole
-        # statement timeout, so this is sized for a person thinking between
-        # queries rather than for a person clicking.
-        'sql_run': '30/min',
+        # Marketplace reads. The catalog is static, in-process data with no
+        # query behind it, and the connectors grid fetches one list plus a
+        # detail per card the user opens, so the ceiling is high enough to be
+        # invisible to a person browsing and low enough to bound a scraper.
+        'connectors': '120/min',
+        # Creating or editing a connection encrypts a credential and, for some
+        # connectors, calls the third party to verify it. Both cost real work
+        # off this process, and nobody legitimately configures twenty
+        # integrations a minute.
+        'connect': '20/min',
+        # Minting an MCP key is the single most sensitive write in the portal:
+        # each one hands out a bearer token with no cookie and no CSRF in front
+        # of it. Same ceiling as 'connect', for the same reason -- a human
+        # setting up an AI client does this a handful of times, ever.
+        'keys': '20/min',
+        # The Overview's feed and sparkline: two reads per page load, plus a
+        # refresh whenever the user comes back to the tab. Higher than the
+        # write scopes because it creates nothing, low enough that a tab left
+        # polling in a loop is capped rather than free.
+        'activity': '60/min',
     },
 }
-
-
-# SQL console
-#
-# Ceilings for a query run, all enforced in datasources/connectors.py. They
-# are limits rather than targets: every one of them exists because the
-# alternative is an unbounded amount of somebody else's data arriving in this
-# process.
-#
-#   MAX_ROWS         rows kept from a result set; the rest are discarded and
-#                    the answer is marked truncated.
-#   TIMEOUT_MS       PostgreSQL statement_timeout, set on the connection, so
-#                    a runaway query is killed at the server rather than
-#                    abandoned by the client while it keeps burning.
-#   MAX_BYTES        rough ceiling on a serialized result, so one wide text
-#                    column cannot do what the row cap prevents.
-#   CONNECT_TIMEOUT  seconds to wait for a socket, so an unreachable host
-#                    fails fast instead of holding a worker.
-HONEYCOMB_SQL_MAX_ROWS = int(os.environ.get('HONEYCOMB_SQL_MAX_ROWS', '1000'))
-HONEYCOMB_SQL_TIMEOUT_MS = int(os.environ.get('HONEYCOMB_SQL_TIMEOUT_MS', '30000'))
-HONEYCOMB_SQL_MAX_BYTES = int(os.environ.get('HONEYCOMB_SQL_MAX_BYTES', str(4 * 1024 * 1024)))
-HONEYCOMB_SQL_CONNECT_TIMEOUT = int(os.environ.get('HONEYCOMB_SQL_CONNECT_TIMEOUT', '8'))
-
-# Where a DataSource's `secret_name` is looked up. Empty means the built-in
-# environment backend (HONEYCOMB_SECRET_<HANDLE>); set it to a dotted path to
-# a callable taking the handle and returning the secret to use Vault, AWS
-# Secrets Manager, or anything else. See datasources/secrets.py.
-HONEYCOMB_SECRET_BACKEND = os.environ.get('HONEYCOMB_SECRET_BACKEND', '')
 
 # How long someone stays signed in without being asked again. This is a
 # *sliding* window: /auth/refresh/ issues a new refresh token on every renewal,
@@ -496,6 +500,159 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+
+# MCP portal
+#
+# Two auth planes, and they never touch each other. This is HANDOFF invariant 2
+# ("CSRF is enforced on every unsafe method") read carefully rather than
+# loosened, so it is worth writing down exactly why /mcp/* is not a hole in it.
+#
+#   Control plane -- /api/**, the browser. Cookie-borne JWT plus the
+#   double-submit CSRF token, enforced by CookieJWTAuthentication and
+#   CsrfViewMiddleware. A cookie is attached by the browser automatically, so a
+#   third-party page could otherwise cause a write on the user's behalf; the
+#   CSRF token is what proves the caller could read this site's cookie. Every
+#   endpoint that mints, edits or deletes a connection or a key lives here.
+#
+#   Data plane -- /mcp/**, an AI client. Authenticated *only* by
+#   `Authorization: Bearer hc_<token>`, hashed and matched against an McpKey row
+#   that must belong to the connection named by both the connector and the
+#   endpoint slug in the URL. It is served by the FastAPI app in mcp/endpoint.py,
+#   mounted beside Django in Honeycomb/asgi.py -- outside ROOT_URLCONF, outside
+#   MIDDLEWARE, outside DRF. It never reads a cookie and never sets one.
+#
+# CSRF does not apply to the data plane by construction, not by exemption: the
+# attack CSRF defends against is the browser attaching ambient credentials the
+# attacker cannot read. There is no ambient credential here. A page that wants
+# to call /mcp/ must supply the bearer token in a header, and if it already has
+# the token it did not need the victim's browser. No csrf_exempt is written
+# anywhere for this, and none should be -- the day /mcp/* starts accepting a
+# cookie, it becomes forgeable and this reasoning collapses.
+#
+# The corollary: an MCP key is a bearer credential with no second factor in
+# front of it. Mint it rarely (throttle scope 'keys'), show the plaintext once,
+# store only the hash, and treat a leaked one as a full compromise of that one
+# connection's third-party credentials.
+
+# Keys for encrypting stored connector credentials at rest, comma separated,
+# NEWEST FIRST. connections/crypto.py builds a MultiFernet from the list: the
+# first key encrypts, every key can decrypt. Rotating therefore means prepending
+# a new key and leaving the old one in place until the rows have been re-saved
+# -- remove it too early and the credentials it protects are unrecoverable, not
+# merely unreadable.
+#
+# Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+#
+# Fatal when unset outside DEBUG, for the same reason DJANGO_SECRET_KEY is: with
+# no key there is no encryption, and third-party API credentials for every
+# tenant would sit in the database in clear text. Local development is allowed
+# to run without one so a fresh checkout still boots; the app layer is
+# responsible for refusing to *store* a credential when the list is empty.
+HONEYCOMB_CRED_KEYS = [
+    key.strip()
+    for key in os.environ.get('HONEYCOMB_CRED_KEYS', '').split(',')
+    if key.strip()
+]
+if not HONEYCOMB_CRED_KEYS and not DEBUG:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        'HONEYCOMB_CRED_KEYS must be set when DEBUG is False. '
+        'Generate a key with: python -c "from cryptography.fernet import '
+        'Fernet; print(Fernet.generate_key().decode())"'
+    )
+
+# The origin an AI client will actually dial. Connection.mcp_url is built from
+# it, and that URL is copied into a user's Claude or Cursor config and then
+# lives there -- so this is not cosmetic: get it wrong and every URL the portal
+# has ever handed out points somewhere that does not answer.
+#
+# It is this service's own public origin, not the frontend's. The single-origin
+# proxying that keeps the auth cookies SameSite=Lax exists for browsers, and an
+# MCP client is not a browser: it carries no cookie and can dial the API
+# directly. No trailing slash; the URL builder adds its own.
+HONEYCOMB_PUBLIC_BASE = os.environ.get(
+    'HONEYCOMB_PUBLIC_BASE',
+    'http://localhost:8000' if DEBUG else '',
+).rstrip('/')
+
+# Ceiling on a single tools/call, in seconds. A connector reaching a slow
+# third-party API is the normal case, so this is generous -- but it is a
+# ceiling, not a target: without it one hung upstream holds an event-loop task
+# and its slot in connectors/shims/concurrency.py open indefinitely.
+#
+# Whatever runs this process must allow more than this. See render.yaml, where
+# gunicorn's --timeout is deliberately well above it: a worker killed mid-call
+# returns nothing an MCP client can interpret, which reads to the user as the
+# session dying rather than as one slow tool.
+HONEYCOMB_MCP_TOOL_TIMEOUT = int(
+    os.environ.get('HONEYCOMB_MCP_TOOL_TIMEOUT', '45')
+)
+
+
+# Google OAuth
+#
+# The credentials behind every `google_oauth` connector -- Analytics, Search
+# Console, Ads and the rest. One Google Cloud OAuth 2.0 Client of type "Web
+# application" serves all of them; the connector decides which scopes it asks
+# for, not this file.
+#
+# THE OPERATIONAL FACT THAT COSTS PEOPLE AN HOUR: Google matches the
+# `redirect_uri` an authorize request carries against the list registered on
+# that OAuth client, byte for byte. Scheme, host, port, path and trailing slash
+# all count, and there is no wildcard. The callback URL is built from
+# HONEYCOMB_PUBLIC_BASE, so whatever is set there must be exactly what is
+# registered under "Authorised redirect URIs" in the Cloud Console -- an
+# https:// base against an http:// registration, or an apex host against a www
+# one, fails with redirect_uri_mismatch before the user is ever asked to
+# consent, and nothing in this process sees the request.
+#
+# Unlike HONEYCOMB_CRED_KEYS, an unset client is deliberately NOT fatal outside
+# DEBUG. There is no stored-plaintext hazard here: the only consequence is that
+# the google_oauth connectors cannot be connected, and every API-key connector
+# keeps working. A deployment that uses none of the Google connectors should be
+# able to boot without a Google project, so this must never grow a
+# raise ImproperlyConfigured -- the OAuth start view is the right place to
+# refuse, where it can tell one tenant why one connector is unavailable.
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+
+# Endpoints, overridable only so a test can point them at a fake. Google has not
+# moved them in years, and a deployment has no reason to.
+GOOGLE_OAUTH_TOKEN_URI = os.environ.get(
+    'GOOGLE_OAUTH_TOKEN_URI', 'https://oauth2.googleapis.com/token'
+)
+GOOGLE_OAUTH_AUTH_URI = os.environ.get(
+    'GOOGLE_OAUTH_AUTH_URI', 'https://accounts.google.com/o/oauth2/v2/auth'
+)
+
+# Google Ads is the one Google API that needs a second credential beside OAuth:
+# a developer token, issued per Ads manager account and approved separately from
+# the Cloud project. Without it the API rejects every call, however valid the
+# refresh token is.
+GOOGLE_ADS_DEVELOPER_TOKEN = os.environ.get('GOOGLE_ADS_DEVELOPER_TOKEN', '')
+GOOGLE_ADS_BASE_URL = os.environ.get(
+    'GOOGLE_ADS_BASE_URL', 'https://googleads.googleapis.com'
+).rstrip('/')
+# Pinned, not floating: Google sunsets an Ads API version roughly yearly, and a
+# version that has been retired answers with an error rather than degrading, so
+# the upgrade has to be a deliberate edit that someone tests.
+GOOGLE_ADS_API_VERSION = os.environ.get('GOOGLE_ADS_API_VERSION', 'v23')
+
+# Where the OAuth callback bounces the browser back to when it is done -- the
+# connector page that started the flow, with ?connected=1 or ?error=<message>.
+#
+# This is the FRONTEND's origin, and it is a separate setting from
+# HONEYCOMB_PUBLIC_BASE on purpose: that one is this API's own public origin,
+# which is what Google must redirect *to* and what is registered in the Cloud
+# Console, while this is where a person's browser belongs *after*. In local
+# development they differ by port; in production they are usually different
+# hosts entirely. No trailing slash; the redirect builder adds its own.
+HONEYCOMB_FRONTEND_BASE = os.environ.get(
+    'HONEYCOMB_FRONTEND_BASE', 'http://localhost:3000'
+).rstrip('/')
 
 
 # Internationalization

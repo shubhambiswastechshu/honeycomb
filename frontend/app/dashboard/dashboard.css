@@ -43,7 +43,11 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: 34px 32px 64px 32px;
+  /* Named so the full-bleed cover can cancel exactly this and not drift from
+     it when the padding is next adjusted. */
+  --main-pad-x: 32px;
+  --main-pad-top: 34px;
+  padding: var(--main-pad-top) var(--main-pad-x) 64px var(--main-pad-x);
 }
 
 /* ---- Top bar ---- */
@@ -61,8 +65,17 @@
   gap: 20px;
   height: 56px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  /* AMOLED black. On an OLED panel a true #000 pixel is switched off rather
+     than lit, so the bar costs no backlight and reads as a hard edge. The
+     warmth that keeps it from feeling like a foreign component is carried by
+     the text and the amber monogram instead of by the ground. */
+  --bar-ink: #000000;
+  --bar-text: #f6efdc;
+  --bar-muted: rgba(246, 239, 220, 0.62);
+  --bar-hover: rgba(246, 239, 220, 0.1);
+  border-bottom: 1px solid #000000;
+  background: var(--bar-ink);
+  color: var(--bar-text);
 }
 
 .dash-brand {
@@ -76,7 +89,7 @@
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--ink);
+  color: var(--bar-text);
 }
 
 .dash-search {
@@ -90,7 +103,7 @@
   left: 11px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--muted);
+  color: var(--bar-muted);
   pointer-events: none;
 }
 
@@ -100,23 +113,27 @@
   /* Right padding clears .dash-search-hint, which is sized for the widest
      label it can carry ("Ctrl K" on non-Apple platforms, not just "⌘K"). */
   padding: 0 64px 0 33px;
-  border: 1px solid var(--border);
+  /* A white field on an ink bar is a hole punched through it. Lifted from the
+     bar's own ground instead, which is how a search field on a dark bar reads
+     as part of the bar. */
+  border: 1px solid rgba(246, 239, 220, 0.16);
   border-radius: 9px;
-  background: #ffffff;
-  color: var(--ink);
+  background: rgba(246, 239, 220, 0.09);
+  color: var(--bar-text);
   font: inherit;
   font-size: 14px;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .dash-search-input::placeholder {
-  color: var(--muted);
+  color: var(--bar-muted);
 }
 
 .dash-search-input:focus {
   outline: none;
   border-color: var(--amber-400);
-  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.18);
+  background: rgba(246, 239, 220, 0.14);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.24);
 }
 
 .dash-search-hint {
@@ -125,12 +142,109 @@
   top: 50%;
   transform: translateY(-50%);
   padding: 2px 6px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(246, 239, 220, 0.2);
   border-radius: 6px;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--muted);
+  color: var(--bar-muted);
   pointer-events: none;
+}
+
+/* ---- Account cluster, right of the search ---- */
+
+.dash-account {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dash-account-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  color: var(--bar-text);
+  text-decoration: none;
+  transition: background-color 0.16s ease;
+}
+
+.dash-account-link:hover {
+  background: var(--bar-hover);
+}
+
+.dash-account-link:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 1px;
+}
+
+.dash-account-link[aria-current="page"] {
+  background: rgba(234, 157, 62, 0.22);
+}
+
+.dash-account-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--amber-400);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.dash-account-name {
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The monogram already identifies the account; this is the fallback for the
+   narrow bar, where the name is dropped. */
+.dash-account-icon {
+  display: none;
+}
+
+.dash-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  font: inherit;
+  color: var(--bar-muted);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+/* --error-text is a brick red picked to sit on cream; on ink it goes muddy and
+   loses the warning. This is the same hue lifted until it reads as a warning
+   against the bar. */
+.dash-signout:hover {
+  color: #ff9b76;
+  background: rgba(255, 155, 118, 0.14);
+}
+
+.dash-signout:focus-visible {
+  outline: 2px solid #ff9b76;
+  outline-offset: 1px;
 }
 
 .dash-visually-hidden {
@@ -153,8 +267,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 60px;
-  padding: 12px 0 16px 0;
+  width: 78px;
+  padding: 10px 0 16px 0;
   border-right: 1px solid var(--border);
 }
 
@@ -162,7 +276,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -181,46 +295,78 @@
   background: var(--border);
 }
 
+/* An icon in a box, with its name underneath. The box is what carries the
+   current-section state, so the label never becomes a filled block of text. */
 .rail-item {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  gap: 3px;
+  width: 72px;
+  padding: 6px 2px 7px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
   color: var(--muted);
   text-decoration: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.rail-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 26px;
+  border-radius: 8px;
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 
+/* Wraps to two lines rather than ellipsising: "Connect data" is two words and
+   truncating it to "Connect d..." would lose the half that says what it does. */
+.rail-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  text-align: center;
+}
+
+.rail-item:hover .rail-box {
+  background: rgba(234, 157, 62, 0.12);
+}
+
 .rail-item:hover {
-  background: rgba(234, 157, 62, 0.1);
   color: var(--ink);
 }
 
 .rail-item:focus-visible {
   outline: 2px solid var(--amber-400);
-  outline-offset: 2px;
+  outline-offset: -1px;
 }
 
 .rail-item[aria-current="page"] {
-  color: var(--amber-500);
-  background: rgba(234, 157, 62, 0.14);
+  color: var(--ink);
 }
 
-/* The little amber marker against the rail's edge. */
-.rail-item[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  left: -10px;
-  top: 50%;
-  width: 3px;
-  height: 20px;
-  border-radius: 0 3px 3px 0;
-  background: var(--amber-500);
-  transform: translateY(-50%);
+.rail-item[aria-current="page"] .rail-box {
+  color: var(--amber-500);
+  background: rgba(234, 157, 62, 0.18);
 }
+
+.rail-item[aria-current="page"] .rail-name {
+  font-weight: 600;
+}
+
 
 /* Tooltip. The rail shows icons only, so this is the only place the section
    name is visible -- it must reach anyone who can see, including a keyboard
@@ -251,6 +397,12 @@
   transition: opacity 0.14s ease, transform 0.14s ease;
 }
 
+/* The label is on screen in the vertical rail, so the tooltip would repeat
+   it. It comes back in the bottom-bar layout, where there is no room for one. */
+.rail-tip {
+  display: none;
+}
+
 .rail-item:focus-visible .rail-tip {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
@@ -265,10 +417,35 @@
 
 /* ---- Panels ---- */
 
+/* The panel is a container, not a column of prose.
+   940px was a reading measure, and it was wrong here: on a 1920 window it left
+   roughly 450px of dead space down each side while the connector grid squeezed
+   into four columns. Everything inside that IS prose carries its own ch-based
+   cap -- .panel-lede, .empty-text, .acct-card-text, .conn-note -- so widening
+   the container does not stretch a line of text past comfortable.
+   1440px rather than none: past that, a row of cards drifts far enough from
+   the rail that the eye loses the connection between them. */
 .dash .panel {
-  max-width: 940px;
+  max-width: 1440px;
   margin: 0 auto;
   animation: dash-rise 0.34s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+/* The lede sits under a 24px title and reads as a sentence, so it keeps a
+   measure of its own now that the container no longer imposes one. */
+.dash .panel-lede {
+  max-width: 68ch;
+}
+
+/* Opts a panel out of the centred measure. For a page whose content is a
+   full-bleed cover and a grid, the cap leaves a margin either side that the
+   cover then cannot reach past.
+
+   Declared AFTER .panel deliberately: both selectors have the same
+   specificity, so the one that wins is the one that comes last. Above the
+   .panel rule this was silently doing nothing. */
+.dash .panel-wide {
+  max-width: none;
 }
 
 .dash .panel-title {
@@ -383,20 +560,54 @@
 
   .dash-main {
     order: 1;
-    padding: 24px 16px 32px 16px;
+    --main-pad-x: 16px;
+    --main-pad-top: 24px;
+    padding: var(--main-pad-top) var(--main-pad-x) 32px var(--main-pad-x);
   }
 
   .dash-rail {
     order: 2;
     flex-direction: row;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
     width: 100%;
     height: 58px;
-    padding: 0 10px;
+    padding: 0 6px;
     border-right: none;
     border-top: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  /* Back to icons only: nine captions will not fit across a phone, and the
+     tooltip returns to carry the name for anyone who focuses an item. */
+  .rail-item {
+    width: 48px;
+    padding: 5px 2px;
+  }
+
+  .rail-name {
+    display: none;
+  }
+
+  .rail-tip {
+    display: block;
+    left: 50%;
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+  }
+
+  .rail-item:focus-visible .rail-tip {
+    transform: translateX(-50%);
+  }
+
+  .dash-account-name {
+    display: none;
+  }
+
+  .dash-account-link {
+    padding: 4px;
   }
 
   .rail-list {
@@ -451,6 +662,14 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+/* Forms do not widen with the container. A 1440px-wide text input is harder to
+   use than a 640px one, not easier, and the profile and settings panels are
+   nothing but forms. The connector detail page reuses .acct-stack for its
+   tabs, so it opts back out below. */
+.dash .panel-form {
+  max-width: 720px;
 }
 
 .dash .acct-card {
@@ -695,7 +914,8 @@
   border: 1px solid var(--border);
   border-radius: 7px;
   cursor: pointer;
-  transition: border-color 0.16s ease, background-color 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease,
+    transform 0.12s ease;
 }
 
 .dash .acct-signout:hover:not(:disabled) {
@@ -790,215 +1010,1376 @@
 }
 
 /* ==========================================================================
-   APPENDED BLOCK -- product surfaces (tiles + resource boards)
-   Owned by the workspaces/sources/SQL/pipelines work; nothing above this line
-   was changed.
-
-   Everything is prefixed .tile-* or .board-* and, where it leans on an
-   existing class, scoped under .dash -- .panel and .empty already belong to
-   the shell above.
+   Profile tabs
    ========================================================================== */
 
-/* ---- Overview tiles ---- */
+.dash .acct-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
 
-.tile-grid {
-  display: grid;
-  /* Explicit columns, not auto-fill. An auto track count kept changing how
-     many tiles shared a row as the description text changed length, and a
-     grid that reflows when someone edits a sentence is not a grid. Two
-     columns give each tile a full sentence per line. */
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+/* The strip sits on a hairline that runs the full width, so the current tab
+   reads as attached to the panel below rather than as a floating pill. */
+.dash .acct-tablist {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dash .acct-tablist::-webkit-scrollbar {
+  display: none;
+}
+
+.dash .acct-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  /* Transparent rather than absent, so selecting a tab does not move it. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.dash .acct-tab:hover {
+  color: var(--ink);
+}
+
+.dash .acct-tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--amber-500);
+}
+
+.dash .acct-tab:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.dash .acct-tabpanel:focus {
+  outline: none;
+}
+
+.dash .acct-tabpanel > .acct-card {
+  animation: fade 0.22s ease both;
+}
+
+/* ---- Sign out, in the rail foot ----
+   Identical to its neighbours at rest; only the hover tint says the action is
+   destructive, because the dialog it opens carries that weight already. */
+
+.rail-signout:hover {
+  color: var(--error-text);
+  background: rgba(155, 61, 34, 0.08);
+}
+
+.rail-signout:focus-visible {
+  outline-color: var(--error-text);
+}
+
+/* ==========================================================================
+   Confirmation dialog
+   Rendered only while open, so none of this applies at rest.
+   ========================================================================== */
+
+/* The backdrop blurs the page behind it as it fades in, and unblurs on the
+   way out -- which is why the dialog stays mounted for the length of the exit
+   animation rather than vanishing the moment it is dismissed.
+
+   backdrop-filter, not a filter on the page: filtering the page itself would
+   force every element under it into a new stacking context and blur the
+   dialog along with it. */
+.hc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(49, 47, 23, 0.34);
+  -webkit-backdrop-filter: blur(7px) saturate(0.92);
+  backdrop-filter: blur(7px) saturate(0.92);
+  animation: hc-backdrop-in 0.22s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+.hc-modal-backdrop.is-closing {
+  animation: hc-backdrop-out 0.16s ease both;
+}
+
+.hc-modal-backdrop.is-closing .hc-modal {
+  animation: hc-modal-out 0.16s ease both;
+}
+
+@keyframes hc-backdrop-in {
+  from {
+    opacity: 0;
+    background: rgba(49, 47, 23, 0);
+    -webkit-backdrop-filter: blur(0) saturate(1);
+    backdrop-filter: blur(0) saturate(1);
+  }
+  to {
+    opacity: 1;
+    background: rgba(49, 47, 23, 0.34);
+    -webkit-backdrop-filter: blur(7px) saturate(0.92);
+    backdrop-filter: blur(7px) saturate(0.92);
+  }
+}
+
+@keyframes hc-backdrop-out {
+  from {
+    opacity: 1;
+    background: rgba(49, 47, 23, 0.34);
+    -webkit-backdrop-filter: blur(7px) saturate(0.92);
+    backdrop-filter: blur(7px) saturate(0.92);
+  }
+  to {
+    opacity: 0;
+    background: rgba(49, 47, 23, 0);
+    -webkit-backdrop-filter: blur(0) saturate(1);
+    backdrop-filter: blur(0) saturate(1);
+  }
+}
+
+@keyframes hc-modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+.hc-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(49, 47, 23, 0.18);
+  animation: rise 0.2s ease both;
+}
+
+/* A form needs more room than a question, and its own card chrome would be a
+   second border inside the dialog's. */
+.hc-modal-form {
+  max-width: 520px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.hc-modal-form .acct-card {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+/* The portal host. It exists only to carry the `dash` class into the portal so
+   the scoped styles inside a dialog still match; display:contents means it
+   contributes no box of its own, so `.dash`'s full-height flex layout does not
+   come along with the scope. */
+.hc-modal-host {
+  display: contents;
+}
+
+.hc-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.hc-modal-close:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(49, 47, 23, 0.07);
+}
+
+.hc-modal-close:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 1px;
+}
+
+.hc-modal-close:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The panel is the cross's positioning context, and the heading needs to clear
+   it rather than run underneath. */
+.hc-modal {
+  position: relative;
+}
+
+.hc-modal-title,
+.hc-modal-form .acct-card-title {
+  padding-right: 34px;
+}
+
+.hc-modal-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hc-modal-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.hc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.hc-modal-cancel,
+.hc-modal-confirm {
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.hc-modal-cancel {
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--border);
+}
+
+.hc-modal-cancel:hover:not(:disabled) {
+  background: rgba(49, 47, 23, 0.05);
+}
+
+.hc-modal-confirm {
+  color: var(--ink);
+  background: var(--amber-400);
+  border: 1px solid var(--amber-500);
+}
+
+.hc-modal-confirm-danger {
+  color: #ffffff;
+  background: var(--error-text);
+  border-color: var(--error-text);
+}
+
+.hc-modal-confirm-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.hc-modal-cancel:focus-visible,
+.hc-modal-confirm:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.hc-modal-cancel:disabled,
+.hc-modal-confirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No animated blur. The dim stays -- it is what separates the dialog from
+     the page -- but it arrives at once instead of being animated into place. */
+  .hc-modal-backdrop,
+  .hc-modal-backdrop.is-closing,
+  .hc-modal-backdrop.is-closing .hc-modal,
+  .hc-modal,
+  .dash .acct-tabpanel > .acct-card {
+    animation: none;
+  }
+
+  .dash .acct-tab {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   APPENDED BLOCK -- connector surfaces (marketplace + connector detail)
+   Owned by the MCP connector work; nothing above this line was changed.
+
+   Two routes use this block:
+     /dashboard/connectors        -> .mkt-*  (the marketplace grid)
+     /dashboard/connectors/[slug] -> .conn-* (one connector and its instances)
+
+   Everything leans on what the shell already established rather than inventing
+   a second visual language: the cards borrow the retired .tile proportions and
+   easing, the tab strip is the .acct-tab strip, the instance and key rows are
+   the .acct-card surface, and the form controls stay .field / .label / .input
+   from globals.css. Palette values are the brand variables plus the same three
+   rgba tints already used above (amber 234 157 62, error 155 61 34, ink
+   49 47 23) -- nothing here introduces a new colour.
+
+   State is expressed with `.is-*` modifier classes (.is-connected, .is-on,
+   .is-error, .is-off, .is-revoked, .is-done) or, where the element is already
+   a control carrying a native or ARIA state, with [aria-pressed] / [aria-
+   selected] / :checked / :disabled. Page code should follow that convention
+   rather than adding a parallel set of names.
+   ========================================================================== */
+
+/* ---- Marketplace toolbar ---- */
+
+/* Title left, actions right, on one line -- the page header is a row, not a
+   stack, so the toolbar below it starts at the top of the content. */
+.dash .panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dash .panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash .mkt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 20px;
+}
+
+/* The catalog filter is the same control as the top bar's .dash-search: same
+   34px height, same 9px radius, same amber focus ring. Two search fields one
+   scroll apart must not read as two different widgets.
+
+   The selectors below accept the class on the field itself OR on a relative
+   wrapper holding an icon plus the input, because both shapes are reasonable
+   markup and this stylesheet lands before the page that uses it. */
+.dash .mkt-search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.dash input.mkt-search,
+.dash .mkt-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* Only indented when there is an icon in front of it to clear. */
+.dash .mkt-search .mkt-search-icon + input {
+  padding-left: 33px;
+}
+
+.dash input.mkt-search::placeholder,
+.dash .mkt-search input::placeholder {
+  color: var(--muted);
+}
+
+.dash input.mkt-search:focus,
+.dash .mkt-search input:focus {
+  outline: none;
+  border-color: var(--amber-400);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.18);
+}
+
+.dash .mkt-search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ---- Category chips ---- */
+
+.dash .mkt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tile-cell {
+.dash .mkt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.dash .mkt-chip:hover {
+  border-color: var(--amber-400);
+  color: var(--ink);
+}
+
+/* A chip is a filter toggle, so the pressed state is the source of truth; the
+   .is-on twin covers a chip rendered as a link rather than a button. */
+.dash .mkt-chip[aria-pressed="true"],
+.dash .mkt-chip.is-on {
+  border-color: var(--amber-500);
+  background: rgba(234, 157, 62, 0.14);
+  color: var(--ink);
+}
+
+.dash .mkt-chip:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+/* ---- Marketplace grid ---- */
+
+/* auto-fill here, unlike the retired fixed-column .tile-grid: that grid held a
+   known handful of tiles whose row split was a layout decision, this one holds
+   a catalog that grows, so the column count has to follow the viewport. 240px
+   is the narrowest a card can be and still fit a two-line description. */
+.dash .mkt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- Shelves ----
+   A category at a time, because fifteen cards in one undifferentiated grid
+   gives the eye nowhere to land. The heading is the shelf label; the count
+   beside it is the only number on it, and it is real. */
+
+.dash .mkt-shelf + .mkt-shelf {
+  margin-top: 30px;
+}
+
+.dash .mkt-shelf-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash .mkt-shelf-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(234, 157, 62, 0.14);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .mkt-cell {
   display: block;
 }
 
-/* The whole card is the link. A 248px box with a 90px target in the middle of
-   it is the usual reason a tile grid feels imprecise. */
-.tile {
+/* The whole card is the link -- same reasoning, geometry, easing and hover
+   tint as the .tile it descends from, with a shadow added under the lift so a
+   catalog of many cards still shows which one is under the pointer. */
+.dash .mkt-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   height: 100%;
-  padding: 16px;
+  padding: 16px 16px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #ffffff;
   color: var(--ink);
+  text-align: left;
   text-decoration: none;
-  transition: border-color 0.16s ease, background-color 0.16s ease,
-    transform 0.12s ease;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 
-.tile:hover {
-  border-color: var(--amber-400);
-  background: rgba(234, 157, 62, 0.05);
+.dash .mkt-card:hover {
+  border-color: var(--border-strong, #d6c8a6);
+  box-shadow: 0 8px 22px rgba(49, 47, 23, 0.09);
+  transform: translateY(-2px);
 }
 
-.tile:active {
+.dash .mkt-card:active {
   transform: translateY(1px);
+  box-shadow: none;
 }
 
-.tile:focus-visible {
+.dash .mkt-card:focus-visible {
   outline: 2px solid var(--amber-400);
   outline-offset: 2px;
 }
 
-.tile-icon {
+.dash .mkt-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* min-width:0 on the column, so a long connector name ellipsises instead of
+   shoving the connected pill off the card. */
+.dash .mkt-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dash .mkt-tools {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A rounded app tile, NOT the honeycomb hexagon.
+   The hexagon is this product's own mark -- the logo, the loader, the
+   empty-state frame -- so wearing it on every connector made fifteen different
+   vendors look like fifteen copies of Honeycomb, which is the single reason
+   the catalogue did not read as a store.
+
+   --mark-h is set inline per connector, hashed from its slug (see
+   ConnectorMark.tsx). Only the hue varies: saturation and lightness are fixed
+   here, which is what keeps fifteen colours looking like one designed set, and
+   guarantees the glyph stays legible on its own tint whatever hue it lands on. */
+.dash .mkt-mark {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(234, 157, 62, 0.12);
-  color: var(--amber-500);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: hsl(var(--mark-h, 36) 58% 90%);
+  box-shadow: inset 0 0 0 1px hsl(var(--mark-h, 36) 42% 78%);
+  color: hsl(var(--mark-h, 36) 62% 28%);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.tile-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* Wraps to two lines rather than truncating. "Google Analytics 4" cut to
+   "Google Analyti..." loses the only word that distinguishes it from the four
+   other Google connectors in the same grid. */
+/* A vendor logo supplies its own colour, so the tinted tile is dropped for a
+   neutral one -- an amber or violet ground behind a multicoloured mark reads as
+   a mistake. The hairline keeps it the same object as its neighbours. */
+.dash .mkt-mark-brand {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
-.tile-label {
-  font-size: 14px;
+.dash .mkt-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  font-size: 13.5px;
   font-weight: 600;
+  line-height: 1.25;
   color: var(--ink);
 }
 
-.tile-text {
+/* Clamped to two lines: a store's shelf reads by scanning down the left edge,
+   and a card three lines taller than its neighbour breaks that column. */
+.dash .mkt-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--muted);
 }
 
-/* Pushed to the card's bottom edge so the counts line up across a row however
-   long each description runs. */
-.tile-meta {
+/* Pinned to the bottom edge so the calls to action line up across a row
+   however long each description runs. */
+.dash .mkt-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: auto;
   padding-top: 2px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--muted);
 }
 
-.tile-hint {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 16px 0 0 0;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-/* ---- Resource boards ---- */
-
-.dash .board-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.dash .board-add {
+/* The store's one affordance. Quiet at rest -- fifteen amber buttons would be
+   a wall of shouting -- and it fills in when its card is under the pointer. */
+.dash .mkt-cta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex: none;
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--amber-500);
-  border-radius: 9px;
-  background: var(--amber-500);
-  color: var(--accent-contrast);
-  font: inherit;
-  font-size: 13px;
+  gap: 5px;
+  padding: 5px 11px 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
+  color: var(--ink);
   transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
-.dash .board-add:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+.dash .mkt-card:hover .mkt-cta {
+  border-color: var(--amber-500);
+  background: var(--amber-400);
 }
 
-.dash .board-add:focus-visible {
-  outline: 2px solid var(--amber-400);
-  outline-offset: 2px;
-}
-
-.dash .board-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-bottom: 22px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fffdf8;
-}
-
-.dash .board-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.dash .board-textarea {
-  min-height: 96px;
-  padding: 10px 12px;
-  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
-    monospace;
-  font-size: 12.5px;
-  line-height: 1.55;
-  resize: vertical;
-}
-
-.dash .board-help {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
+/* Connected is the only state that gets a badge. "Not connected" needs no
+   pill saying so -- the Connect button already says it, and a badge on every
+   card would be fifteen labels carrying no information. */
+.dash .mkt-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  align-self: flex-start;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
-.dash .board-submit {
-  align-self: flex-start;
+.dash .mkt-state.is-connected {
+  background: rgba(74, 107, 61, 0.13);
+  color: #3f5f33;
+}
+
+/* Search and filters can empty the grid without the catalog being empty, so
+   this is a lighter note than the shell's .empty card, which means "nothing
+   exists yet". */
+.dash .mkt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 44px 24px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   Connector detail
+   ========================================================================== */
+
+.dash .conn-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.dash .conn-head-body {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.dash .conn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.16s ease;
+}
+
+.dash .conn-back:hover {
+  color: var(--ink);
+}
+
+.dash .conn-back:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- Tabs: the profile strip, same behaviour and same hairline ---- */
+
+.dash .conn-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dash .conn-tablist {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dash .conn-tablist::-webkit-scrollbar {
+  display: none;
+}
+
+.dash .conn-tab {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  width: auto;
-  margin-top: 0;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  /* Transparent rather than absent, so selecting a tab does not move it. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.16s ease, border-color 0.16s ease;
 }
 
-.dash .board-spinner {
-  animation: spin 0.9s linear infinite;
+.dash .conn-tab:hover {
+  color: var(--ink);
 }
 
-.dash .board-error {
-  margin: 0 0 14px 0;
+.dash .conn-tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--amber-500);
+}
+
+.dash .conn-tab:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.dash .conn-tabpanel:focus {
+  outline: none;
+}
+
+/* A count riding on the tab label -- "Tools 24", "Keys 2". */
+.dash .conn-tab-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(49, 47, 23, 0.07);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.dash .conn-tab[aria-selected="true"] .conn-tab-count {
+  background: rgba(234, 157, 62, 0.18);
+  color: var(--ink);
+}
+
+/* ---- Instances ---- */
+
+.dash .conn-instances {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .conn-instance {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+/* A connection upstream rejected earns a coloured edge, not a red card: it
+   still has to be comfortable to read while you are fixing it. */
+.dash .conn-instance.is-error {
+  border-left: 3px solid var(--error-text);
+}
+
+.dash .conn-instance-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dash .conn-instance-name {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.dash .conn-instance-meta {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* The upstream message, already redacted server-side. */
+.dash .conn-instance-error {
+  margin: 12px 0 0 0;
   padding: 10px 12px;
   border: 1px solid rgba(155, 61, 34, 0.3);
   border-radius: 9px;
   background: rgba(155, 61, 34, 0.06);
   font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--error-text);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Status pill ---- */
+
+.dash .conn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash .conn-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dash .conn-status.is-active {
+  border-color: var(--amber-400);
+  background: rgba(234, 157, 62, 0.14);
+  color: var(--ink);
+}
+
+/* The dot carries the amber so the label keeps ink's contrast against the
+   tint behind it. */
+.dash .conn-status.is-active::before {
+  background: var(--amber-500);
+}
+
+/* Both spellings. The stylesheet was written against .is-error while every
+   component renders .conn-status-error, so the failing state has been styled
+   as if it were healthy -- an amber "Active" dot on a connection that is
+   down. Matching both means neither has to be hunted down and renamed. */
+.dash .conn-status.is-error,
+.dash .conn-status-error {
+  border-color: rgba(155, 61, 34, 0.3);
+  background: rgba(155, 61, 34, 0.07);
   color: var(--error-text);
 }
 
-.dash .board-note {
+/* ---- Row actions ---- */
+
+.dash .conn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash .conn-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.dash .conn-button:hover:not(:disabled) {
+  border-color: var(--amber-400);
+  background: rgba(234, 157, 62, 0.07);
+}
+
+.dash .conn-button:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.dash .conn-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* One filled button per surface -- "Connect" -- matching .board-add's weight. */
+.dash .conn-button-primary {
+  border-color: var(--amber-500);
+  background: var(--amber-500);
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.dash .conn-button-primary:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.dash .conn-button-danger {
+  color: var(--error-text);
+}
+
+.dash .conn-button-danger:hover:not(:disabled) {
+  border-color: rgba(155, 61, 34, 0.35);
+  background: rgba(155, 61, 34, 0.06);
+}
+
+.dash .conn-button-danger:focus-visible {
+  outline-color: var(--error-text);
+}
+
+.dash .conn-spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ---- Credential form ---- */
+
+/* Reuses .field / .label / .input / .error from globals.css; only the card the
+   form sits in, its heading and its footer are defined here. */
+.dash .conn-form {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  animation: dash-rise 0.24s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+.dash .conn-form .field {
+  max-width: 460px;
+  margin-bottom: 16px;
+}
+
+.dash .conn-form-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dash .conn-form-text {
   margin: 0 0 18px 0;
+  max-width: 62ch;
   font-size: 13px;
   color: var(--muted);
 }
 
-.dash .board-list {
+.dash .conn-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Credentials are write-only and never come back from the API, so the note
+   saying a blank field leaves them unchanged has to sit beside the field. */
+.dash .conn-form-hint {
+  margin: 6px 0 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- Tools ---- */
+
+.dash .conn-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .conn-tool {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.dash .conn-tool-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Monospace because this is the literal name an agent will call. */
+.dash .conn-tool-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.dash .conn-tool-text {
+  margin: 3px 0 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* A tool that mutates the upstream account. Amber, not red: it is a property
+   of the tool rather than a fault -- but it has to be legible at a glance,
+   because the decision it informs is handing an agent a key. */
+.dash .conn-tool-write {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--amber-400);
+  border-radius: 999px;
+  background: rgba(234, 157, 62, 0.16);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* A disabled tool stays listed -- turning it back on happens here -- but it
+   recedes so the enabled set is what the eye lands on. */
+.dash .conn-tool.is-off .conn-tool-name,
+.dash .conn-tool.is-off .conn-tool-text {
+  opacity: 0.55;
+}
+
+/* ---- Toggle switch ----
+   Defined on the checkbox itself, so a bare <input type="checkbox"
+   class="conn-switch"> is already a switch and no wrapper markup is required;
+   the label.conn-switch form is supported too, for a switch that carries its
+   own visible text. Only the appearance is replaced -- the control keeps its
+   native checkbox semantics, keyboard behaviour and :checked state. */
+
+/* The tools list uses <button role="switch">, which the input./label. rules
+   below never reach -- so it rendered as an unstyled 34x20 button, the little
+   dash on the right of every tool row. This is the rule that actually applies. */
+.dash button.conn-switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f3ede0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.dash button.conn-switch:hover:not(:disabled) {
+  border-color: var(--amber-400);
+}
+
+.dash button.conn-switch:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.dash button.conn-switch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.dash button.conn-switch[aria-checked="true"] {
+  background: var(--amber-400);
+  border-color: var(--amber-500);
+}
+
+.dash button.conn-switch > .conn-switch-knob {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(49, 47, 23, 0.3);
+}
+
+.dash button.conn-switch[aria-checked="false"] > .conn-switch-knob {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.dash label.conn-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dash input.conn-switch,
+.dash label.conn-switch > input[type="checkbox"] {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.dash input.conn-switch::after,
+.dash label.conn-switch > input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transform: translateY(-50%);
+  transition: transform 0.18s cubic-bezier(0.22, 0.68, 0.35, 1),
+    background-color 0.18s ease;
+}
+
+.dash input.conn-switch:checked,
+.dash label.conn-switch > input[type="checkbox"]:checked {
+  border-color: var(--amber-500);
+  background: var(--amber-500);
+}
+
+.dash input.conn-switch:checked::after,
+.dash label.conn-switch > input[type="checkbox"]:checked::after {
+  background: #ffffff;
+  transform: translateY(-50%) translateX(14px);
+}
+
+.dash input.conn-switch:focus-visible,
+.dash label.conn-switch > input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.dash input.conn-switch:disabled,
+.dash label.conn-switch > input[type="checkbox"]:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---- MCP endpoint URL ---- */
+
+/* The one string a user has to carry into another application, so it is
+   selectable in a click, wraps rather than truncates, and owns a button. */
+.dash .conn-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.dash .conn-url-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono), ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+  word-break: break-all;
+  user-select: all;
+}
+
+.dash .conn-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.dash .conn-copy:hover {
+  border-color: var(--amber-400);
+  color: var(--ink);
+}
+
+.dash .conn-copy:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+/* Held for a beat after the write lands: a clipboard copy has no other
+   evidence that it happened. */
+.dash .conn-copy.is-done {
+  border-color: var(--amber-500);
+  background: rgba(234, 157, 62, 0.14);
+  color: var(--ink);
+}
+
+/* ---- One-time secret ----
+   A minted key is shown once and is unrecoverable afterwards. That earns an
+   amber edge and a monospace slab, the same weight as .acct-locked -- not an
+   alarm. Red would say something went wrong; nothing has. */
+
+.dash .conn-secret {
+  margin: 0 0 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber-500);
+  border-radius: 11px;
+  background: rgba(234, 157, 62, 0.08);
+  animation: dash-rise 0.24s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+}
+
+.dash .conn-secret-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dash .conn-secret-text {
+  margin: 0 0 12px 0;
+  max-width: 62ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dash .conn-secret-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.dash .conn-secret-token {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono), ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ---- Keys ---- */
+
+.dash .conn-keys {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1007,190 +2388,1207 @@
   list-style: none;
 }
 
-.dash .board-row {
+.dash .conn-key {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 11px;
   background: #ffffff;
 }
 
-.dash .board-row-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  /* min-width lets a long SQL line ellipsize instead of pushing the delete
-     button off the row. */
-  min-width: 0;
+.dash .conn-key-body {
   flex: 1;
+  min-width: 0;
 }
 
-.dash .board-row-title {
-  font-size: 14px;
+.dash .conn-key-label {
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
-.dash .board-row-text {
-  font-size: 12.5px;
+.dash .conn-key-prefix {
+  margin-top: 2px;
+  font-family: var(--font-mono), ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    monospace;
+  font-size: 11.5px;
   color: var(--muted);
 }
 
-.dash .board-row-code {
-  display: block;
+.dash .conn-key-meta {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* A revoked key stays on the list as a record; it just stops looking live. */
+.dash .conn-key.is-revoked {
+  background: var(--bg);
+}
+
+.dash .conn-key.is-revoked .conn-key-label,
+.dash .conn-key.is-revoked .conn-key-prefix {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* ---- Activity ---- */
+
+.dash .conn-activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
   overflow: hidden;
-  max-height: 3.2em;
-  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+}
+
+/* Four tracks: tool, status, duration, when. The tool column takes the slack
+   so the three fixed facts stay in a column down the whole list. */
+.dash .conn-activity-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.dash .conn-activity-row:last-child {
+  border-bottom: none;
+}
+
+.dash .conn-activity-tool {
+  min-width: 0;
+  font-family: var(--font-mono), ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
     monospace;
   font-size: 12px;
-  line-height: 1.6;
   color: var(--ink);
-  white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-.dash .board-row-meta {
-  margin-top: 2px;
-  font-size: 11px;
+.dash .conn-activity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--muted);
 }
 
-/* Quiet until the row is hovered: a delete button that is always the loudest
-   thing on a list invites the click it should discourage. */
-.dash .board-delete {
+.dash .conn-activity-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber-500);
+}
+
+.dash .conn-activity-status.is-error {
+  color: var(--error-text);
+}
+
+.dash .conn-activity-status.is-error::before {
+  background: var(--error-text);
+}
+
+.dash .conn-activity-duration,
+.dash .conn-activity-time {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The redacted upstream message, spanning all four tracks under the row it
+   belongs to rather than squeezing into one of them. */
+.dash .conn-activity-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--error-text);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Wide screens ---- */
+
+@media (min-width: 1600px) {
+  /* The panel is capped at 940px, so the extra room goes into one more column
+     of narrower cards rather than into stretching the ones already there. */
+  .dash .mkt-grid {
+    grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  }
+}
+
+/* ---- Narrow screens ---- */
+
+@media (max-width: 719px) {
+  .dash .mkt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash .mkt-toolbar {
+    align-items: stretch;
+  }
+
+  .dash .conn-instance,
+  .dash .conn-form {
+    padding: 16px;
+  }
+
+  .dash .conn-form .field {
+    max-width: none;
+  }
+
+  /* Stacked, so a long endpoint URL is not squeezed into a third of the row
+     by the copy button beside it. */
+  .dash .conn-url,
+  .dash .conn-secret-value {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dash .conn-copy {
+    align-self: flex-start;
+  }
+
+  /* Four columns do not survive a phone. The row becomes a wrapping line with
+     the tool name on top and the three facts beneath it. */
+  .dash .conn-activity-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .dash .conn-activity-tool,
+  .dash .conn-activity-error {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash .conn-form,
+  .dash .conn-secret {
+    animation: none;
+  }
+
+  .dash .mkt-card,
+  .dash .mkt-chip,
+  .dash .conn-tab,
+  .dash .conn-back,
+  .dash .conn-button,
+  .dash .conn-copy,
+  .dash input.mkt-search,
+  .dash .mkt-search input,
+  .dash input.conn-switch,
+  .dash input.conn-switch::after,
+  .dash label.conn-switch > input[type="checkbox"],
+  .dash label.conn-switch > input[type="checkbox"]::after {
+    transition: none;
+  }
+
+  .dash .mkt-card:hover,
+  .dash .mkt-card:active {
+    transform: none;
+  }
+
+  .dash .mkt-cta {
+    transition: none;
+  }
+
+  /* Slowed rather than stopped: a frozen spinner would read as a hang. */
+  .dash .conn-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ==========================================================================
+   Connector surfaces -- the rules the page markup reaches for that the block
+   above does not cover. Same language as the rest of this file: white cards on
+   the warm ground, amber for the current thing, --error-text for the
+   destructive one, and no colour that is not already a variable.
+   ========================================================================== */
+
+/* ---- Rows: one shape reused by instances, tools, keys and activity ---- */
+
+.dash .conn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .conn-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* A tool row is a dense list item, not a card. Fifteen to two hundred of them
+   stack on this tab, so they lose the per-row border and sit inside one
+   framed list -- the border repeated 196 times was the whole visual weight of
+   the WordPress tab. */
+.dash .conn-list-framed {
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.dash .conn-list-framed > .conn-tool {
+  align-items: center;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+}
+
+.dash .conn-list-framed > .conn-tool:first-child {
+  border-top: none;
+}
+
+.dash .conn-list-framed > .conn-tool:hover {
+  background: rgba(234, 157, 62, 0.05);
+}
+
+.dash .conn-tool-name {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.dash .conn-row-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
   width: 32px;
   height: 32px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: none;
+  border-radius: 9px;
+  color: var(--amber-500);
+  background: rgba(234, 157, 62, 0.12);
+}
+
+/* min-width:0 so a long URL or a long error truncates instead of pushing the
+   row's actions off the edge of the card. */
+.dash .conn-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dash .conn-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.dash .conn-row-meta {
+  margin: 3px 0 0;
+  font-size: 12.5px;
   color: var(--muted);
+}
+
+.dash .conn-row-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--error-text);
+  word-break: break-word;
+}
+
+.dash .conn-row-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Actions ---- */
+
+.dash .conn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.dash .conn-action:hover:not(:disabled) {
+  border-color: var(--amber-400);
+  background: rgba(234, 157, 62, 0.08);
+}
+
+.dash .conn-action:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+.dash .conn-action:disabled {
   opacity: 0.55;
-  transition: opacity 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  cursor: default;
 }
 
-.dash .board-row:hover .board-delete {
-  opacity: 1;
+.dash .conn-action-primary {
+  color: var(--ink);
+  background: var(--amber-400);
+  border-color: var(--amber-500);
 }
 
-.dash .board-delete:hover {
-  border-color: rgba(155, 61, 34, 0.3);
+.dash .conn-action-primary:hover:not(:disabled) {
+  background: var(--amber-300);
+  border-color: var(--amber-500);
+}
+
+.dash .conn-action-danger {
   color: var(--error-text);
 }
 
-.dash .board-delete:focus-visible {
-  outline: 2px solid var(--amber-400);
-  outline-offset: 2px;
-  opacity: 1;
+.dash .conn-action-danger:hover:not(:disabled) {
+  border-color: var(--error-text);
+  background: rgba(155, 61, 34, 0.06);
 }
 
-/* Wide enough for four across without cramping the copy. */
-@media (min-width: 1600px) {
-  /* Three, not four. There are five tiles: four across leaves one alone on
-     its own row, three across fills the first row and pairs the rest. */
-  .tile-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.dash .conn-action-danger:focus-visible {
+  outline-color: var(--error-text);
+}
+
+.dash .conn-head-actions,
+.dash .conn-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash .conn-activity-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dash .conn-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ---- Badges and status ---- */
+
+.dash .conn-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: rgba(234, 157, 62, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* A tool that can change a customer's data must not look like one that only
+   reads it. This is the only badge in the product that borrows the error
+   colour without anything having gone wrong. */
+.dash .conn-badge-write {
+  color: var(--error-text);
+  border-color: rgba(155, 61, 34, 0.34);
+  background: rgba(155, 61, 34, 0.07);
+}
+
+.dash .conn-status-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber-500);
+}
+
+.dash .conn-status.is-error .conn-status-dot,
+.dash .conn-status-error .conn-status-dot,
+.dash .is-error .conn-status-dot {
+  background: var(--error-text);
+}
+
+/* ---- Tool switch knob ---- */
+
+.dash .conn-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(49, 47, 23, 0.28);
+  transition: transform 0.16s ease;
+  pointer-events: none;
+}
+
+.dash .conn-switch input:checked ~ .conn-switch-knob,
+.dash .conn-switch[aria-checked="true"] .conn-switch-knob {
+  transform: translateX(16px);
+}
+
+/* ---- The one-time token ---- */
+
+/* Shown exactly once and never stored, so it has to read as something to act
+   on now. An amber edge rather than a red one: nothing has gone wrong. */
+.dash .conn-token {
+  padding: 16px 18px;
+  border: 1px solid var(--amber-400);
+  border-left: 3px solid var(--amber-500);
+  border-radius: 4px 12px 12px 4px;
+  background: rgba(234, 157, 62, 0.07);
+}
+
+.dash .conn-token-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dash .conn-token-note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.dash .conn-token-text {
+  display: block;
+  padding: 10px 12px;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.dash .conn-token-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dash .conn-prefix {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---- Forms, pickers and the quieter states ---- */
+
+.dash .conn-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.dash .conn-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .conn-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+
+.dash .conn-picker-item:hover {
+  border-color: var(--amber-400);
+}
+
+.dash .conn-picker-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.dash .conn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.dash .conn-meta-text,
+.dash .conn-note,
+.dash .conn-none,
+.dash .conn-loading {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.dash .conn-note {
+  max-width: 62ch;
+}
+
+.dash .conn-none,
+.dash .conn-loading {
+  padding: 18px 0;
+  text-align: center;
+}
+
+/* ---- Marketplace leftovers ---- */
+
+.dash .mkt-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .mkt-empty-text {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
 }
 
 @media (max-width: 719px) {
-  .dash .board-head {
-    flex-direction: column;
-    align-items: stretch;
+  .dash .conn-row {
+    flex-wrap: wrap;
   }
 
-  .tile-grid {
-    grid-template-columns: 1fr;
+  .dash .conn-row-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile,
-  .dash .board-add,
-  .dash .board-delete {
+  .dash .conn-action,
+  .dash .conn-picker-item,
+  .dash .conn-switch-knob {
     transition: none;
   }
-
-  .tile:active {
-    transform: none;
-  }
-
-  /* Slowed rather than stopped: a frozen spinner would read as a hang. */
-  .dash .board-spinner {
-    animation-duration: 2.4s;
-  }
 }
 
-/* ---- Data source test ----
-   Sits between the row body and the delete button, so it is a column of its
-   own rather than something laid over the row's text. The result note wraps
-   under the button because a connection error is a sentence, not a word. */
+/* ==========================================================================
+   Data panel -- the cover band and the connected-MCP list
+   ========================================================================== */
 
-.source-test {
+/* The cover.
+   --data-cover is the seam: set it to url(...) on this element and a real
+   image takes over with no other change, because the honeycomb pattern below
+   is a background LAYER rather than the element's only paint. The gradient
+   stays underneath as the fallback that shows while an image loads and if one
+   never arrives.
+
+   The pattern is two offset radial-gradient grids -- the same seven-cell
+   cluster as the logo, at low contrast. It is decoration and carries no
+   information, which is why the element is role="presentation". */
+.dash .data-cover {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
-  max-width: 340px;
+  min-height: 132px;
+  /* Out to the pane's edges and up under the top bar. The negative margins are
+     exactly the padding .dash-main sets, so the cover reaches the window on the
+     right, the rail on the left, and the bar above -- with no gap and no
+     horizontal scrollbar. */
+  margin: calc(-1 * var(--main-pad-top, 34px)) calc(-1 * var(--main-pad-x, 32px))
+    22px;
+  padding: 22px var(--main-pad-x, 32px);
+  /* Only the edge it does not touch keeps a border and a radius. */
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  overflow: hidden;
+  background-color: #fdf6e7;
+  /* The photograph on top, the drawn pattern beneath it. The pattern is not
+     dead weight: it is what shows while the image is still downloading and
+     what remains if it 404s, so the band is never a bare rectangle.
+     --data-cover is the override -- a panel can point it at its own image, or
+     at `none` to fall back to the pattern alone. */
+  background-image: var(--data-cover, url('/cover-honeycomb.jpg')),
+    radial-gradient(circle at 12px 10px, rgba(234, 157, 62, 0.16) 4px, transparent 4.5px),
+    radial-gradient(circle at 36px 10px, rgba(229, 189, 63, 0.13) 4px, transparent 4.5px),
+    radial-gradient(circle at 24px 31px, rgba(238, 195, 61, 0.15) 4px, transparent 4.5px),
+    linear-gradient(105deg, rgba(234, 157, 62, 0.14), rgba(238, 195, 61, 0.05) 62%, transparent);
+  background-size: cover, 48px 42px, 48px 42px, 48px 42px, auto;
+  /* 42% down: the crop already favours the comb, and this keeps the busiest
+     blossom below the line where the heading sits. */
+  background-position: center 42%, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
 }
 
-.source-test-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease;
+/* The scrim. Over a photograph this is doing real work -- the heading is ink
+   on a mid-tone image -- so it is opaque where the text sits and clears toward
+   the top right, which is the part of the picture worth seeing. Horizontal,
+   not vertical: the text is left-aligned, so fading upward would dim the
+   picture while leaving the words over whatever happened to be behind them. */
+.dash .data-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      100deg,
+      rgba(255, 252, 244, 0.97) 0%,
+      rgba(255, 252, 244, 0.9) 34%,
+      rgba(255, 252, 244, 0.55) 58%,
+      rgba(255, 252, 244, 0.18) 100%
+    ),
+    linear-gradient(to top, rgba(255, 252, 244, 0.5), transparent 70%);
 }
 
-.source-test-button:hover:not(:disabled) {
-  border-color: var(--accent);
+.dash .data-cover-body {
+  position: relative;
+  z-index: 1;
+}
+
+.dash .data-cover-title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
-.source-test-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.dash .data-cover-lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 14px;
+  color: var(--muted);
 }
 
-.source-test-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+/* Status that belongs with the heading. Inside the band rather than under it,
+   so the first thing below the cover is the content, not another caption. */
+.dash .data-cover-meta {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.source-test-note {
+.dash .data-cover-meta .mkt-count {
+  font-size: 12.5px;
+}
+
+/* ---- Dark cover ----
+   The same photograph under an ink scrim instead of a cream one, with the
+   type inverted. Nothing else about the panel changes, so this is one class
+   on the band rather than a second design.
+
+   Light mode only is a rule about the PRODUCT's chrome, not about a
+   photograph: this is a dark image, not a dark theme -- the page around it,
+   the rail and every card stay exactly as they were. */
+.dash .data-cover-dark {
+  background-color: #241f10;
+  border-bottom-color: rgba(49, 47, 23, 0.25);
+}
+
+.dash .data-cover-dark::after {
+  background: linear-gradient(
+      100deg,
+      rgba(28, 24, 12, 0.94) 0%,
+      rgba(28, 24, 12, 0.82) 36%,
+      rgba(28, 24, 12, 0.5) 62%,
+      rgba(28, 24, 12, 0.24) 100%
+    ),
+    linear-gradient(to top, rgba(28, 24, 12, 0.45), transparent 72%);
+}
+
+.dash .data-cover-dark .data-cover-title {
+  color: #fbf4e4;
+}
+
+.dash .data-cover-dark .data-cover-lede,
+.dash .data-cover-dark .data-cover-meta,
+.dash .data-cover-dark .data-cover-meta .mkt-count {
+  /* Not --muted: that grey was chosen against a cream ground and goes muddy
+     on ink. */
+  color: rgba(251, 244, 228, 0.72);
+}
+
+/* ---- Stat row ---- */
+
+.dash .data-stats {
+  display: grid;
+  /* Fixed-width tiles, not fractions. auto-fit with 1fr stretched three tiles
+     to 450px each on a wide screen, so a single digit sat in a field the size
+     of a card -- the stretching was itself the empty space. */
+  grid-template-columns: repeat(auto-fill, 172px);
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .data-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.dash .data-stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .data-stat-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash .data-stat-bad {
+  border-color: rgba(155, 61, 34, 0.3);
+  background: rgba(155, 61, 34, 0.05);
+}
+
+.dash .data-stat-bad .data-stat-value,
+.dash .data-stat-bad .data-stat-label {
+  color: var(--error-text);
+}
+
+/* ---- The list ----
+   A grid, not full-width rows. With one connection a full-width row is a
+   1400px band holding a name and a URL, which is what made this page read as
+   mostly empty; at card width the same row is a card, and the page grows a
+   column at a time as connections are added. */
+
+.dash .data-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.dash .data-row {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.dash .data-row-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.dash .data-row-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dash .data-row-link:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The meta line mixes text and small icons, so they need to sit on the text
+   baseline rather than on the line box's. */
+.dash .data-row .conn-row-meta svg {
+  vertical-align: -2px;
+}
+
+.dash .data-row .conn-url {
+  margin-top: 10px;
+}
+
+/* In a card the URL has no room to sit on one line beside its button, and a
+   slug is unbreakable, so it wraps and the button drops beneath it. */
+.dash .data-row .conn-url {
+  flex-wrap: wrap;
+}
+
+.dash .data-row .conn-url-text {
+  word-break: break-all;
+}
+
+/* ---- Empty-state action ---- */
+
+.dash .empty-action {
+  margin-top: 16px;
+}
+
+@media (max-width: 719px) {
+  .dash .data-cover {
+    min-height: 104px;
+    padding: 16px 18px;
+  }
+
+  .dash .data-cover-title {
+    font-size: 20px;
+  }
+}
+
+/* ==========================================================================
+   Overview
+   app/dashboard/page.tsx only.
+
+   Five stacked sections, each one owned by a response that has arrived. The
+   shapes are borrowed rather than reinvented -- rows are .conn-row, the stat
+   tiles are the Data page's .data-stat, the empty states are .empty -- so this
+   block is the stack, the section headings, the sparkline and the checklist,
+   and nothing else.
+   ========================================================================== */
+
+.dash .ov-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* ---- Section headings ----
+   Small, uppercase and muted, in the same voice as .data-stat-label. The
+   Overview is a page of five things at once; headings the size of .panel-title
+   would each claim to be the page. */
+
+.dash .ov-section {
+  min-width: 0;
+}
+
+.dash .ov-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dash .ov-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash .ov-section-title svg {
+  flex: none;
+  color: var(--amber-500);
+}
+
+/* Only when the heading stands alone: inside .ov-section-head the row's own
+   margin already carries the gap. */
+.dash .ov-section > .ov-section-title {
+  margin-bottom: 12px;
+}
+
+.dash .ov-section-link {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dash .ov-section-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dash .ov-section-link:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The stat row already carries a bottom margin for the Data page's layout;
+   here the stack's gap does that job and the two would compound. */
+.dash .ov-section .data-stats {
+  margin-bottom: 0;
+}
+
+/* ---- Needs attention ----
+   The same row as everywhere else, tinted. It is only ever on screen when
+   something is genuinely broken, so the colour is never ambient. */
+
+.dash .ov-attention-row {
+  border-color: rgba(155, 61, 34, 0.3);
+  background: rgba(155, 61, 34, 0.04);
+}
+
+/* ---- Sparkline ----
+   Seven integers drawn by hand. No fill or stroke is set on the elements
+   themselves: the colours live here, with the rest of the palette. */
+
+.dash .ov-spark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash .ov-spark-svg {
+  display: block;
+  flex: none;
+}
+
+.dash .ov-spark-area {
+  fill: rgba(234, 157, 62, 0.16);
+  stroke: none;
+}
+
+.dash .ov-spark-line {
+  fill: none;
+  stroke: var(--amber-500);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The floor the volume is measured from, so an empty week still reads as a
+   chart rather than as a failed render. */
+.dash .ov-spark-base {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.dash .ov-spark-dot {
+  fill: var(--amber-500);
+}
+
+.dash .ov-spark-dot-bad {
+  fill: var(--error-text);
+}
+
+.dash .ov-spark-caption {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- Recent activity ----
+   Twelve rows, so they lose their individual borders and sit in one frame:
+   twelve bordered cards would outweigh everything else on the page. */
+
+.dash .ov-events {
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.dash .ov-events > .ov-event {
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+}
+
+.dash .ov-events > .ov-event:first-child {
+  border-top: none;
+}
+
+.dash .ov-event .conn-row-title {
+  flex-wrap: wrap;
+}
+
+.dash .ov-event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Endpoints ----
+   A grid for the same reason the Data page uses one: a full-width band holding
+   a name and a URL is mostly empty band. */
+
+.dash .ov-endpoints {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.dash .ov-endpoint .conn-url {
+  margin-top: 10px;
+  /* A slug is unbreakable and a card is narrow, so the URL wraps and the copy
+     button drops beneath it rather than being pushed off the edge. */
+  flex-wrap: wrap;
+}
+
+.dash .ov-endpoint .conn-url-text {
+  word-break: break-all;
+}
+
+.dash .ov-endpoint .conn-row-meta {
+  margin-bottom: 2px;
+}
+
+/* ---- Getting started ----
+   One card, three steps, each tied to a fact the page already loaded. The
+   whole card leaves once all three are true. */
+
+.dash .ov-start {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.dash .ov-start > .ov-section-title {
+  margin-bottom: 6px;
+}
+
+.dash .ov-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash .ov-step {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  margin: 0;
-  color: var(--error-text);
-  font-size: 11.5px;
-  line-height: 1.5;
-  /* Left-aligned inside a right-aligned column. Right-aligning the text too
-     gives a wrapped sentence a ragged left edge and floats the icon away from
-     the words it belongs to. */
-  text-align: left;
+  gap: 11px;
+  min-width: 0;
 }
 
-.source-test-note svg {
+/* The same pointy-top hexagon as the loader cells and the empty-state frame. */
+.dash .ov-step-mark {
+  display: flex;
   flex: none;
-  margin-top: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 27px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(234, 157, 62, 0.16);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
-.source-test-ok {
-  color: #3f7d3a;
+.dash .ov-step.is-done .ov-step-mark {
+  background: var(--amber-500);
+}
+
+.dash .ov-step-body {
+  min-width: 0;
+}
+
+.dash .ov-step-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* A finished step steps back rather than disappearing: the list is still a
+   list of three, and the reader needs to see which two are behind them. */
+.dash .ov-step.is-done .ov-step-title {
+  color: var(--muted);
+}
+
+.dash .ov-step-text {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.dash .ov-step-link {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--amber-400);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.dash .ov-step-link:hover {
+  color: var(--amber-500);
+}
+
+.dash .ov-step-link:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (max-width: 719px) {
+  .dash .ov-stack {
+    gap: 22px;
+  }
+
+  /* The chart is the width of a phone's whole column; below the heading it
+     has room, beside it it does not. */
+  .dash .ov-section-head {
+    align-items: flex-start;
+  }
+
+  .dash .ov-endpoints {
+    grid-template-columns: 1fr;
+  }
 }

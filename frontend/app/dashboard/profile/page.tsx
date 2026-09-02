@@ -10,12 +10,21 @@
  * bar and the overview all pick up the new value from the server rather than
  * from an optimistic guess.
  *
+ * The forms are behind tabs rather than stacked: they are three unrelated
+ * errands, and only one is ever being run. Each panel is unmounted when its
+ * tab is not current, so switching away from a half-typed password change
+ * discards it instead of leaving credentials in memory behind a hidden panel.
+ *
+ * Signing out is not here -- it lives in the rail, where it is reachable from
+ * every screen.
+ *
  * Nothing here is invented: every value shown comes from GET /auth/me/.
  */
 
-import { useState } from "react";
-import type { FormEvent } from "react";
-import { LogOut } from "lucide-react";
+import { useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
+import { KeyRound, Mail, UserRound } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useSession } from "@/components/dashboard/SessionProvider";
 import { changeEmail, changePassword, updateProfile } from "@/lib/api";
 import type { Session } from "@/lib/api";
@@ -29,8 +38,84 @@ import {
   useSubmitState,
 } from "@/components/dashboard/AccountForms";
 
+interface TabSpec {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  render: () => JSX.Element;
+}
+
+const TABS: TabSpec[] = [
+  {
+    id: "details",
+    label: "Details",
+    icon: UserRound,
+    render: function renderDetails() {
+      return <NameForm />;
+    },
+  },
+  {
+    id: "email",
+    label: "Email",
+    icon: Mail,
+    render: function renderEmail() {
+      return <EmailForm />;
+    },
+  },
+  {
+    id: "password",
+    label: "Password",
+    icon: KeyRound,
+    render: function renderPassword() {
+      return <PasswordForm />;
+    },
+  },
+];
+
 export default function ProfilePage() {
   const { session } = useSession();
+  const [current, setCurrent] = useState<string>(TABS[0].id);
+  // Arrow keys move focus as well as selection, which means the newly current
+  // tab has to be told to take focus after the render that selects it.
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  function selectByIndex(index: number): void {
+    const next = TABS[(index + TABS.length) % TABS.length];
+    setCurrent(next.id);
+    const list = listRef.current;
+    if (list !== null) {
+      const button = list.querySelector<HTMLButtonElement>(
+        "#profile-tab-" + next.id
+      );
+      if (button !== null) {
+        button.focus();
+      }
+    }
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    const index = TABS.findIndex(function isCurrent(tab) {
+      return tab.id === current;
+    });
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      selectByIndex(index + 1);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      selectByIndex(index - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      selectByIndex(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      selectByIndex(TABS.length - 1);
+    }
+  }
+
+  const active =
+    TABS.find(function isCurrent(tab) {
+      return tab.id === current;
+    }) ?? TABS[0];
 
   return (
     <div className="panel">
@@ -39,12 +124,53 @@ export default function ProfilePage() {
         Your account details. Changes take effect immediately.
       </p>
 
-      <div className="panel-body acct-stack">
+      <div className="panel-body acct-stack panel-form">
         <IdentityCard session={session} />
-        <NameForm />
-        <EmailForm />
-        <PasswordForm />
-        <SignOutCard />
+
+        <div className="acct-tabs">
+          <div
+            className="acct-tablist"
+            role="tablist"
+            aria-label="Profile sections"
+            ref={listRef}
+            onKeyDown={onKeyDown}
+          >
+            {TABS.map(function renderTab(tab) {
+              const Icon = tab.icon;
+              const isCurrent = tab.id === current;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  id={"profile-tab-" + tab.id}
+                  className="acct-tab"
+                  role="tab"
+                  aria-selected={isCurrent}
+                  aria-controls={"profile-panel-" + tab.id}
+                  // Roving tabindex: one Tab reaches the strip, arrows move
+                  // within it. Three separate tab stops would be wrong.
+                  tabIndex={isCurrent ? 0 : -1}
+                  onClick={function onClick() {
+                    setCurrent(tab.id);
+                  }}
+                >
+                  <Icon size={15} strokeWidth={1.9} aria-hidden="true" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            className="acct-tabpanel"
+            id={"profile-panel-" + active.id}
+            role="tabpanel"
+            aria-labelledby={"profile-tab-" + active.id}
+            tabIndex={-1}
+          >
+            {active.render()}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -277,45 +403,5 @@ function PasswordForm() {
         <FormFeedback error={state.error} success={state.success} />
       </form>
     </SectionCard>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Sign out                                                            */
-/* ------------------------------------------------------------------ */
-
-function SignOutCard() {
-  // The provider's signOut() clears the auth cookies server-side and then
-  // performs the router.replace("/signin") itself, so this only owns the
-  // button's pending state.
-  const { signOut } = useSession();
-  const [leaving, setLeaving] = useState<boolean>(false);
-
-  function handleClick(): void {
-    if (leaving) {
-      return;
-    }
-    setLeaving(true);
-    void signOut();
-  }
-
-  return (
-    <section className="acct-danger">
-      <div>
-        <h2 className="acct-card-title">Sign out</h2>
-        <p className="acct-card-text">
-          Ends this session on this device. Your account is not affected.
-        </p>
-      </div>
-      <button
-        type="button"
-        className="acct-signout"
-        onClick={handleClick}
-        disabled={leaving}
-      >
-        <LogOut size={15} strokeWidth={1.9} aria-hidden="true" />
-        <span>{leaving ? "Signing out" : "Sign out"}</span>
-      </button>
-    </section>
   );
 }

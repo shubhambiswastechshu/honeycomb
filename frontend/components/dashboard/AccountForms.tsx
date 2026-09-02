@@ -158,6 +158,11 @@ export interface SectionCardProps {
   title: string;
   description?: ReactNode;
   children: ReactNode;
+  /**
+   * id for the heading, so a dialog wrapping this card can name itself with
+   * aria-labelledby instead of repeating the title in an aria-label.
+   */
+  titleId?: string;
 }
 
 /** One bordered block: heading, optional explanation, then whatever it holds. */
@@ -165,11 +170,14 @@ export function SectionCard({
   title,
   description,
   children,
+  titleId,
 }: SectionCardProps) {
   return (
     <section className="acct-card">
       <div className="acct-card-head">
-        <h2 className="acct-card-title">{title}</h2>
+        <h2 className="acct-card-title" id={titleId}>
+          {title}
+        </h2>
         {description !== undefined && description !== null ? (
           <p className="acct-card-text">{description}</p>
         ) : null}
