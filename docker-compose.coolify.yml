@@ -42,6 +42,14 @@ services:
       DJANGO_DB_PASSWORD: ${POSTGRES_PASSWORD}
       DJANGO_DB_HOST: postgres
       DJANGO_DB_PORT: "5432"
+      # Outside DEBUG the project requires TLS to the database, which is the
+      # right default when the database is on another host. Here it is a
+      # sibling container on a private Docker network on this same machine,
+      # and postgres:16-alpine ships without TLS -- so psycopg refuses to
+      # connect at all, migrate fails, and the container crash-loops while the
+      # deploy reports success. The setting exists to be relaxed exactly here.
+      # If Postgres ever moves off this host, this must go back to require.
+      DJANGO_DB_SSLMODE: disable
       # Coolify's proxy is the only hop in front of this container. If that
       # ever changes, this number must change with it: get it wrong and
       # X-Forwarded-For becomes caller-controlled and every throttle is
