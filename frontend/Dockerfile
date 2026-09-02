@@ -20,8 +20,12 @@ COPY . .
 
 # Baked into the bundle at build time, so it cannot be changed by a restart --
 # the browser calls the API directly, so this is a public origin.
-ARG NEXT_PUBLIC_API_BASE
-ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+# The name lib/api.ts actually reads, and it must carry the /api suffix --
+# the fallback in that file is "http://localhost:8000/api", so getting the
+# name wrong does not fail the build, it ships a bundle that asks the
+# visitor's own machine for the API.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
 RUN npm run build
 

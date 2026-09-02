@@ -89,8 +89,9 @@ services:
       context: ./frontend
       args:
         # Baked into the bundle: the browser calls the API directly, so this
-        # is a public origin, not the internal service name.
-        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+        # is a public origin, not the internal service name -- and it must end
+        # in /api, which is what lib/api.ts expects.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
     restart: unless-stopped
     environment:
       SERVICE_FQDN_FRONTEND_3000: /
