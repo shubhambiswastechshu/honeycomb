@@ -270,12 +270,36 @@ else:
 # gunicorn workers gets N independent sets of counters, so every limit below is
 # effectively multiplied by N. A real deployment must point this at a shared
 # backend (Redis or Memcached) for the limits to mean what they say.
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'honeycomb-default',
+# Redis when REDIS_URL is set, per-process memory when it is not.
+#
+# This is not a performance setting. Every rate limit in this project --
+# DRF's ScopedRateThrottle and the admin login limiter in
+# accounts/middleware.py -- keeps its counters here, so the cache IS a
+# security control. With LocMemCache each worker holds its own counters, which
+# silently multiplies every published limit by the worker count: two workers
+# turn '30/min' into 60. That was tolerable when a person clicking was the only
+# caller. It is not, now that /mcp/ is driven by AI clients that retry in
+# loops, so production sets REDIS_URL and gets one shared counter.
+#
+# django.core.cache.backends.redis is built into Django 4.2; only the `redis`
+# driver is a dependency.
+_REDIS_URL = os.environ.get('REDIS_URL', '').strip()
+
+if _REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _REDIS_URL,
+            'KEY_PREFIX': 'honeycomb',
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'honeycomb-default',
+        }
+    }
 
 
 # Password validation

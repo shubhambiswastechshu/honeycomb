@@ -33,3 +33,8 @@ uvicorn[standard]==0.34.0
 # inside the FastAPI event loop; connectors/shims/http.py owns the one shared
 # client and its retry policy.
 httpx==0.28.1
+
+# Cache backend for production. Django 4.2 ships the RedisCache backend itself;
+# this is only the driver it needs. Without REDIS_URL set the project falls
+# back to per-process memory and this package goes unused.
+redis==5.2.1

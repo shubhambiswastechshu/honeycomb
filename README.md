@@ -38,11 +38,14 @@ and no `export` needed. A real environment variable always beats the file.
 No Postgres to hand? `DJANGO_DB_ENGINE=sqlite` falls back to a local file —
 nothing in this project uses a Postgres-only feature.
 
-**Backend** (port 8000):
+**Backend** (port 8000). Use uvicorn, not `manage.py runserver`: runserver
+serves `WSGI_APPLICATION`, which bypasses `asgi.py` entirely, and every
+`/mcp/` URL would 404 while the portal looked healthy.
 
 ```bash
 python3 -m venv .venv && ./.venv/bin/pip install -r Honeycomb/requirements.txt
-cd Honeycomb && ../.venv/bin/python manage.py migrate && ../.venv/bin/python manage.py runserver
+cd Honeycomb && ../.venv/bin/python manage.py migrate
+../.venv/bin/python -m uvicorn Honeycomb.asgi:application --port 8000 --reload
 ```
 
 **Frontend** (port 3000), in a second terminal:

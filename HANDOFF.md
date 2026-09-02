@@ -22,7 +22,9 @@ once already (the honeycomb loader).
 Do not add sample rows, mock charts, placeholder metrics, or lorem ipsum. The only
 real values shown anywhere come from the authenticated session.
 
-**Python 3.9.** No `X | Y` unions, no `match`, no `dict | dict`. Use `typing.Optional`.
+**Python 3.11.** Raised from 3.9 when the connectors were ported: eleven of
+them use `X | None` in signatures, which 3.9 cannot parse at import time.
+`render.yaml` and the Dockerfile both pin 3.11.
 
 **Light mode only.** `color-scheme: light` is set deliberately. There is no dark
 palette; do not add `prefers-color-scheme: dark` blocks.
