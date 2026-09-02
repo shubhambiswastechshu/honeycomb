@@ -12,10 +12,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: honeycomb
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: honeycomb
     volumes:
-      - honeycomb_pg:/var/lib/postgresql/data
+      - honeycomb_pg2:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U honeycomb"]
       interval: 5s
@@ -26,7 +26,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
-      - honeycomb_redis:/data
+      - honeycomb_redis2:/data
 
   backend:
     build:
@@ -35,7 +35,7 @@ services:
     environment:
       SERVICE_FQDN_BACKEND_8000: /
       DJANGO_DEBUG: "false"
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?generate one}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DB_ENGINE: postgres
       DJANGO_DB_NAME: honeycomb
       DJANGO_DB_USER: honeycomb
@@ -47,17 +47,17 @@ services:
       # X-Forwarded-For becomes caller-controlled and every throttle is
       # bypassable. HANDOFF invariant 6, and it was a real finding.
       DJANGO_NUM_PROXIES: "1"
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?api hostname}
-      DJANGO_PUBLIC_ORIGINS: ${DJANGO_PUBLIC_ORIGINS:?frontend origin}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      DJANGO_PUBLIC_ORIGINS: ${DJANGO_PUBLIC_ORIGINS}
       REDIS_URL: redis://redis:6379/0
       # Lose this and every stored connector credential is unrecoverable --
       # there is no reset path, only reconnecting each source by hand. Back it
       # up somewhere that is not this server.
-      HONEYCOMB_CRED_KEYS: ${HONEYCOMB_CRED_KEYS:?fernet key, newest first}
+      HONEYCOMB_CRED_KEYS: ${HONEYCOMB_CRED_KEYS}
       # Must match the redirect URI registered on the Google OAuth client,
       # byte for byte, scheme included.
-      HONEYCOMB_PUBLIC_BASE: ${HONEYCOMB_PUBLIC_BASE:?api origin}
-      HONEYCOMB_FRONTEND_BASE: ${HONEYCOMB_FRONTEND_BASE:?app origin}
+      HONEYCOMB_PUBLIC_BASE: ${HONEYCOMB_PUBLIC_BASE}
+      HONEYCOMB_FRONTEND_BASE: ${HONEYCOMB_FRONTEND_BASE}
       HONEYCOMB_MCP_TOOL_TIMEOUT: ${HONEYCOMB_MCP_TOOL_TIMEOUT:-45}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -82,7 +82,7 @@ services:
       args:
         # Baked into the bundle: the browser calls the API directly, so this
         # is a public origin, not the internal service name.
-        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:?api origin}
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
     restart: unless-stopped
     environment:
       SERVICE_FQDN_FRONTEND_3000: /
@@ -90,5 +90,5 @@ services:
       - backend
 
 volumes:
-  honeycomb_pg:
-  honeycomb_redis:
+  honeycomb_pg2:
+  honeycomb_redis2:
