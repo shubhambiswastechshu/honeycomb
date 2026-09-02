@@ -1,31 +1,30 @@
-# Honeycomb frontend: Next.js 14, built once and served by `next start`.
-FROM node:20-alpine AS deps
+# Honeycomb frontend: Next.js 14, built and served from one stage.
+#
+# Deliberately NOT multi-stage. Coolify rewrites this file before building --
+# it injected 45 ARG declarations across three stages -- and the rewritten
+# result lost `/app/.next` between the build stage and the runtime stage, so
+# `COPY --from=build` failed on a directory the build had just produced.
+# One stage has nothing to copy across and cannot fail that way. The cost is a
+# larger image; the benefit is a build that survives being rewritten.
+FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json package-lock.json ./
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # npm ci, not install: the lockfile is the build's input, and `install` would
-# silently resolve something newer than what was tested.
+# quietly resolve something newer than what was tested.
+COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Baked into the bundle at build time, so it cannot be changed by a restart.
+
+# Baked into the bundle at build time, so it cannot be changed by a restart --
+# the browser calls the API directly, so this is a public origin.
 ARG NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
-ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-FROM node:20-alpine AS run
-WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
-# Only what serving needs. node_modules comes from the build stage rather than
-# a fresh `npm ci --omit=dev`, so the running image contains exactly the tree
-# the bundle was built against.
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/next.config.mjs ./next.config.mjs
+ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["sh", "-c", "npm run start -- --port ${PORT:-3000} --hostname 0.0.0.0"]
