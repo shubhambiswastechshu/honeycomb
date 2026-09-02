@@ -67,7 +67,10 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/auth/csrf/', timeout=4).status==200 else 1)\""]
+      # See Honeycomb/healthcheck.py -- it has to claim X-Forwarded-Proto, or
+      # SECURE_SSL_REDIRECT answers the check with a 301 to a localhost URL
+      # that has no certificate, and a healthy container looks dead.
+      test: ["CMD", "python", "healthcheck.py"]
       interval: 15s
       timeout: 6s
       retries: 10
