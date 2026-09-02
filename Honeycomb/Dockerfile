@@ -19,11 +19,14 @@ COPY . .
 # Collected at build time, not on boot: WhiteNoise serves the admin re-skin
 # from here, and doing it per container start would repeat the same work on
 # every restart and every replica.
-ENV DJANGO_COLLECTSTATIC=1
-RUN DJANGO_SECRET_KEY=build-only \
-    DJANGO_DB_ENGINE=sqlite \
-    HONEYCOMB_CRED_KEYS=dummy \
-    python manage.py collectstatic --noinput
+#
+# DJANGO_DEBUG=false is the load-bearing part. settings.py selects the manifest
+# storage backend only outside DEBUG, so collecting with the default DEBUG=True
+# writes the files but NO staticfiles.json. At runtime, where DEBUG is false,
+# the manifest backend then raises on the first {% static %} it is asked for --
+# the admin answers 500 while every other route is healthy.
+# The other three exist only so settings.py can import during the build.
+RUN DJANGO_DEBUG=false     DJANGO_SECRET_KEY=build-only-not-used-at-runtime     DJANGO_DB_ENGINE=sqlite     DJANGO_ALLOWED_HOSTS=localhost     HONEYCOMB_CRED_KEYS=build-only     python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
