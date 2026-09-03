@@ -44,6 +44,10 @@ class McpKey(TenantOwnedModel):
     revoked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        # "Mcp key" next to McpActivity's "MCP activity" in the same admin
+        # section; the acronym is spelled one way everywhere else in the product.
+        verbose_name = 'MCP key'
+        verbose_name_plural = 'MCP keys'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['connection', 'revoked_at'], name='mcpkey_conn_revoked_idx'),

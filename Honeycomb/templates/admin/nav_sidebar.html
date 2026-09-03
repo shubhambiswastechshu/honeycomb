@@ -3,19 +3,30 @@
 Replaces the admin's 275px text sidebar with the app's icon rail, so crossing
 from /dashboard into /admin does not change what navigation looks like.
 
-Three things follow from that and are deliberate:
+Four things follow from that and are deliberate:
 
 * The id is `hc-rail`, not `nav-sidebar`. Django's nav_sidebar.js looks up
   `#nav-sidebar` and then `#nav-filter` unconditionally; renaming the element
   makes that script bail on its first lookup instead of throwing on a filter box
   this rail does not have. It also frees the rail from nav_sidebar.css, whose
   every rule is keyed on that id.
-* There is no toggle. The rail is 60px of icons -- there is nothing to reclaim
-  by collapsing it, and a chrome element that can vanish is one the eye has to
-  re-find on every page.
-* Labels live in tooltips, matching components/dashboard/IconRail.tsx. Each item
-  still carries aria-label and title, so the name reaches assistive tech and the
-  native tooltip even when the CSS one is not shown.
+* There is no toggle. The rail is a fixed column of icons -- there is nothing to
+  reclaim by collapsing it, and a chrome element that can vanish is one the eye
+  has to re-find on every page.
+* **Labels are on screen, not in a tooltip.** This matches
+  components/dashboard/IconRail.tsx and for the same reason: an icon-only rail
+  works when every glyph is unambiguous, and a dozen admin models are not.
+  "Connections", "Connector OAuth states", "MCP keys" and "MCP activity" are
+  four abstractions no icon distinguishes on its own, so the name belongs next
+  to the icon rather than behind a hover a keyboard user never triggers. The
+  CSS tooltip this rail used to carry is gone with it -- `title` says more than
+  it did, because it names the app as well, and `aria-label` carries the name
+  to assistive tech.
+* **One list per app, separated by a hairline.** `available_apps` arrives
+  grouped already, and flattening it threw that away -- twelve items in one
+  undifferentiated column is a list to read, whereas five short groups is a
+  structure to scan. The group is the only thing that distinguishes, say, the
+  crawler's four tables from the MCP portal's two.
 
 `available_apps` comes from AdminSite.each_context, so this works on every admin
 page without a view change.
@@ -24,43 +35,61 @@ page without a view change.
 {% url 'admin:index' as admin_index_url %}
 
 <nav class="hc-rail" id="hc-rail" aria-label="{% translate 'Sections' %}">
-  <ul class="hc-rail-list">
-    <li class="hc-rail-cell">
-      <a class="hc-rail-item"
-         href="{{ admin_index_url }}"
-         title="{% translate 'Overview' %}"
-         aria-label="{% translate 'Overview' %}"
-         {% if request.path == admin_index_url %}aria-current="page"{% endif %}>
-        <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="1.75"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          {% include "admin/hc_rail_icon.html" with icon="overview" %}
-        </svg>
-        <span class="hc-rail-tip" role="presentation">{% translate 'Overview' %}</span>
-      </a>
-    </li>
+  <div class="hc-rail-scroll">
+    <ul class="hc-rail-list">
+      <li class="hc-rail-cell">
+        <a class="hc-rail-item"
+           href="{{ admin_index_url }}"
+           title="{% translate 'Overview' %}"
+           aria-label="{% translate 'Overview' %}"
+           {% if request.path == admin_index_url %}aria-current="page"{% endif %}>
+          <span class="hc-rail-box">
+            <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.75"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              {% include "admin/hc_rail_icon.html" with icon="overview" %}
+            </svg>
+          </span>
+          <span class="hc-rail-name">{% translate 'Overview' %}</span>
+        </a>
+      </li>
+    </ul>
 
     {% for app in available_apps %}
-      {% for model in app.models %}
-        {% if model.admin_url %}
-          <li class="hc-rail-cell">
-            <a class="hc-rail-item"
-               href="{{ model.admin_url }}"
-               title="{{ model.name }}"
-               aria-label="{{ model.name }}"
-               {% if model.admin_url in request.path|urlencode %}aria-current="page"{% endif %}>
-              <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
-                   fill="none" stroke="currentColor" stroke-width="1.75"
-                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                {% include "admin/hc_rail_icon.html" with icon=model.object_name|lower %}
-              </svg>
-              <span class="hc-rail-tip" role="presentation">{{ model.name }}</span>
-            </a>
-          </li>
-        {% endif %}
-      {% endfor %}
+      {# An app whose every model is hidden from this user would otherwise draw
+         a separator with nothing under it. #}
+      {% if app.models %}
+        <span class="hc-rail-sep" aria-hidden="true"></span>
+
+        {# The app name is the group's accessible label. It is not drawn: the
+           hairline says "these belong together" in 1px, and repeating
+           "Authentication and Authorization" over two lines of 10px type would
+           cost more room than the four models under it. #}
+        <ul class="hc-rail-list" aria-label="{{ app.name }}">
+          {% for model in app.models %}
+            {% if model.admin_url %}
+              <li class="hc-rail-cell">
+                <a class="hc-rail-item"
+                   href="{{ model.admin_url }}"
+                   title="{{ app.name }} — {{ model.name }}"
+                   aria-label="{{ model.name }}"
+                   {% if model.admin_url in request.path|urlencode %}aria-current="page"{% endif %}>
+                  <span class="hc-rail-box">
+                    <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="1.75"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      {% include "admin/hc_rail_icon.html" with icon=model.object_name|lower %}
+                    </svg>
+                  </span>
+                  <span class="hc-rail-name">{{ model.name }}</span>
+                </a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
     {% endfor %}
-  </ul>
+  </div>
 
   {% if site_url %}
     <span class="hc-rail-divider" aria-hidden="true"></span>
@@ -71,12 +100,14 @@ page without a view change.
            href="{{ site_url }}"
            title="{% translate 'View site' %}"
            aria-label="{% translate 'View site' %}">
-          <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="1.75"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            {% include "admin/hc_rail_icon.html" with icon="site" %}
-          </svg>
-          <span class="hc-rail-tip" role="presentation">{% translate 'View site' %}</span>
+          <span class="hc-rail-box">
+            <svg class="hc-rail-icon" width="19" height="19" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.75"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              {% include "admin/hc_rail_icon.html" with icon="site" %}
+            </svg>
+          </span>
+          <span class="hc-rail-name">{% translate 'View site' %}</span>
         </a>
       </li>
     </ul>

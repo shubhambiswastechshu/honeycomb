@@ -404,9 +404,14 @@ div.breadcrumbs {
    Icon rail
 
    Deliberately a copy of the app's rail (frontend/app/dashboard/dashboard.css,
-   `.dash-rail`) down to the 60px column, the 40px cells and the tooltip that
-   slides out on the right -- crossing from /dashboard into /admin should not
-   change what the navigation looks like.
+   `.dash-rail`) down to the 78px column, the 34x26 icon box and the 10px label
+   under it -- crossing from /dashboard into /admin should not change what the
+   navigation looks like.
+
+   The label is on screen rather than in a hover tooltip, which is the same call
+   the app rail made and made for the same reason: an icon-only rail works when
+   every glyph is unambiguous, and a dozen admin models are not. See the comment
+   in templates/admin/nav_sidebar.html.
 
    Keyed on .hc-rail, not #nav-sidebar: templates/admin/nav_sidebar.html renames
    the element so Django's nav_sidebar.js and nav_sidebar.css both let go of it.
@@ -417,28 +422,54 @@ div.breadcrumbs {
   position: sticky;
   top: 0;
   align-self: flex-start;
-  flex: 0 0 60px;
+  flex: 0 0 78px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 60px;
+  width: 78px;
   /* One viewport tall and stuck to the top, so the rail is always fully in view
-     on a long change list without ever scrolling itself.
-
-     No overflow: a scroll container clips absolutely positioned children, so
-     `overflow: auto` here would put a scrollbar inside a 60px column *and* cut
-     every tooltip off at its edge. */
+     on a long change list without ever scrolling the page to reach it. */
   height: 100vh;
-  padding: 12px 0 16px 0;
+  padding: 10px 0 14px 0;
   border-right: 1px solid var(--border-color);
   background: var(--hc-sidebar-bg);
+}
+
+/* The sections scroll; "View site" does not.
+
+   Unlike the app rail, this one's length is not fixed -- it is one cell per
+   registered ModelAdmin, and a project that registers twenty models would push
+   the last of them past the fold with no way to reach it. So the groups get
+   their own scroll container and the trailing item stays pinned to the bottom
+   edge. `min-height: 0` because a flex child will not shrink below its content
+   without it, which would move the overflow back onto the page. */
+.hc-rail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.hc-rail-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hc-rail-scroll::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--border-color);
 }
 
 .hc-rail-list {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -448,108 +479,109 @@ div.breadcrumbs {
   display: block;
 }
 
-/* Pushes the trailing group to the far end of the rail. */
-.hc-rail-divider {
+/* Between two apps. Tighter than .hc-rail-divider on purpose: this one groups,
+   that one terminates. */
+.hc-rail-sep {
+  flex: none;
   width: 26px;
   height: 1px;
-  margin-top: auto;
-  margin-bottom: 12px;
+  margin: 9px 0;
   background: var(--border-color);
 }
 
+/* Above the trailing group, which .hc-rail-scroll has already pushed to the
+   bottom of the rail. */
+.hc-rail-divider {
+  flex: none;
+  width: 26px;
+  height: 1px;
+  margin: 12px 0;
+  background: var(--border-color);
+}
+
+/* An icon in a box, with its name underneath. The box is what carries the
+   current-section state, so the label never becomes a filled block of text. */
 .hc-rail-item {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  gap: 3px;
+  width: 72px;
+  padding: 6px 2px 7px;
+  border-radius: 8px;
   color: var(--body-quiet-color);
   text-decoration: none;
+}
+
+.hc-rail-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 26px;
+  border-radius: 8px;
   transition: background-color var(--hc-ease), color var(--hc-ease);
 }
 
+/* Wraps to two lines rather than ellipsising: "Connector OAuth states" is three
+   words and truncating it to "Connector O..." would lose the half that says
+   what it is. Anything longer than two lines is clipped -- at that point the
+   `title` attribute, which carries the app name too, is the better answer. */
+.hc-rail-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  text-align: center;
+}
+
 .hc-rail-item:hover {
-  background: var(--hc-tint-soft);
   color: var(--body-loud-color);
 }
 
-.hc-rail-item:focus-visible {
+.hc-rail-item:hover .hc-rail-box {
+  background: var(--hc-tint-soft);
+}
+
+/* The stock focus ring sits at offset 2px, which on a 72px item inside a 78px
+   rail is drawn half outside the column. Pulled inside instead. */
+.hc-rail .hc-rail-item:focus-visible {
   outline: 2px solid var(--hc-amber-500);
-  outline-offset: 2px;
+  outline-offset: -1px;
 }
 
 .hc-rail-item[aria-current="page"] {
+  color: var(--body-loud-color);
+}
+
+.hc-rail-item[aria-current="page"] .hc-rail-box {
   background: var(--hc-tint);
   color: var(--hc-amber-deep);
 }
 
-html[data-theme="dark"] .hc-rail-item[aria-current="page"] {
-  color: var(--hc-amber-300);
+.hc-rail-item[aria-current="page"] .hc-rail-name {
+  font-weight: 600;
 }
 
-/* The marker against the rail's edge. */
-.hc-rail-item[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  left: -10px;
-  top: 50%;
-  width: 3px;
-  height: 20px;
-  border-radius: 0 3px 3px 0;
-  background: var(--hc-amber-500);
-  transform: translateY(-50%);
+html[data-theme="dark"] .hc-rail-item[aria-current="page"] .hc-rail-box {
+  color: var(--hc-amber-300);
 }
 
 .hc-rail-icon {
   flex: none;
 }
 
-/* Tooltip. The rail shows icons only, so this is the only place a section name
-   is visible -- it has to reach anyone who can see, including a keyboard user
-   on a touchscreen laptop where (pointer: fine) is false. So the box exists
-   unconditionally and appears on focus-visible unconditionally; only the hover
-   reveal is gated, which is what stops a tap leaving a label stuck open.
-
-   Absolutely positioned, so showing it can never move the rail. */
-.hc-rail-tip {
-  display: block;
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  z-index: 30;
-  padding: 4px 9px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--hc-radius-xs);
-  background: var(--body-bg);
-  color: var(--body-fg);
-  font-size: 0.75rem;
-  line-height: 1.4;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%) translateX(-4px);
-  transition: opacity 0.14s ease, transform 0.14s ease;
-}
-
-.hc-rail-item:focus-visible .hc-rail-tip {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .hc-rail-item:hover .hc-rail-tip {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
-}
-
 /* nav_sidebar.css sizes .content against the 275px sidebar it no longer sits
    next to. */
 .main > #hc-rail + .content,
 .main.shifted > #hc-rail + .content {
-  max-width: calc(100% - 60px);
+  max-width: calc(100% - 78px);
 }
 
 /* --------------------------------------------------------------------------
@@ -2086,7 +2118,7 @@ html.hc-leaving {
 
   .hc-loading-overlay,
   .hc-rail-item,
-  .hc-rail-tip,
+  .hc-rail-box,
   .button,
   input[type="submit"],
   input[type="text"],

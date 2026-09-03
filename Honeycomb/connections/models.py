@@ -215,6 +215,10 @@ class ConnectorOAuthState(models.Model):
     )
 
     class Meta:
+        # Django would title-case the class name into "Connector o auth state",
+        # which is what the admin rail, the breadcrumbs and the index all show.
+        verbose_name = 'OAuth handshake'
+        verbose_name_plural = 'OAuth handshakes'
         ordering = ('-created_at',)
 
     def __str__(self) -> str:
