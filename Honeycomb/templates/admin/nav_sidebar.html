@@ -56,15 +56,15 @@ page without a view change.
     </ul>
 
     {% for app in available_apps %}
-      {# An app whose every model is hidden from this user would otherwise draw
-         a separator with nothing under it. #}
+      {% comment %} An app whose every model is hidden from this user would otherwise draw
+         a separator with nothing under it. {% endcomment %}
       {% if app.models %}
         <span class="hc-rail-sep" aria-hidden="true"></span>
 
-        {# The app name is the group's accessible label. It is not drawn: the
+        {% comment %} The app name is the group's accessible label. It is not drawn: the
            hairline says "these belong together" in 1px, and repeating
            "Authentication and Authorization" over two lines of 10px type would
-           cost more room than the four models under it. #}
+           cost more room than the four models under it. {% endcomment %}
         <ul class="hc-rail-list" aria-label="{{ app.name }}">
           {% for model in app.models %}
             {% if model.admin_url %}
