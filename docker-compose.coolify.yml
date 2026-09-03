@@ -65,6 +65,11 @@ services:
       # Unset both and no admin account is made.
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+      # DESTRUCTIVE. Set only for the one deploy that should wipe the user
+      # table and leave a single admin, then clear it again.
+      HONEYCOMB_RESET_ADMIN: ${HONEYCOMB_RESET_ADMIN:-}
+      HONEYCOMB_ADMIN_ID: ${HONEYCOMB_ADMIN_ID:-}
+      HONEYCOMB_ADMIN_PASSWORD: ${HONEYCOMB_ADMIN_PASSWORD:-}
       REDIS_URL: redis://redis:6379/0
       # Lose this and every stored connector credential is unrecoverable --
       # there is no reset path, only reconnecting each source by hand. Back it
