@@ -42,4 +42,10 @@ EXPOSE 8000
 # solely through Coolify's proxy. Do not copy it onto a directly exposed
 # service: it makes the client IP -- and therefore every rate limit -- caller
 # controlled. See HANDOFF invariant 6 and DJANGO_NUM_PROXIES.
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn Honeycomb.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --forwarded-allow-ips='*' --access-logfile -"]
+# createsuperuser --noinput reads DJANGO_SUPERUSER_EMAIL and
+# DJANGO_SUPERUSER_PASSWORD. It exits non-zero when the account already
+# exists, which is the normal case on every deploy after the first, so its
+# failure is swallowed deliberately -- `|| true` here means "already there",
+# not "ignore errors in general". Leave the two variables unset and no admin
+# account is created at all.
+CMD ["sh", "-c", "python manage.py migrate --noinput && { [ -n \"$DJANGO_SUPERUSER_EMAIL\" ] && python manage.py createsuperuser --noinput || true; } && gunicorn Honeycomb.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --forwarded-allow-ips='*' --access-logfile -"]

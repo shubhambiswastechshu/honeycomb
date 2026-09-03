@@ -61,6 +61,10 @@ services:
       # cookie and the auth cookies are host-only, so the frontend can read
       # neither and every sign-in fails with "CSRF token missing".
       HONEYCOMB_COOKIE_DOMAIN: ${HONEYCOMB_COOKIE_DOMAIN:-}
+      # Creates the platform admin on first boot only; harmless afterwards.
+      # Unset both and no admin account is made.
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
       REDIS_URL: redis://redis:6379/0
       # Lose this and every stored connector credential is unrecoverable --
       # there is no reset path, only reconnecting each source by hand. Back it
