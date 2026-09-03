@@ -57,3 +57,6 @@ client_secret*.json
 /crawler/
 /crawler-go/
 /bench/
+
+# Operational reference: contains live production secrets.
+DEPLOYMENT.local.md
