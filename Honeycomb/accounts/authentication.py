@@ -39,11 +39,18 @@ def refresh_cookie_name():
 
 
 def _cookie_security():
-    return {
+    kwargs = {
         'secure': getattr(settings, 'HC_COOKIE_SECURE', not settings.DEBUG),
         'samesite': getattr(settings, 'HC_COOKIE_SAMESITE', 'Lax'),
         'path': '/',
     }
+    # Only when configured. Passing domain=None is not the same as omitting
+    # it for delete_cookie, and a host-only cookie is the right default when
+    # the app and the API share a hostname.
+    domain = getattr(settings, 'HC_COOKIE_DOMAIN', None)
+    if domain:
+        kwargs['domain'] = domain
+    return kwargs
 
 
 def _lifetime_seconds(key, fallback):
@@ -122,8 +129,15 @@ def set_refresh_cookie(response, refresh_token):
 def clear_auth_cookies(response):
     kwargs = _cookie_security()
     for name in (access_cookie_name(), refresh_cookie_name()):
+        # domain must match what set_cookie used, or the browser keeps the
+        # cookie: a delete is just an expiry on an identically-scoped cookie,
+        # and a host-only delete does not touch a domain-scoped one. Getting
+        # this wrong means signing out appears to work and does not.
         response.delete_cookie(
-            name, path=kwargs['path'], samesite=kwargs['samesite']
+            name,
+            path=kwargs['path'],
+            samesite=kwargs['samesite'],
+            domain=kwargs.get('domain'),
         )
     return response
 

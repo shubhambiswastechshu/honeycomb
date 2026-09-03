@@ -57,6 +57,10 @@ services:
       DJANGO_NUM_PROXIES: "1"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
       DJANGO_PUBLIC_ORIGINS: ${DJANGO_PUBLIC_ORIGINS}
+      # The parent domain the app and the API share. Without it both the CSRF
+      # cookie and the auth cookies are host-only, so the frontend can read
+      # neither and every sign-in fails with "CSRF token missing".
+      HONEYCOMB_COOKIE_DOMAIN: ${HONEYCOMB_COOKIE_DOMAIN:-}
       REDIS_URL: redis://redis:6379/0
       # Lose this and every stored connector credential is unrecoverable --
       # there is no reset path, only reconnecting each source by hand. Back it

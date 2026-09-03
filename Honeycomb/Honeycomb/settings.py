@@ -445,6 +445,21 @@ HC_COOKIE_SECURE = not DEBUG
 # 'None' plus Secure, or an API served from the frontend's own domain.
 HC_COOKIE_SAMESITE = 'Lax'
 
+# The domain the auth and CSRF cookies are pinned to.
+#
+# Unset, Django sets a host-only cookie: one that the browser will only ever
+# hand back to the exact host that issued it. That is right when the app and
+# the API share a hostname, and wrong the moment they do not -- the frontend
+# then cannot read the csrftoken it is supposed to echo back, so every unsafe
+# request is rejected with "CSRF token missing", and the Next middleware
+# cannot see the auth cookie either, so the route guard never lets anyone in.
+#
+# Set it to the closest parent both hosts share, with a leading dot, e.g.
+# '.a.techshu.in' for honeycomb.a.techshu.in and honeycomb-api.a.techshu.in.
+# Do NOT widen it further than necessary: every host under this domain is
+# handed these cookies.
+HC_COOKIE_DOMAIN = os.environ.get('HONEYCOMB_COOKIE_DOMAIN', '').strip() or None
+
 
 # CORS
 # https://github.com/adamchainz/django-cors-headers
@@ -496,6 +511,10 @@ if not DEBUG:
 # proves the caller could read a cookie scoped to this site.
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
+# The same parent domain as the auth cookies, and for the same reason: the
+# frontend reads this one with document.cookie, which can only see cookies
+# issued for its own host unless a shared domain says otherwise.
+CSRF_COOKIE_DOMAIN = HC_COOKIE_DOMAIN
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 
