@@ -22,6 +22,8 @@ that leaves a half-drawn approval button.
     width: 100%; max-width: 460px; background: #fff; border: 1px solid #e8e1d0;
     border-radius: 16px; padding: 28px; box-shadow: 0 12px 34px rgba(60,50,20,.08);
   }
+  .brand { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; }
+  .wordmark { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
   h1 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; }
   p.sub { margin: 0 0 20px; color: #6f6754; font-size: 14px; }
   .who { font-weight: 600; }
@@ -55,6 +57,28 @@ that leaves a half-drawn approval button.
 </style>
 
 <div class="card">
+  {% comment %}
+  The same seven-hexagon mark as the admin header and the app's favicon, inlined
+  rather than pulled in with {% templatetag openblock %} static {% templatetag closeblock %}.
+  This page is served from the API host and is deliberately dependency-free: a
+  logo that 404s -- or a missing staticfiles manifest entry, which raises
+  outside DEBUG -- would break the one screen a user must complete to connect
+  anything. Seven polygons cost less than that risk.
+  {% endcomment %}
+  <div class="brand">
+    <svg width="34" height="34" viewBox="-27 -26 54 52" role="img"
+         aria-label="Honeycomb" focusable="false">
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#ea9d3e" transform="translate(0 0)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#e8a23f" transform="translate(17.32 0)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#e5ac3f" transform="translate(8.66 -15)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#e5b53f" transform="translate(-8.66 -15)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#e5bd3f" transform="translate(-17.32 0)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#ecc23d" transform="translate(-8.66 15)"/>
+      <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#eec33d" transform="translate(8.66 15)"/>
+    </svg>
+    <span class="wordmark">Honeycomb</span>
+  </div>
+
   <h1>Connect <span class="who">{{ client.client_name|default:"an AI client" }}</span>?</h1>
 
   {% if not choices %}
