@@ -3592,3 +3592,244 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Activity trend -- the cell field                                     */
+/* ------------------------------------------------------------------ */
+
+/* Colours are declared as roles here so the two series live in one place.
+   Brand amber and the reserved "critical" red were checked together against
+   this cream surface: CVD deltaE 18.3, normal-vision 22.1 -- comfortably clear.
+   Amber's own contrast against the surface is 2.2:1, under the 3:1 bar, which
+   is why the panel ships a table view: the field is never the only way to read
+   a number. Deepening the amber to pass contrast collides it with the red
+   (normal-vision deltaE falls to 13.8), so the relief route is the right trade
+   and keeps the brand colour. */
+.dash .ov-matrix {
+  --cell-ok: var(--amber-500);
+  --cell-bad: #d03b3b;
+  --cell-empty: rgba(49, 47, 23, 0.07);
+
+  margin: 0;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.dash .ov-matrix-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 0;
+}
+
+.dash .ov-matrix-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+
+/* Two series, so the legend is always present -- identity never rests on
+   colour alone. */
+.dash .ov-matrix-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dash .ov-matrix-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash .ov-matrix-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.dash .ov-matrix-swatch-ok {
+  background: var(--cell-ok);
+}
+
+.dash .ov-matrix-swatch-bad {
+  background: var(--cell-bad);
+}
+
+.dash .ov-matrix-plot {
+  position: relative;
+}
+
+.dash .ov-matrix-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  border-radius: 4px;
+}
+
+.dash .ov-matrix-svg:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 4px;
+}
+
+/* The gap between cells is surface showing through, not a stroke: a border
+   round each cell would thicken the field into a grid of boxes. */
+.dash .ov-matrix-cell {
+  stroke: none;
+  shape-rendering: crispEdges;
+}
+
+.dash .ov-matrix-cell-empty {
+  fill: var(--cell-empty);
+}
+
+.dash .ov-matrix-cell-ok {
+  fill: var(--cell-ok);
+}
+
+.dash .ov-matrix-cell-bad {
+  fill: var(--cell-bad);
+}
+
+.dash .ov-matrix-col {
+  transition: opacity 0.12s ease;
+}
+
+/* Dim the rest rather than brighten the hovered column: raising one column's
+   colour would change what its height appears to mean. */
+.dash .ov-matrix-plot:hover .ov-matrix-col:not(.is-on),
+.dash .ov-matrix-svg:focus-within .ov-matrix-col:not(.is-on) {
+  opacity: 0.55;
+}
+
+/* Solid hairlines. Dashes on a grid read as "threshold" or "projection" when
+   they mean neither. */
+.dash .ov-matrix-rule {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.dash .ov-matrix-cursor {
+  stroke: var(--amber-500);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.dash .ov-matrix-tick,
+.dash .ov-matrix-xlabel {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .ov-matrix-tip {
+  position: absolute;
+  bottom: calc(100% - 6px);
+  transform: translateX(-50%);
+  z-index: 3;
+  min-width: 116px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--ink);
+  color: #f6efdc;
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 8px 22px rgba(49, 47, 23, 0.22);
+}
+
+.dash .ov-matrix-tip-day {
+  display: block;
+  color: rgba(246, 239, 220, 0.66);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+/* Value leads, label follows. */
+.dash .ov-matrix-tip-row {
+  display: block;
+}
+
+.dash .ov-matrix-tip-row b {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .ov-matrix-tip-bad {
+  color: #f0a99f;
+}
+
+.dash .ov-matrix-table {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.dash .ov-matrix-table > summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 3px 0;
+}
+
+.dash .ov-matrix-table > summary:hover {
+  color: var(--text);
+}
+
+/* A wide table scrolls inside its own box; the panel never scrolls sideways. */
+.dash .ov-matrix-table-scroll {
+  max-height: 220px;
+  overflow: auto;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.dash .ov-matrix-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dash .ov-matrix-table caption {
+  text-align: left;
+  padding: 8px 10px 6px;
+  color: var(--muted);
+}
+
+.dash .ov-matrix-table th,
+.dash .ov-matrix-table td {
+  text-align: left;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.dash .ov-matrix-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .ov-matrix-table thead th {
+  color: var(--muted);
+  font-weight: 500;
+  border-top: none;
+}
+
+.dash .ov-matrix-table tbody th {
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .dash .ov-matrix {
+    padding: 14px 13px 12px;
+  }
+
+  .dash .ov-matrix-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

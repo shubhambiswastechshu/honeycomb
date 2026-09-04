@@ -22,6 +22,7 @@ import Link from "next/link";
 import { Activity, Check, Database, TriangleAlert } from "lucide-react";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
+import ActivityMatrix from "@/components/dashboard/ActivityMatrix";
 import McpUrl from "@/components/dashboard/McpUrl";
 import PanelCover from "@/components/dashboard/PanelCover";
 import { useSession } from "@/components/dashboard/SessionProvider";
@@ -31,8 +32,8 @@ import type { ActivityEvent, ActivitySummary, Connection } from "@/lib/api";
 /** How many calls the activity list shows. Also what is asked of the server. */
 const EVENT_LIMIT = 12;
 
-/** The sparkline's window, in days. */
-const SPARK_DAYS = 7;
+/** The activity field's window, in days. 30 is the summary endpoint's cap. */
+const SPARK_DAYS = 90;
 
 /**
  * How many MCP URLs the Overview lists before handing off to /dashboard/data.
@@ -110,139 +111,6 @@ function firstName(fullName: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
-/* ------------------------------------------------------------------ */
-/* Sparkline                                                           */
-/* ------------------------------------------------------------------ */
-
-/* Drawn by hand, in SVG, from the numbers the summary endpoint returned.
-   A charting library for seven integers would be a dependency, a bundle and a
-   theme to fight, and it would still have to be told the same seven numbers. */
-
-const SPARK_W = 176;
-const SPARK_H = 42;
-const SPARK_PAD = 4;
-
-export interface SparklineProps {
-  summary: ActivitySummary;
-}
-
-/**
- * Seven days of call volume, plotted in the order the server sent them.
- *
- * The whole figure carries role="img" and an aria-label that says the totals
- * out loud, because a polyline announces nothing: to a screen reader an
- * unlabelled chart is a decorative rectangle, and the shape here is the only
- * place those numbers appear.
- */
-function Sparkline({ summary }: SparklineProps) {
-  const days = summary.days;
-  if (days.length === 0) {
-    return null;
-  }
-
-  const totals = days.map(function dayTotal(day) {
-    return day.ok + day.error;
-  });
-  const peak = totals.reduce(function larger(best: number, value: number) {
-    return value > best ? value : best;
-  }, 0);
-  // A quiet week is all zeros, and dividing by that peak would be a crash --
-  // or, worse, a flat line drawn along the top of the box, which reads as
-  // constant maximum traffic. A floor of 1 puts an empty week on the floor.
-  const ceiling = peak > 0 ? peak : 1;
-
-  const floorY = SPARK_H - SPARK_PAD;
-  const span = SPARK_W - SPARK_PAD * 2;
-  const step = days.length > 1 ? span / (days.length - 1) : 0;
-
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (let index = 0; index < days.length; index += 1) {
-    // A single day has no step, so it sits in the middle rather than hard
-    // against the left edge where it would read as a clipped chart.
-    xs.push(days.length > 1 ? SPARK_PAD + index * step : SPARK_W / 2);
-    ys.push(floorY - (totals[index] / ceiling) * (SPARK_H - SPARK_PAD * 2));
-  }
-
-  const line = xs
-    .map(function point(x: number, index: number) {
-      return x.toFixed(1) + "," + ys[index].toFixed(1);
-    })
-    .join(" ");
-  const area =
-    line +
-    " " +
-    xs[xs.length - 1].toFixed(1) +
-    "," +
-    String(floorY) +
-    " " +
-    xs[0].toFixed(1) +
-    "," +
-    String(floorY);
-
-  const label =
-    count(summary.total, "tool call", "tool calls") +
-    " in the last " +
-    count(days.length, "day", "days") +
-    (summary.errors > 0
-      ? ", " + count(summary.errors, "of them an error", "of them errors")
-      : ", none of them errors");
-
-  return (
-    <div className="ov-spark">
-      <svg
-        className="ov-spark-svg"
-        viewBox={"0 0 " + String(SPARK_W) + " " + String(SPARK_H)}
-        width={SPARK_W}
-        height={SPARK_H}
-        role="img"
-        aria-label={label}
-      >
-        {days.length > 1 ? (
-          <polygon className="ov-spark-area" points={area} />
-        ) : null}
-        <line
-          className="ov-spark-base"
-          x1={SPARK_PAD}
-          y1={floorY}
-          x2={SPARK_W - SPARK_PAD}
-          y2={floorY}
-        />
-        {days.length > 1 ? (
-          <polyline className="ov-spark-line" points={line} />
-        ) : null}
-        {days.map(function marker(day, index: number) {
-          // A dot only where it says something: the day that failed, and the
-          // day we are standing in. Seven dots on seven points is decoration.
-          const failed = day.error > 0;
-          const last = index === days.length - 1;
-          if (!failed && !last) {
-            return null;
-          }
-          return (
-            <circle
-              key={day.date}
-              className={failed ? "ov-spark-dot ov-spark-dot-bad" : "ov-spark-dot"}
-              cx={xs[index]}
-              cy={ys[index]}
-              r={2.6}
-            />
-          );
-        })}
-      </svg>
-      <span className="ov-spark-caption">
-        {count(summary.total, "call", "calls")}
-        {/* "failed calls", not "errors": the tile below counts failing
-            CONNECTIONS under that word, and two different quantities sharing a
-            name on one screen makes a reader assume one of them is wrong. */}
-        {summary.errors > 0
-          ? " · " + count(summary.errors, "failed call", "failed calls")
-          : ""}
-        {" · " + String(days.length) + "d"}
-      </span>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Getting started                                                     */
@@ -522,8 +390,9 @@ export default function OverviewPage() {
                 <Activity size={15} strokeWidth={2} aria-hidden="true" />
                 <span>Recent activity</span>
               </h2>
-              {summary !== null ? <Sparkline summary={summary} /> : null}
             </div>
+
+            {summary !== null ? <ActivityMatrix summary={summary} /> : null}
 
             {eventsError !== null ? (
               <p className="error" role="alert">
