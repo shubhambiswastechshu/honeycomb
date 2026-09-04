@@ -1,8 +1,16 @@
-"""Bearer-key resolution for the MCP data plane -- the whole tenant boundary.
+"""Bearer resolution for the MCP data plane -- the whole tenant boundary.
 
-There is exactly ONE way to authenticate against /mcp/: an `Authorization:
-Bearer hc_...` key that hashes to a live McpKey row whose connection matches
-BOTH the connector and the endpoint slug in the URL.
+Two credentials authenticate against /mcp/, and both are `Authorization: Bearer`
+values that must hash to a live row whose connection matches BOTH the connector
+and the endpoint slug in the URL:
+
+  hc_...   an McpKey the user minted and pasted by hand.
+  hco_...  an OAuthToken this server issued, for clients that cannot be given a
+           header at all -- claude.ai's connector dialog takes a URL and nothing
+           else, so the flow in mcp/oauth.py is the only way it can hold one.
+
+The check that matters is identical for both, and lives in the last few lines of
+each resolver: one credential, one connection.
 
 The falcon original this is ported from also had a slug-only mode, where a bare
 request with no header authenticated as the connection's creator. It is not
@@ -17,7 +25,7 @@ SynchronousOnlyOperation.
 """
 from django.utils import timezone
 
-from .models import McpKey
+from .models import McpKey, OAuthToken
 
 
 class AuthError(Exception):
@@ -62,6 +70,19 @@ async def resolve_bearer(authorization, connector, slug):
                         'malformed_authorization')
 
     plain = header[len(_BEARER):].strip()
+
+    # Two kinds of bearer reach this endpoint, and they are told apart by
+    # prefix only to pick the right table -- both are verified by hash.
+    #   hc_   a key the user minted and pasted, for clients that can send a
+    #         header (Claude Code, Claude Desktop, curl).
+    #   hco_  a token this server issued through the OAuth flow in mcp/oauth.py,
+    #         for browser-only clients such as claude.ai that have nowhere to
+    #         paste a key.
+    # Both are scoped to exactly one connection, so the tenant boundary below is
+    # identical whichever door the caller came through.
+    if plain.startswith(OAuthToken.PREFIX):
+        return await _resolve_oauth_token(plain, connector, slug)
+
     # A cheap early reject only -- authentication is by hash, never by prefix.
     if not plain.startswith(McpKey.PREFIX):
         raise AuthError(_DENIED, 'invalid_token')
@@ -89,3 +110,35 @@ async def resolve_bearer(authorization, connector, slug):
 
     await McpKey.objects.filter(pk=key.pk).aupdate(last_used_at=timezone.now())
     return connection, key
+
+
+async def _resolve_oauth_token(plain, connector, slug):
+    """Resolve an `hco_...` token minted by the OAuth flow.
+
+    Deliberately the same shape, and the same refusals, as the McpKey path
+    above: one connection per credential, the connector and slug in the URL
+    must match the row, and every failure says the same thing.
+    """
+    token = await (
+        OAuthToken.objects
+        .select_related('connection', 'connection__tenant')
+        .filter(token_hash=OAuthToken.hash_token(plain), revoked_at__isnull=True)
+        .afirst()
+    )
+    if token is None:
+        raise AuthError(_DENIED, 'invalid_key')
+    # Expiry is enforced here rather than by a cleanup job: a row that outlives
+    # its expires_at must not authenticate just because nothing has swept it.
+    if token.expires_at and token.expires_at <= timezone.now():
+        raise AuthError(
+            'This authorization has expired. Reconnect the connector in your AI client.',
+            'expired_token',
+        )
+    connection = token.connection
+    if connection is None:
+        raise AuthError(_DENIED, 'orphan_key')
+    if connection.connector != connector or connection.endpoint_slug != slug:
+        raise AuthError(_DENIED, 'connection_mismatch')
+
+    await OAuthToken.objects.filter(pk=token.pk).aupdate(last_used_at=timezone.now())
+    return connection, token

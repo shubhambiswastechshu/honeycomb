@@ -1,0 +1,27 @@
+{% comment %}
+Shown instead of a redirect when the client_id or redirect_uri is the thing that
+is wrong. Redirecting an error to an address we have not verified is exactly how
+an open redirector is built, so these failures stop here.
+{% endcomment %}
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cannot connect</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px;
+         background:#faf8f2; color:#23201a;
+         font:15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { max-width:440px; background:#fff; border:1px solid #e8e1d0; border-radius:16px; padding:26px; }
+  h1 { margin:0 0 8px; font-size:18px; }
+  p { margin:0; color:#6f6754; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#14120d; color:#ece7db; }
+    .card { background:#1c1913; border-color:#342f24; }
+    p { color:#a79c84; }
+  }
+</style>
+<div class="card">
+  <h1>Nothing was connected</h1>
+  <p>{{ message }}</p>
+</div>

@@ -1,0 +1,114 @@
+{% comment %}
+The consent screen. Server-rendered rather than handed to the Next.js app: it
+must work when the frontend is down, and an approval page that depends on a
+separate deployment to render is a page that can strand a user mid-flow.
+
+Deliberately plain HTML with inline CSS -- it is served from the API host, which
+has no frontend bundle, and one file with no dependencies cannot break in a way
+that leaves a half-drawn approval button.
+{% endcomment %}
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect to Honeycomb</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #faf8f2; color: #23201a; padding: 24px;
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .card {
+    width: 100%; max-width: 460px; background: #fff; border: 1px solid #e8e1d0;
+    border-radius: 16px; padding: 28px; box-shadow: 0 12px 34px rgba(60,50,20,.08);
+  }
+  h1 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; }
+  p.sub { margin: 0 0 20px; color: #6f6754; font-size: 14px; }
+  .who { font-weight: 600; }
+  label.pick {
+    display: block; border: 1px solid #e8e1d0; border-radius: 10px;
+    padding: 11px 13px; margin-bottom: 8px; cursor: pointer;
+  }
+  label.pick:hover { border-color: #cbbf98; background: #fdfcf7; }
+  .name { font-weight: 600; }
+  .meta { color: #857c66; font-size: 13px; }
+  .grants { margin: 18px 0; padding: 14px 16px; background: #faf8f2;
+            border-radius: 10px; font-size: 13.5px; color: #4a442f; }
+  .grants ul { margin: 7px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 10px; margin-top: 20px; }
+  button {
+    flex: 1; padding: 11px 16px; border-radius: 10px; font: inherit;
+    font-weight: 600; cursor: pointer; border: 1px solid transparent;
+  }
+  .allow { background: #1f1b12; color: #fff; }
+  .deny { background: #fff; color: #4a442f; border-color: #e0d8c4; }
+  .none { color: #8a7f66; font-size: 14px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #14120d; color: #ece7db; }
+    .card { background: #1c1913; border-color: #342f24; box-shadow: none; }
+    p.sub, .meta { color: #a79c84; }
+    .grants { background: #221e17; color: #d4cbb4; }
+    label.pick { border-color: #342f24; }
+    .allow { background: #f4e9c8; color: #1a170f; }
+    .deny { background: #221e17; color: #d4cbb4; border-color: #3b352a; }
+  }
+</style>
+
+<div class="card">
+  <h1>Connect <span class="who">{{ client.client_name|default:"an AI client" }}</span>?</h1>
+
+  {% if needs_choice %}
+    <p class="sub">Choose which data source it may read.</p>
+  {% else %}
+    <p class="sub">It is asking to read one of your connected data sources.</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {% comment %}
+    The consent POST is a real cross-page form submission and goes through
+    CsrfViewMiddleware like every other Django view, so it needs a token. The
+    view is deliberately NOT csrf_exempt: this is the one request in the whole
+    OAuth flow driven by a browser the user is sitting in front of, which is
+    precisely the request CSRF protection exists for -- without it, another site
+    could silently approve a connector on their behalf.
+    {% endcomment %}
+    {# The flow's parameters ride along hidden, so the POST carries the same
+       client, redirect_uri, state and PKCE challenge the GET was checked against. #}
+    {% for key, value in params %}
+      {% if key != "decision" %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
+    {% endfor %}
+
+    {% if needs_choice %}
+      {% for choice in choices %}
+        <label class="pick">
+          <input type="radio" name="connection" value="{{ choice.pk }}" {% if forloop.first %}checked{% endif %}>
+          <span class="name">{{ choice.name|default:choice.connector }}</span>
+          <span class="meta">— {{ choice.connector }}</span>
+        </label>
+      {% empty %}
+        <p class="none">You have no connected data sources yet. Connect one in the
+          Honeycomb dashboard first, then add this connector again.</p>
+      {% endfor %}
+    {% else %}
+      <label class="pick">
+        <span class="name">{{ connection.name|default:connection.connector }}</span>
+        <span class="meta">— {{ connection.connector }}</span>
+      </label>
+    {% endif %}
+
+    <div class="grants">
+      If you allow this:
+      <ul>
+        <li>it can run this connection's tools and read the data they return</li>
+        <li>it never receives your stored account credentials</li>
+        <li>you can revoke it at any time from the Honeycomb dashboard</li>
+      </ul>
+    </div>
+
+    <div class="row">
+      <button class="deny" type="submit" name="decision" value="deny">Cancel</button>
+      <button class="allow" type="submit" name="decision" value="allow">Allow</button>
+    </div>
+  </form>
+</div>

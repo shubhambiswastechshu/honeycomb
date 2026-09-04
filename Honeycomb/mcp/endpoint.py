@@ -72,6 +72,39 @@ def _err(rid, code, message, data=None):
     return _rpc(rid, error=error)
 
 
+def _unauthorized(rid, connector, slug, exc):
+    """The one response in this file that is deliberately NOT HTTP 200.
+
+    Everything else here answers 200 with a JSON-RPC error, because a bare
+    non-200 makes several clients report "Session terminated" instead of the
+    message. Authentication is the exception, and it has to be: a client with no
+    credential can only discover how to get one from a 401 carrying
+    WWW-Authenticate. Answering 200 is what made claude.ai say "Couldn't
+    determine the server settings" -- it probed, found no challenge and no
+    metadata, and concluded there was nothing to configure.
+
+    The body stays a readable JSON-RPC error for clients that show it, so
+    pasting a wrong hc_ key still explains itself.
+
+    `resource_metadata` points at the RFC 9728 document; from there the client
+    finds the authorization server, registers itself and runs the flow in
+    mcp/oauth.py.
+    """
+    from .oauth import resource_metadata_url
+
+    challenge = (
+        'Bearer realm="OAuth", error="invalid_token", '
+        'error_description="{0}", resource_metadata="{1}"'
+    ).format(
+        exc.reason.replace('"', ''),
+        resource_metadata_url(connector, slug),
+    )
+    response = _err(rid, -32001, exc.message, {'reason': exc.reason})
+    response.status_code = 401
+    response.headers['WWW-Authenticate'] = challenge
+    return response
+
+
 def _tool_result(rid, text, is_error):
     return _rpc(rid, {'content': [{'type': 'text', 'text': text}], 'isError': is_error})
 
@@ -174,15 +207,13 @@ def build_app():
         # Authenticate BEFORE resolving anything about the connection. The falcon
         # original looked the connection up first so it could say "this one was
         # disconnected"; that answers slug-existence questions for a caller who
-        # holds no key at all, so here the key is the only thing that can turn a
-        # slug into a connection. Failures are JSON-RPC errors at HTTP 200: a 401
-        # without the WWW-Authenticate OAuth flow we do not implement only makes
-        # clients drop the session.
+        # holds no key at all, so here the credential is the only thing that can
+        # turn a slug into a connection.
         try:
             connection, _key = await resolve_bearer(
                 request.headers.get('authorization'), connector, slug)
         except AuthError as exc:
-            return _err(rid, -32001, exc.message, {'reason': exc.reason})
+            return _unauthorized(rid, connector, slug, exc)
 
         if method == 'initialize':
             # Deliberately STATELESS: we issue NO Mcp-Session-Id. The client then
