@@ -115,6 +115,22 @@
     .m,.z{display:none}
     .t{flex-basis:52px}
   }
+
+  .act { cursor: pointer; font: inherit; border: 1px solid rgba(255,255,255,.22);
+         background: transparent; color: inherit; }
+  .act:hover { border-color: var(--amber, #ea9d3e); }
+  .pairbox { margin: 14px 18px 0; padding: 14px 16px; border-radius: 10px;
+             border: 1px solid rgba(234,157,62,.4); background: rgba(234,157,62,.07); }
+  .pairbox b { display: block; margin-bottom: 4px; }
+  .pairbox p { margin: 0 0 10px; opacity: .75; font-size: 13px; max-width: 62ch; }
+  .pairbox pre { margin: 0 0 10px; padding: 11px 13px; border-radius: 8px;
+                 background: rgba(0,0,0,.35); overflow-x: auto; font-size: 12.5px;
+                 line-height: 1.6; white-space: pre; }
+  .pairrow { display: flex; gap: 8px; }
+  .pairrow button { cursor: pointer; font: inherit; font-size: 13px; padding: 6px 13px;
+                    border-radius: 7px; border: 1px solid rgba(255,255,255,.22);
+                    background: transparent; color: inherit; }
+  .pairrow button:hover { border-color: #ea9d3e; }
 </style>
 </head>
 <body>
@@ -124,7 +140,19 @@
   <div class="brand"><b>HONEYCOMB SYSTEM</b><span>Forager · heavy load server</span></div>
   <div class="right">
     <span class="pill"><span class="dot" id="wdot"></span><span id="wtext">worker …</span></span>
+    <button class="pill act" id="addworker" type="button" hidden>pair a machine</button>
     <span class="pill"><span class="dot" id="jdot"></span><span id="jtext">idle</span></span>
+  </div>
+</div>
+
+<div id="pairbox" class="pairbox" hidden>
+  <b>Pair a machine</b>
+  <p id="pairhint">A worker token is shown once and stored only as a hash. Run the
+     two lines below on the PC that should do the crawling.</p>
+  <pre id="paircmd"></pre>
+  <div class="pairrow">
+    <button type="button" id="paircopy">Copy</button>
+    <button type="button" id="pairclose">Done</button>
   </div>
 </div>
 
@@ -254,9 +282,53 @@
       el("wtext").textContent = on.length
         ? on[0].name + (on[0].memory_mb ? " · " + Math.round(on[0].rss_mb) + " MB" : "")
         : "no worker online";
+      // Offer the pairing button only when nothing is running: with a worker
+      // online it is one more thing to mis-click, and the token panel would
+      // cover the numbers someone came here to read.
+      el("addworker").hidden = on.length > 0;
     } catch (_) {
       el("wdot").className = "dot bad";
       el("wtext").textContent = "server unreachable";
+      el("addworker").hidden = true;
+    }
+  }
+
+  // csrftoken is not httpOnly, deliberately, so that a POST from this page can
+  // carry it; the auth cookie itself stays out of reach of script.
+  function csrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : "";
+  }
+
+  async function pair() {
+    const name = prompt("A name for the machine that will crawl:", "Workstation");
+    if (!name) { return; }
+    el("addworker").disabled = true;
+    try {
+      const r = await fetch(API + "workers/", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {"Content-Type": "application/json", "X-CSRFToken": csrf()},
+        body: JSON.stringify({name: name})
+      });
+      if (!r.ok) {
+        say("could not create a worker — an Owner or Admin can do this", "error");
+        return;
+      }
+      const w = await r.json();
+      // The plaintext exists in this response and nowhere else, ever. Show it
+      // as the command they actually need rather than as a bare string to
+      // copy into a form they then have to find.
+      el("paircmd").textContent =
+        "forager pair " + location.origin + " " + w.token + "
+forager agent";
+      el("pairbox").hidden = false;
+      el("pairbox").scrollIntoView({behavior: "smooth", block: "nearest"});
+      say("worker \"" + w.name + "\" created — run those two lines on that PC", "info");
+    } catch (_) {
+      say("could not reach the server", "error");
+    } finally {
+      el("addworker").disabled = false;
     }
   }
 
@@ -319,6 +391,17 @@
   say("crawls run on your worker machine — this server only holds the results", "info");
   line('<span class="t"></span><span class="u"><span class="cursor"></span></span>');
 
+  el("addworker").addEventListener("click", pair);
+  el("pairclose").addEventListener("click", function () {
+    // Blank it on close: the token must not sit in the DOM of a page left open.
+    el("paircmd").textContent = "";
+    el("pairbox").hidden = true;
+  });
+  el("paircopy").addEventListener("click", function () {
+    navigator.clipboard.writeText(el("paircmd").textContent).then(function () {
+      say("copied — the token is not shown again", "info");
+    });
+  });
   workers();
   setInterval(workers, 5000);
   if (jobId != null) watch(jobId);
