@@ -63,11 +63,19 @@ def public_base():
     return (getattr(settings, 'HONEYCOMB_PUBLIC_BASE', '') or '').rstrip('/')
 
 
-def resource_url(connector, slug):
-    return '{0}/mcp/{1}/{2}/'.format(public_base(), connector, slug)
+def resource_url(connector, slug, tail=''):
+    """The canonical endpoint URL, optionally with the suffix the client used.
+
+    A client that addressed .../<slug>/mcp compares the `resource` in the
+    metadata against the URL it called. Echoing its own spelling back keeps that
+    comparison true; dropping the suffix would make a strict client reject a
+    document that is otherwise about exactly the right endpoint.
+    """
+    suffix = ('/' + tail.strip('/')) if tail else '/'
+    return '{0}/mcp/{1}/{2}{3}'.format(public_base(), connector, slug, suffix)
 
 
-def resource_metadata_url(connector, slug):
+def resource_metadata_url(connector, slug, tail=''):
     """RFC 9728 inserts the resource's PATH after the well-known segment.
 
     So the document for https://host/mcp/ga4/abc/ lives at
@@ -75,8 +83,9 @@ def resource_metadata_url(connector, slug):
     bare well-known path. Clients construct this themselves and will not find a
     document served anywhere else.
     """
-    return '{0}/.well-known/oauth-protected-resource/mcp/{1}/{2}/'.format(
-        public_base(), connector, slug)
+    suffix = ('/' + tail.strip('/')) if tail else '/'
+    return '{0}/.well-known/oauth-protected-resource/mcp/{1}/{2}{3}'.format(
+        public_base(), connector, slug, suffix)
 
 
 def _json(payload, status=200):
@@ -89,10 +98,10 @@ def _json(payload, status=200):
 
 
 @require_http_methods(['GET', 'OPTIONS'])
-def protected_resource_metadata(request, connector=None, slug=None):
+def protected_resource_metadata(request, connector=None, slug=None, tail=''):
     """RFC 9728. Tells the client which authorization server guards this URL."""
     if connector and slug:
-        resource = resource_url(connector, slug)
+        resource = resource_url(connector, slug, tail)
     else:
         # The bare well-known path. Some clients probe it before trying the
         # path-inserted one; answering keeps them from giving up early.
@@ -108,7 +117,7 @@ def protected_resource_metadata(request, connector=None, slug=None):
 
 
 @require_http_methods(['GET', 'OPTIONS'])
-def authorization_server_metadata(request, connector=None, slug=None):
+def authorization_server_metadata(request, connector=None, slug=None, tail=''):
     """RFC 8414. The endpoint map, plus the two facts that gate a modern client.
 
     `registration_endpoint` is what makes dynamic registration possible; without
@@ -357,6 +366,8 @@ def _connection_for(user, resource):
     parts = path.split('/')
     if len(parts) < 3 or parts[0] != 'mcp':
         return None
+    # parts[3:] is whatever the client appended (/mcp, /sse); the connection is
+    # identified by the first three segments and nothing else.
     connector, slug = parts[1], parts[2]
     return _connections_for(user).filter(connector=connector, endpoint_slug=slug).first()
 

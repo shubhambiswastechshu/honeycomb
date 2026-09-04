@@ -19,9 +19,14 @@ only, no in-memory sessions), so the rules that keep clients happy are:
     connection, a bad key and an unknown path all come back as a readable
     JSON-RPC error with HTTP 200 instead.
 
-Every route is registered twice, with and without the trailing slash. Django's
-APPEND_SLASH would answer a slash-less POST with a 301, and a redirected POST
-loses its body -- the request would arrive here empty and the session would die.
+Every route is registered six times: with and without the trailing slash, and
+with an optional trailing "/mcp" or "/sse" segment. The slash pair exists
+because Django's APPEND_SLASH would answer a slash-less POST with a 301, and a
+redirected POST loses its body -- the request would arrive here empty and the
+session would die. The suffix pair exists because nearly every public MCP server
+is addressed as https://host/mcp, so people append the word out of habit; before
+these routes existed that URL fell to the catch-all and answered 200, which
+claude.ai reports as "Couldn't determine the server settings".
 """
 import asyncio
 import json
@@ -72,7 +77,7 @@ def _err(rid, code, message, data=None):
     return _rpc(rid, error=error)
 
 
-def _unauthorized(rid, connector, slug, exc):
+def _unauthorized(rid, connector, slug, exc, tail=''):
     """The one response in this file that is deliberately NOT HTTP 200.
 
     Everything else here answers 200 with a JSON-RPC error, because a bare
@@ -97,12 +102,26 @@ def _unauthorized(rid, connector, slug, exc):
         'error_description="{0}", resource_metadata="{1}"'
     ).format(
         exc.reason.replace('"', ''),
-        resource_metadata_url(connector, slug),
+        resource_metadata_url(connector, slug, tail),
     )
     response = _err(rid, -32001, exc.message, {'reason': exc.reason})
     response.status_code = 401
     response.headers['WWW-Authenticate'] = challenge
     return response
+
+
+def _tail_of(path, connector, slug):
+    """Whatever the client appended after /mcp/<connector>/<slug>.
+
+    '' for the canonical URL, 'mcp' or 'sse' for the habitual spellings. Read
+    from the path rather than passed per route so adding another alias does not
+    mean touching the handler.
+    """
+    marker = '/mcp/{0}/{1}'.format(connector, slug)
+    index = path.find(marker)
+    if index < 0:
+        return ''
+    return path[index + len(marker):].strip('/')
 
 
 def _tool_result(rid, text, is_error):
@@ -154,6 +173,22 @@ def build_app():
         openapi_url=None,
     )
 
+    # Every route below is declared four times: with and without a trailing
+    # slash, and with and without a trailing "/mcp" or "/sse" segment.
+    #
+    # The suffixes are not decoration. Nearly every public MCP server is
+    # addressed as https://host/mcp or https://host/sse, so people append the
+    # word out of habit -- and a URL like
+    # /mcp/forager/<slug>/mcp then missed every route, fell to the catch-all,
+    # and answered 200 with "no endpoint here". claude.ai reads that as a server
+    # with nothing to discover and shows "Couldn't determine the server
+    # settings", which is indistinguishable from the endpoint being broken.
+    # Accepting the suffix costs one decorator per route and removes a whole
+    # class of support question.
+    @application.get('/mcp/{connector}/{slug}/mcp')
+    @application.get('/mcp/{connector}/{slug}/mcp/')
+    @application.get('/mcp/{connector}/{slug}/sse')
+    @application.get('/mcp/{connector}/{slug}/sse/')
     @application.get('/mcp/{connector}/{slug}/')
     @application.get('/mcp/{connector}/{slug}')
     async def probe(connector: str, slug: str):
@@ -164,6 +199,10 @@ def build_app():
         # that asked for an event stream.
         return Response(status_code=405, headers=_ALLOW)
 
+    @application.delete('/mcp/{connector}/{slug}/mcp')
+    @application.delete('/mcp/{connector}/{slug}/mcp/')
+    @application.delete('/mcp/{connector}/{slug}/sse')
+    @application.delete('/mcp/{connector}/{slug}/sse/')
     @application.delete('/mcp/{connector}/{slug}/')
     @application.delete('/mcp/{connector}/{slug}')
     async def terminate(connector: str, slug: str):
@@ -171,9 +210,17 @@ def build_app():
         # session state, so just acknowledge -- never error.
         return Response(status_code=200)
 
+    @application.post('/mcp/{connector}/{slug}/mcp')
+    @application.post('/mcp/{connector}/{slug}/mcp/')
+    @application.post('/mcp/{connector}/{slug}/sse')
+    @application.post('/mcp/{connector}/{slug}/sse/')
     @application.post('/mcp/{connector}/{slug}/')
     @application.post('/mcp/{connector}/{slug}')
     async def endpoint(connector: str, slug: str, request: Request):
+        # Which spelling the client used, so the challenge and the metadata can
+        # describe the URL it actually called rather than a canonical one it
+        # never asked for.
+        tail = _tail_of(request.url.path, connector, slug)
         try:
             body = json.loads(await request.body() or b'{}')
         except json.JSONDecodeError:
@@ -213,7 +260,7 @@ def build_app():
             connection, _key = await resolve_bearer(
                 request.headers.get('authorization'), connector, slug)
         except AuthError as exc:
-            return _unauthorized(rid, connector, slug, exc)
+            return _unauthorized(rid, connector, slug, exc, tail)
 
         if method == 'initialize':
             # Deliberately STATELESS: we issue NO Mcp-Session-Id. The client then

@@ -19,9 +19,18 @@ from . import oauth
 # protected resources. <slug> is matched loosely because it is generated
 # elsewhere; the view resolves it against the database anyway.
 _RESOURCE = 'mcp/<str:connector>/<str:slug>'
+# A client that addressed the endpoint as .../<slug>/mcp derives its metadata
+# URL from that same path, so the well-known route has to accept the suffix too
+# -- otherwise the challenge points at a document that 404s and discovery stops
+# one step short of working.
+_RESOURCE_TAIL = 'mcp/<str:connector>/<str:slug>/<str:tail>'
 
 urlpatterns = [
     # --- protected resource metadata (RFC 9728) ---
+    path('.well-known/oauth-protected-resource/{0}/'.format(_RESOURCE_TAIL),
+         oauth.protected_resource_metadata),
+    path('.well-known/oauth-protected-resource/{0}'.format(_RESOURCE_TAIL),
+         oauth.protected_resource_metadata),
     path('.well-known/oauth-protected-resource/{0}/'.format(_RESOURCE),
          oauth.protected_resource_metadata, name='mcp-oauth-prm'),
     path('.well-known/oauth-protected-resource/{0}'.format(_RESOURCE),
@@ -32,6 +41,10 @@ urlpatterns = [
     # --- authorization server metadata (RFC 8414) ---
     # Also served under the resource path: some clients ask for the AS metadata
     # at the path-inserted location before trying the bare one.
+    path('.well-known/oauth-authorization-server/{0}/'.format(_RESOURCE_TAIL),
+         oauth.authorization_server_metadata),
+    path('.well-known/oauth-authorization-server/{0}'.format(_RESOURCE_TAIL),
+         oauth.authorization_server_metadata),
     path('.well-known/oauth-authorization-server/{0}/'.format(_RESOURCE),
          oauth.authorization_server_metadata),
     path('.well-known/oauth-authorization-server/{0}'.format(_RESOURCE),
