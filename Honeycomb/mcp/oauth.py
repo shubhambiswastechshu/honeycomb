@@ -253,18 +253,23 @@ def authorize(request):
 
     connection = _connection_for(user, resource)
     choices = list(_connections_for(user))
-    if connection is None and request.method == 'GET':
-        # No resource named, or it named something this user cannot reach: let
-        # them pick, rather than guessing on their behalf.
-        return render(request, 'mcp/authorize.html', {
-            'client': client, 'choices': choices, 'params': params.items(),
-            'needs_choice': True,
-        })
 
     if request.method == 'GET':
+        # Three states, and they are shown differently because they need
+        # different actions from the person reading the page:
+        #   - the resource named one connection  -> confirm that one
+        #   - several to choose from             -> pick one
+        #   - none at all                        -> nothing to approve, and the
+        #     signed-in account is named, because the usual cause is being
+        #     signed in as the wrong one (the platform admin owns no tenant).
         return render(request, 'mcp/authorize.html', {
-            'client': client, 'connection': connection, 'choices': choices,
-            'params': params.items(), 'needs_choice': False,
+            'client': client,
+            'connection': connection,
+            'choices': choices,
+            'params': params.items(),
+            'needs_choice': connection is None,
+            'account': getattr(user, 'email', ''),
+            'frontend': (getattr(settings, 'HONEYCOMB_FRONTEND_BASE', '') or '').rstrip('/'),
         })
 
     # POST: the user pressed a button.
@@ -296,32 +301,41 @@ def _deny(request, message):
 
 
 def _signed_in_user(request):
-    """Who is at the keyboard, by either of the two ways this product knows.
+    """Who is at the keyboard, preferring the PRODUCT identity over the admin's.
 
-    The portal authenticates with an httpOnly JWT cookie; the admin uses a
-    Django session. Accepting both means a user already signed in to either
-    surface is not asked to sign in again, and the cookie domain is shared
-    across the app and API hosts so the cookie actually arrives here.
+    Two sessions can exist in one browser at once on this host: the portal's
+    httpOnly JWT cookie, and a Django admin session. The order below is the
+    whole point of this function.
+
+    The portal cookie wins. Checking request.user first -- the obvious way to
+    write this -- reads the ADMIN session, and the platform admin deliberately
+    belongs to no tenant, so the consent screen offered a user with two live
+    connections an empty list and the message "You have no connected data
+    sources yet". The account that owns connections is the one that must be
+    asked to share them.
+
+    The Django session remains a fallback so that a staff user who only ever
+    signs in at /admin/ can still complete a flow.
     """
-    user = getattr(request, 'user', None)
-    if user is not None and user.is_authenticated:
-        return user
     try:
         from accounts.authentication import access_cookie_name
         from rest_framework_simplejwt.authentication import JWTAuthentication
     except ImportError:
-        return None
-    raw = request.COOKIES.get(access_cookie_name())
-    if not raw:
-        return None
-    try:
-        backend = JWTAuthentication()
-        validated = backend.get_validated_token(raw)
-        return backend.get_user(validated)
-    except Exception:
-        # An expired or tampered cookie is simply "not signed in"; the redirect
-        # to /signin below is the right answer for both.
-        return None
+        access_cookie_name = None
+    if access_cookie_name is not None:
+        raw = request.COOKIES.get(access_cookie_name())
+        if raw:
+            try:
+                backend = JWTAuthentication()
+                return backend.get_user(backend.get_validated_token(raw))
+            except Exception:
+                # An expired or tampered cookie is simply "not signed in" --
+                # fall through to the session, then to the /signin redirect.
+                pass
+    user = getattr(request, 'user', None)
+    if user is not None and user.is_authenticated:
+        return user
+    return None
 
 
 def _connections_for(user):

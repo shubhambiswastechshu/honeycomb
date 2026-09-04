@@ -57,10 +57,13 @@ that leaves a half-drawn approval button.
 <div class="card">
   <h1>Connect <span class="who">{{ client.client_name|default:"an AI client" }}</span>?</h1>
 
-  {% if needs_choice %}
-    <p class="sub">Choose which data source it may read.</p>
+  {% if not choices %}
+    <p class="sub">Signed in as <b>{{ account }}</b>.</p>
+  {% elif needs_choice %}
+    <p class="sub">Choose which data source it may read. Signed in as <b>{{ account }}</b>.</p>
   {% else %}
-    <p class="sub">It is asking to read one of your connected data sources.</p>
+    <p class="sub">It is asking to read one of your connected data sources.
+      Signed in as <b>{{ account }}</b>.</p>
   {% endif %}
 
   <form method="post">
@@ -73,8 +76,10 @@ that leaves a half-drawn approval button.
     precisely the request CSRF protection exists for -- without it, another site
     could silently approve a connector on their behalf.
     {% endcomment %}
-    {# The flow's parameters ride along hidden, so the POST carries the same
-       client, redirect_uri, state and PKCE challenge the GET was checked against. #}
+    {% comment %}
+    The flow's parameters ride along hidden, so the POST carries the same
+    client, redirect_uri, state and PKCE challenge the GET was checked against.
+    {% endcomment %}
     {% for key, value in params %}
       {% if key != "decision" %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
     {% endfor %}
@@ -87,8 +92,13 @@ that leaves a half-drawn approval button.
           <span class="meta">— {{ choice.connector }}</span>
         </label>
       {% empty %}
-        <p class="none">You have no connected data sources yet. Connect one in the
-          Honeycomb dashboard first, then add this connector again.</p>
+        <p class="none">
+          This account has no connected data sources. If your connections belong
+          to another account, sign out and sign in as that one -- the platform
+          admin account deliberately owns none. Otherwise connect a source in the
+          <a href="{{ frontend }}/dashboard/connectors">Honeycomb dashboard</a>
+          first, then add this connector again.
+        </p>
       {% endfor %}
     {% else %}
       <label class="pick">
@@ -97,6 +107,7 @@ that leaves a half-drawn approval button.
       </label>
     {% endif %}
 
+    {% if choices or connection %}
     <div class="grants">
       If you allow this:
       <ul>
@@ -106,9 +117,13 @@ that leaves a half-drawn approval button.
       </ul>
     </div>
 
+    {% endif %}
+
     <div class="row">
       <button class="deny" type="submit" name="decision" value="deny">Cancel</button>
-      <button class="allow" type="submit" name="decision" value="allow">Allow</button>
+      {% if choices or connection %}
+        <button class="allow" type="submit" name="decision" value="allow">Allow</button>
+      {% endif %}
     </div>
   </form>
 </div>
