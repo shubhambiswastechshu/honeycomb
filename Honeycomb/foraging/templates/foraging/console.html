@@ -319,12 +319,12 @@
       // The plaintext exists in this response and nowhere else, ever. Show it
       // as the command they actually need rather than as a bare string to
       // copy into a form they then have to find.
+      var NL = String.fromCharCode(10);
       el("paircmd").textContent =
-        "forager pair " + location.origin + " " + w.token + "
-forager agent";
+        "forager pair " + location.origin + " " + w.token + NL + "forager agent";
       el("pairbox").hidden = false;
       el("pairbox").scrollIntoView({behavior: "smooth", block: "nearest"});
-      say("worker \"" + w.name + "\" created — run those two lines on that PC", "info");
+      say("worker " + w.name + " created — run those two lines on that PC", "info");
     } catch (_) {
       say("could not reach the server", "error");
     } finally {
