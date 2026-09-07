@@ -158,6 +158,20 @@ const nextConfig = {
         source: "/api/:path*",
         destination: apiProxyTarget + "/api/:path*",
       },
+      // The Forager console is a Django page rather than a route in this app,
+      // and the rail links to it. Where NEXT_PUBLIC_API_BASE_URL is absolute
+      // the link points straight at the API host and never reaches here; where
+      // it is relative ("/api", the shape above), the link is /forager/ on this
+      // origin and needs forwarding exactly as /api/* does -- without this it
+      // would 404 against the Next router.
+      {
+        source: "/forager",
+        destination: apiProxyTarget + "/forager/",
+      },
+      {
+        source: "/forager/:path*",
+        destination: apiProxyTarget + "/forager/:path*",
+      },
     ];
   },
 };

@@ -120,6 +120,18 @@ const RAW_BASE: string =
 /** Base URL with any trailing slashes removed, so BASE + "/auth/me/" is always well formed. */
 export const API_BASE: string = RAW_BASE.replace(/\/+$/, "");
 
+/**
+ * The Forager console.
+ *
+ * It is a server-rendered Django page on the API host rather than a route in
+ * this app, on purpose: it has to work when the Next build is not running.
+ * Its URL is the API origin with the /api prefix taken off, so it follows
+ * whatever NEXT_PUBLIC_API_BASE_URL points at instead of needing a second env
+ * var that could drift out of step with it.
+ */
+export const FORAGER_CONSOLE_URL: string =
+  API_BASE.replace(/\/api$/, "") + "/forager/";
+
 const CSRF_COOKIE = "csrftoken";
 const CSRF_HEADER = "X-CSRFToken";
 

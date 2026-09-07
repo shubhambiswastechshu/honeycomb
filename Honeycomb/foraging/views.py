@@ -482,10 +482,16 @@ def console(request, job_id=None):
     SSHed in wondering why a crawl stalled -- and a server-rendered page with no
     build step always does.
     """
+    from django.conf import settings
     from django.shortcuts import render
     from django.urls import reverse
 
     return render(request, 'foraging/console.html', {
         'api_base': reverse('foraging:jobs'),
         'job_id': job_id if job_id is not None else 'null',
+        # The console is on the API host, the dashboard is not, so the browser
+        # back button is otherwise the only way out of here. Reuse the frontend
+        # origin the OAuth flow already redirects to rather than adding a
+        # setting that could drift away from it.
+        'dashboard': (getattr(settings, 'HONEYCOMB_FRONTEND_BASE', '') or '').rstrip('/'),
     })

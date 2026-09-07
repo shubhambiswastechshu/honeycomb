@@ -23,8 +23,11 @@ import {
   Blocks,
   Settings,
   Users,
+  Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+import { FORAGER_CONSOLE_URL } from "@/lib/api";
 
 interface RailItem {
   href: string;
@@ -35,6 +38,12 @@ interface RailItem {
    * exact match. The rest also match their own children.
    */
   exact?: boolean;
+  /**
+   * A page served by the API host rather than a route in this app. It gets a
+   * plain anchor -- next/link would try to route it internally -- and it never
+   * lights up, because this app is never the thing rendering it.
+   */
+  external?: boolean;
 }
 
 const MAIN_ITEMS: RailItem[] = [
@@ -44,12 +53,20 @@ const MAIN_ITEMS: RailItem[] = [
      so this entry stays lit while a single connector is open. */
   { href: "/dashboard/connectors", label: "MCPs", icon: Blocks },
   { href: "/dashboard/data", label: "Data", icon: Database },
+  /* Next to Data, because that is what it produces: Forager is where a crawl
+     is started and watched, and its pages land in the same inventory. Same
+     glyph the Forager connector carries in ConnectorMark, so the rail and the
+     connector list are recognisably the same thing. */
+  { href: FORAGER_CONSOLE_URL, label: "Crawler", icon: Waypoints, external: true },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 function isActive(pathname: string, item: RailItem): boolean {
+  if (item.external === true) {
+    return false;
+  }
   if (item.exact === true) {
     return pathname === item.href;
   }
@@ -58,25 +75,37 @@ function isActive(pathname: string, item: RailItem): boolean {
 
 function RailLink({ item, active }: { item: RailItem; active: boolean }) {
   const Icon = item.icon;
+  /* The box is a child rather than the link's own background: the label sits
+     outside it, so the current section reads as a highlighted icon with a
+     caption, not as a filled block of text. */
+  const inner = (
+    <>
+      <span className="rail-box">
+        <Icon size={19} strokeWidth={1.75} aria-hidden="true" />
+      </span>
+      <span className="rail-name">{item.label}</span>
+      <span className="rail-tip" role="presentation">
+        {item.label}
+      </span>
+    </>
+  );
+
   return (
     <li className="rail-cell">
-      <Link
-        href={item.href}
-        className="rail-item"
-        title={item.label}
-        aria-current={active ? "page" : undefined}
-      >
-        {/* The box is a child rather than the link's own background: the
-            label sits outside it, so the current section reads as a
-            highlighted icon with a caption, not as a filled block of text. */}
-        <span className="rail-box">
-          <Icon size={19} strokeWidth={1.75} aria-hidden="true" />
-        </span>
-        <span className="rail-name">{item.label}</span>
-        <span className="rail-tip" role="presentation">
-          {item.label}
-        </span>
-      </Link>
+      {item.external === true ? (
+        <a href={item.href} className="rail-item" title={item.label}>
+          {inner}
+        </a>
+      ) : (
+        <Link
+          href={item.href}
+          className="rail-item"
+          title={item.label}
+          aria-current={active ? "page" : undefined}
+        >
+          {inner}
+        </Link>
+      )}
     </li>
   );
 }
