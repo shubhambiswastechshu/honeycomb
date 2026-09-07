@@ -55,19 +55,29 @@ class WorkerAuthMixin:
     tenant it belongs to by comparing error messages.
     """
 
-    def worker_from(self, request):
+    def worker_from(self, request, touch=True):
         header = (request.META.get('HTTP_AUTHORIZATION') or '').strip()
         if not header.startswith('Bearer '):
             return None
         plain = header[7:].strip()
         if not plain.startswith(Worker.PREFIX):
             return None
-        return (
+        worker = (
             Worker.objects
             .select_related('tenant')
             .filter(token_hash=Worker.hash_token(plain), revoked_at__isnull=True)
             .first()
         )
+        # Any authenticated call from a worker proves it is alive, and that has
+        # to count as a heartbeat. Until this existed, last_seen_at was written
+        # only by the poll endpoint -- and a worker does not poll while it is
+        # running a job, so every busy worker read as offline after
+        # Worker.OFFLINE_AFTER seconds even while it was posting progress once
+        # a second. The dashboard then said "no worker online" during the exact
+        # crawl that worker was performing.
+        if worker is not None and touch:
+            Worker.objects.filter(pk=worker.pk).update(last_seen_at=timezone.now())
+        return worker
 
 
 DENIED = Response({'detail': 'Invalid or revoked worker token.'},
@@ -89,7 +99,10 @@ class AgentPoll(WorkerAuthMixin, APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        worker = self.worker_from(request)
+        # touch=False: the update below already carries last_seen_at along with
+        # the fields only a poll knows, so the mixin's touch would be a second
+        # write on the one endpoint that runs every couple of seconds.
+        worker = self.worker_from(request, touch=False)
         if worker is None:
             return DENIED
 
@@ -117,13 +130,44 @@ class AgentPoll(WorkerAuthMixin, APIView):
         }, 'paused': False})
 
     @staticmethod
-    def _claim(worker):
+    def _reap(worker):
+        """Return jobs whose worker vanished to the queue.
+
+        `forager_sweep` does this on a timer, and the timer was never set up on
+        any deployment -- so a worker that died mid-job left that job in
+        `running` forever. Nothing else would touch it, because claiming only
+        looks at `queued`, and the tenant's crawler was effectively dead until
+        somebody noticed by hand.
+
+        Doing it here instead makes it self-healing with no scheduler at all:
+        the only moment a stale job matters is the moment an idle worker is
+        asking for work, and that is exactly this code path. The management
+        command still works and is still worth scheduling -- it also recovers a
+        tenant whose workers have all gone away -- but nothing depends on it now.
+        """
+        from foraging.management.commands.forager_sweep import (
+            CLAIM_TIMEOUT, STALE_AFTER,
+        )
+
+        now = timezone.now()
+        (CrawlJob.objects
+         .filter(tenant=worker.tenant, status=CrawlJob.Status.RUNNING,
+                 heartbeat_at__lt=now - STALE_AFTER)
+         .update(status=CrawlJob.Status.QUEUED, worker=None, claimed_at=None))
+        (CrawlJob.objects
+         .filter(tenant=worker.tenant, status=CrawlJob.Status.CLAIMED,
+                 claimed_at__lt=now - CLAIM_TIMEOUT)
+         .update(status=CrawlJob.Status.QUEUED, worker=None, claimed_at=None))
+
+    @classmethod
+    def _claim(cls, worker):
         """Take the oldest queued job for this tenant, atomically.
 
         select_for_update(skip_locked) so two workers on the same tenant never
         take the same job and neither waits on the other. SQLite ignores
         skip_locked; the transaction still makes the claim safe there.
         """
+        cls._reap(worker)
         with transaction.atomic():
             job = (
                 CrawlJob.objects
