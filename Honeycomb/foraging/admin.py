@@ -1,4 +1,9 @@
+import secrets
+
 from django.contrib import admin
+
+from django.contrib import messages
+from django.utils.html import format_html
 
 from .models import CrawlEvent, CrawlJob, CrawlPage, Worker
 
@@ -10,6 +15,33 @@ class WorkerAdmin(admin.ModelAdmin):
     list_filter = ('paused', 'tenant')
     search_fields = ('name', 'token_prefix')
     readonly_fields = ('token_prefix', 'token_hash', 'last_seen_at')
+
+    def save_model(self, request, obj, form, change):
+        """Adding a worker here mints its token, exactly as the API does.
+
+        Without this, a Worker added from the admin saved with an empty hash and
+        could never authenticate -- the two credential columns are read-only, so
+        the form had no way to fill them. Support has one other route to a
+        token (the console's pair button), and that route needs a session on an
+        account with a tenant; this one needs staff. Both are useful, for
+        different people.
+
+        The plaintext is shown once, in the message, and never stored.
+        """
+        if change:
+            super().save_model(request, obj, form, change)
+            return
+        plain = Worker.PREFIX + secrets.token_urlsafe(32)
+        obj.token_prefix = plain[:len(Worker.PREFIX) + 4]
+        obj.token_hash = Worker.hash_token(plain)
+        super().save_model(request, obj, form, change)
+        self.message_user(
+            request,
+            format_html(
+                'Worker token, shown once and stored only as a hash — copy it now:'
+                '<br><code style="user-select:all">{}</code>', plain),
+            level=messages.WARNING,
+        )
 
 
 @admin.register(CrawlJob)
