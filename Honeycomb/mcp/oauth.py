@@ -31,6 +31,7 @@ here; putting them in the FastAPI app would make them unreachable.
 import base64
 import hashlib
 import json
+import logging
 import secrets
 from urllib.parse import urlencode, urlparse
 
@@ -51,6 +52,22 @@ from .models import OAuthClient, OAuthGrant, OAuthToken
 # One scope, because a token's authority is decided by WHICH connection it is
 # bound to, not by a scope string.
 SCOPES = ['mcp']
+
+
+logger = logging.getLogger(__name__)
+
+
+def auto_approve():
+    """Whether /authorize completes without showing the consent screen.
+
+    On by default: claude.ai's connector UI accepts a URL and nothing else, so
+    OAuth is the only way in there, and a consent screen between pasting that
+    URL and the connector working is the whole of the setup friction.
+
+    The cost is real and is spelled out at the call site. Turn it off with
+    HONEYCOMB_OAUTH_AUTO_APPROVE=0.
+    """
+    return bool(getattr(settings, 'HONEYCOMB_OAUTH_AUTO_APPROVE', True))
 
 
 def public_base():
@@ -263,6 +280,30 @@ def authorize(request):
     connection = _connection_for(user, resource)
     choices = list(_connections_for(user))
 
+    if request.method == 'GET' and auto_approve() and connection is not None:
+        # Approval without a human, by explicit choice of the account holder.
+        #
+        # Be clear about what this gives up. The consent screen is what stops a
+        # client the user never meant to authorize from getting a token: anyone
+        # can register a client under RFC 7591, and with this on, a registered
+        # client that gets a signed-in browser to load this URL is handed a code
+        # for that user's connection without a prompt. One link is enough.
+        #
+        # It is on because the alternative -- a screen between "paste the URL"
+        # and "it works" -- was judged the bigger cost for this product's users.
+        # Two things keep it from being worse than it needs to be: the client
+        # still only reaches its own registered redirect_uri, so the code cannot
+        # be steered somewhere new, and every silent approval is logged below so
+        # there is a record to read afterwards.
+        #
+        # Set HONEYCOMB_OAUTH_AUTO_APPROVE=0 to put the screen back without a
+        # code change.
+        logger.info(
+            'oauth: auto-approved client=%s user=%s connection=%s redirect=%s',
+            client.client_id, getattr(user, 'pk', None), connection.pk, redirect_uri,
+        )
+        return _issue_code(client, user, connection, redirect_uri, state, challenge)
+
     if request.method == 'GET':
         # Three states, and they are shown differently because they need
         # different actions from the person reading the page:
@@ -292,6 +333,11 @@ def authorize(request):
         return _error_redirect(redirect_uri, state, 'invalid_request',
                                'No connection was selected.')
 
+    return _issue_code(client, user, connection, redirect_uri, state, challenge)
+
+
+def _issue_code(client, user, connection, redirect_uri, state, challenge):
+    """Mint a one-time code and hand it back to the client."""
     code = secrets.token_urlsafe(32)
     OAuthGrant.objects.create(
         client=client, user=user, connection=connection,

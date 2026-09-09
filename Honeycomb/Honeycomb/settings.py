@@ -693,6 +693,18 @@ GOOGLE_ADS_API_VERSION = os.environ.get('GOOGLE_ADS_API_VERSION', 'v23')
 # Console, while this is where a person's browser belongs *after*. In local
 # development they differ by port; in production they are usually different
 # hosts entirely. No trailing slash; the redirect builder adds its own.
+# Whether the MCP consent screen is shown at all.
+#
+# Default on (i.e. no screen): claude.ai's custom-connector UI takes a URL and
+# nothing else, so OAuth is the only route in there, and the screen sat between
+# pasting the URL and a working connector.
+#
+# What it costs: any client registered through /oauth/register that gets a
+# signed-in browser to load /oauth/authorize is handed a code with no prompt.
+# The client still only reaches its own registered redirect_uri, and every
+# silent approval is logged, but the human check is gone. Set to 0 to restore it.
+HONEYCOMB_OAUTH_AUTO_APPROVE = _env_flag('HONEYCOMB_OAUTH_AUTO_APPROVE', 'True')
+
 HONEYCOMB_FRONTEND_BASE = os.environ.get(
     'HONEYCOMB_FRONTEND_BASE', 'http://localhost:3000'
 ).rstrip('/')
