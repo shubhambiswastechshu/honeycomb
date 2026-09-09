@@ -34,6 +34,7 @@ import {
   Activity,
   ArrowLeft,
   CircleAlert,
+  Gauge,
   KeyRound,
   Layers,
   Pencil,
@@ -80,6 +81,10 @@ interface TabSpec {
 
 const TABS: TabSpec[] = [
   { id: "instances", label: "Instances", icon: Layers },
+  /* Second, ahead of Tools: a list of tool names answers "what could this do",
+     and the question people actually arrive with is "is it returning my data".
+     This lived inside the Tools tab first, where nobody found it. */
+  { id: "data", label: "Live data", icon: Gauge },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "access", label: "Access", icon: KeyRound },
   { id: "activity", label: "Activity", icon: Activity },
@@ -521,6 +526,20 @@ function ConnectorDetailView({ slug }: { slug: string }) {
                   <ToolsTab connector={connector} connection={selected} />
                 ) : null}
 
+                {active.id === "data" ? (
+                  selected !== null ? (
+                    <LiveDataTab key={selected.id} connection={selected} />
+                  ) : (
+                    <NoInstances
+                      onConnect={function startConnect() {
+                        setEditing(null);
+                        setConnecting(true);
+                        setCurrent("instances");
+                      }}
+                    />
+                  )
+                ) : null}
+
                 {active.id === "access" ? (
                   selected !== null ? (
                     <McpKeyPanel
@@ -827,6 +846,62 @@ function InstancesTab({
  * a tool that can change a customer's record must not be indistinguishable
  * from one that reads a row back.
  */
+/**
+ * The Live data tab.
+ *
+ * Owns the fetch of this connection's tool list rather than sharing ToolsTab's,
+ * because the two tabs are never mounted at once and a tab that depends on
+ * another tab having been opened first is a tab that is empty the first time
+ * anyone looks at it.
+ */
+function LiveDataTab({ connection }: { connection: Connection }) {
+  const [tools, setTools] = useState<ConnectorTool[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(
+    function loadTools() {
+      let alive = true;
+      setTools(null);
+      setError(null);
+      listConnectionTools(connection.id)
+        .then(function apply(rows: ConnectorTool[]) {
+          if (alive) {
+            setTools(rows);
+          }
+        })
+        .catch(function fail(caught: unknown) {
+          if (alive) {
+            setError(messageOf(caught, "The tool list could not be loaded."));
+          }
+        });
+      return function stop() {
+        alive = false;
+      };
+    },
+    [connection.id]
+  );
+
+  if (error !== null) {
+    return (
+      <p className="error acct-error" role="alert">
+        {error}
+      </p>
+    );
+  }
+
+  if (tools === null) {
+    return <p className="conn-loading">Loading…</p>;
+  }
+
+  return (
+    <LiveData
+      connectionId={connection.id}
+      tools={tools}
+      ready={connection.status !== "error"}
+    />
+  );
+}
+
 function ToolsTab({
   connector,
   connection,
@@ -910,18 +985,6 @@ function ToolsTab({
           This is what {connector.label} can do. Connect it to choose which of
           these tools Claude is allowed to call.
         </p>
-      ) : null}
-
-      {/* Above the tool list, not below it: the question people arrive with is
-          "is this returning my data", and a list of tool names does not answer
-          it. Rendered only once a connection exists -- there is nothing to run
-          a tool against before that. */}
-      {connection !== null && catalog !== null ? (
-        <LiveData
-          connectionId={connection.id}
-          tools={catalog}
-          ready={connection.status !== "error"}
-        />
       ) : null}
 
       {error !== null ? (
