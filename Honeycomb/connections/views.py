@@ -9,6 +9,10 @@ TenantScopedQuerysetMixin so a detail route cannot reach a neighbouring
 organization's row even with a guessed primary key.
 """
 
+import asyncio
+import logging
+import time
+
 from django.apps import apps
 from django.db.models import Count, Q
 from rest_framework import status, viewsets
@@ -24,11 +28,14 @@ from connectors import registry
 from .models import Connection
 from .serializers import (
     ConnectionSerializer,
+    ToolRunSerializer,
     ToolToggleSerializer,
     catalog_tools,
     connector_detail,
     connector_spec,
 )
+
+logger = logging.getLogger(__name__)
 
 #: Ceiling on ?limit= for the activity feed. The dashboard asks for 50; the cap
 #: stops a client turning one request into an unbounded table scan.
@@ -154,6 +161,95 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             connection.disabled_tools = disabled
             connection.save(update_fields=['disabled_tools', 'updated_at'])
         return Response(self._tool_rows(connection), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='run')
+    def run(self, request, pk=None):
+        """Run one READ tool with this connection's stored credentials.
+
+        The dashboard has always been able to say what a connector *could*
+        fetch; this is what lets it show what the connector actually returns,
+        without the user leaving for an AI client.
+
+        Three limits define the surface, and each is a refusal rather than a
+        filter so a caller learns why:
+
+        * read-only. A tool the catalog marks ``write`` is refused outright.
+          The MCP plane can call those because a human approved that client;
+          nothing on a page the browser can be walked into should be able to
+          publish a post or start a crawl.
+        * respects the connection's own switches. A tool switched off in the
+          dashboard is off here too -- one meaning for "off", not two.
+        * tenant-scoped by get_object(), like every other detail route here.
+
+        Errors are redacted with the same helpers the MCP plane uses: some
+        providers carry the access token in a query parameter, and an upstream
+        error string echoed verbatim would put a live credential on the page.
+        """
+        from asgiref.sync import async_to_sync
+
+        from connectors.shims.errors import ConnectorError, redact_exc, redact_text
+        from mcp.endpoint import _tool_timeout
+        from mcp.models import McpActivity
+
+        connection = self.get_object()
+        connector = registry.get(connection.connector)
+        if connector is None:
+            return Response({'detail': 'This connector is no longer available.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ToolRunSerializer(
+            data=request.data, context={'connection': connection, 'connector': connector}
+        )
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data['tool']
+        args = serializer.validated_data['args']
+
+        handler = (getattr(connector, 'handlers', None) or {}).get(name)
+        if handler is None:
+            return Response({'detail': "Tool '{0}' has no handler.".format(name)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        started = time.monotonic()
+
+        def elapsed_ms():
+            return int((time.monotonic() - started) * 1000)
+
+        def log(row_status, message='', detail=None):
+            McpActivity.objects.create(
+                tenant=connection.tenant, connection=connection,
+                connector=connection.connector, tool_name=name, status=row_status,
+                duration_ms=elapsed_ms(), error_message=message[:500],
+                detail=detail or {'via': 'portal'},
+            )
+
+        async def call():
+            # The second argument is the ported handlers' `db` session, which
+            # none of them dereference -- they read what they need off the
+            # connection. None is correct, not a placeholder.
+            return await asyncio.wait_for(handler(connection, None, args),
+                                          timeout=_tool_timeout())
+
+        try:
+            payload = async_to_sync(call)()
+        except asyncio.TimeoutError:
+            message = "'{0}' took longer than {1:.0f}s.".format(name, _tool_timeout())
+            log(McpActivity.STATUS_ERROR, message)
+            return Response({'detail': message}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except ConnectorError as exc:
+            message = redact_text(str(exc))
+            log(McpActivity.STATUS_ERROR, message)
+            return Response({'detail': message}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as exc:  # noqa: BLE001 -- never a raw 500 with a token in it
+            message = redact_exc(exc)
+            logger.exception('Portal tool %s.%s failed', connection.connector, name)
+            log(McpActivity.STATUS_ERROR, message)
+            return Response({'detail': message}, status=status.HTTP_502_BAD_GATEWAY)
+
+        log(McpActivity.STATUS_OK)
+        return Response(
+            {'tool': name, 'duration_ms': elapsed_ms(), 'data': payload},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=['get'], url_path='activity')
     def activity(self, request, pk=None):

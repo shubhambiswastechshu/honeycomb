@@ -51,6 +51,7 @@ import ConnectForm from "@/components/dashboard/ConnectForm";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
 import McpKeyPanel from "@/components/dashboard/McpKeyPanel";
+import LiveData from "@/components/dashboard/LiveData";
 import {
   deleteConnection,
   getConnector,
@@ -909,6 +910,18 @@ function ToolsTab({
           This is what {connector.label} can do. Connect it to choose which of
           these tools Claude is allowed to call.
         </p>
+      ) : null}
+
+      {/* Above the tool list, not below it: the question people arrive with is
+          "is this returning my data", and a list of tool names does not answer
+          it. Rendered only once a connection exists -- there is nothing to run
+          a tool against before that. */}
+      {connection !== null && catalog !== null ? (
+        <LiveData
+          connectionId={connection.id}
+          tools={catalog}
+          ready={connection.status !== "error"}
+        />
       ) : null}
 
       {error !== null ? (

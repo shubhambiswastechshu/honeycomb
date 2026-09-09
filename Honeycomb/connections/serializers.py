@@ -34,10 +34,24 @@ def catalog_tools(connector) -> list:
         name = entry.get('name') or ''
         if not name:
             continue
+        schema = entry.get('input') if isinstance(entry.get('input'), dict) else {}
         tools.append({
             'name': name,
             'description': entry.get('description') or '',
             'write': bool(entry.get('write', False)),
+            # Carried so the dashboard can tell a tool it can run on sight from
+            # one that needs an argument first. Only the two fields a form
+            # needs, not the whole JSON Schema -- the MCP plane already serves
+            # that to clients that actually validate against it.
+            'required': [str(k) for k in (schema.get('required') or [])],
+            'params': {
+                str(k): {
+                    'type': str((v or {}).get('type') or 'string'),
+                    'description': str((v or {}).get('description') or ''),
+                }
+                for k, v in (schema.get('properties') or {}).items()
+                if isinstance(v, dict) or v is None
+            },
         })
     return tools
 
@@ -221,6 +235,43 @@ class ConnectionSerializer(serializers.ModelSerializer):
             instance.last_error = ''
         instance.save()
         return instance
+
+
+class ToolRunSerializer(serializers.Serializer):
+    """Body of POST /api/connections/<id>/run/ -- {tool, args}.
+
+    Validation here is the security boundary for the dashboard's live-data
+    panel, so it refuses rather than filters: a caller that names a write tool
+    or a switched-off tool is told so, instead of quietly getting nothing.
+
+    Needs `connection` and `connector` in the context.
+    """
+
+    tool = serializers.CharField(max_length=64)
+    args = serializers.DictField(required=False, default=dict)
+
+    def validate_tool(self, value):
+        connector = self.context['connector']
+        connection = self.context['connection']
+        by_name = {tool['name']: tool for tool in catalog_tools(connector)}
+        entry = by_name.get(value)
+        if entry is None:
+            raise serializers.ValidationError(
+                'No tool named "{0}" on {1}.'.format(value, connector.label)
+            )
+        if entry.get('write'):
+            # The dashboard is reachable from any tab a browser can be walked
+            # into. Reading through the portal is a convenience; writing needs
+            # the deliberate act of connecting an AI client.
+            raise serializers.ValidationError(
+                '"{0}" changes data, so it can only be run from a connected '
+                'AI client, not from the dashboard.'.format(value)
+            )
+        if value in set(connection.disabled_tools or []):
+            raise serializers.ValidationError(
+                '"{0}" is switched off for this connection.'.format(value)
+            )
+        return value
 
 
 class ToolToggleSerializer(serializers.Serializer):

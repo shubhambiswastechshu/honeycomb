@@ -638,6 +638,10 @@ export interface ConnectorTool {
   description: string;
   write: boolean;
   enabled?: boolean;
+  /** Argument names the tool cannot run without. Empty for most read tools. */
+  required?: string[];
+  /** Every argument it accepts, so a form can label and describe the fields. */
+  params?: Record<string, { type: string; description: string }>;
 }
 
 /** A connector plus its full tool list, from GET /connectors/<slug>/. */
@@ -825,6 +829,33 @@ export function toggleConnectionTool(
   return request<ConnectorTool[]>("/connections/" + id + "/tools/", {
     method: "POST",
     body: { tool: tool, enabled: enabled },
+    authenticated: true,
+  });
+}
+
+/** What POST /connections/<id>/run/ answers with. */
+export interface ToolRun {
+  tool: string;
+  duration_ms: number;
+  data: unknown;
+}
+
+/**
+ * Run one read tool and get back what the provider actually returned.
+ *
+ * Read-only by construction: the server refuses any tool the catalog marks
+ * `write`, so this can never publish, delete or start anything. It is the
+ * dashboard's way of answering "is this connection returning real data" without
+ * sending someone to an AI client to find out.
+ */
+export function runConnectionTool(
+  id: number,
+  tool: string,
+  args?: Record<string, unknown>
+): Promise<ToolRun> {
+  return request<ToolRun>("/connections/" + id + "/run/", {
+    method: "POST",
+    body: { tool: tool, args: args || {} },
     authenticated: true,
   });
 }

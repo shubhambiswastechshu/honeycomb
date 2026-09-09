@@ -4065,3 +4065,311 @@
     min-width: 0;
   }
 }
+
+/* ==========================================================================
+   Live data — the connector page's one moving part.
+   
+   Everything else on this page is a document: it describes what a connector
+   is and what it could do. This panel is an instrument, so it is framed like
+   one — a white card with its controls in a bar across the top, sitting on
+   the page's cream ground rather than blending into it.
+   ========================================================================== */
+.dash .live {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.dash .live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  /* A hair of amber so the control strip separates from the results without a
+     second border doing the work. */
+  background: rgba(234, 157, 62, 0.05);
+}
+
+.dash .live-pick,
+.dash .live-every {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.dash .live-pick select,
+.dash .live-every select,
+.dash .live-arg input {
+  height: 32px;
+  max-width: 260px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.dash .live-pick select:focus-visible,
+.dash .live-every select:focus-visible,
+.dash .live-arg input:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 1px;
+}
+
+.dash .live-pick-label {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.dash .live-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash .live-run {
+  height: 32px;
+}
+
+/* One turn per second while a call is in flight. The button is the only thing
+   that moves, so a spinner elsewhere would be noise. */
+.dash .live-spin {
+  animation: live-spin 1s linear infinite;
+}
+
+@keyframes live-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash .live-spin {
+    animation: none;
+  }
+}
+
+.dash .live-what,
+.dash .live-idle,
+.dash .live-more {
+  margin: 0;
+  padding: 10px 14px 0 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* When one of these is the last thing in the card, it owns the bottom edge and
+   has to pay for the padding the results block would otherwise have provided. */
+.dash .live-what:last-child,
+.dash .live-idle:last-child,
+.dash .live-more:last-child {
+  padding-bottom: 12px;
+}
+
+.dash .live-error:last-child {
+  margin-bottom: 12px;
+}
+
+.dash .live-args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px 0 14px;
+}
+
+.dash .live-arg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dash .live-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 10px 14px 0 14px;
+  padding: 9px 11px;
+  border: 1px solid rgba(155, 61, 34, 0.3);
+  border-radius: 9px;
+  background: rgba(155, 61, 34, 0.05);
+  color: var(--error-text);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.dash .live-error svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.dash .live-out {
+  padding: 12px 14px 14px 14px;
+}
+
+/* Provenance line: how much came back, how long it took, how stale it is.
+   Three facts a reader needs before trusting a single number below it. */
+.dash .live-when {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px 0;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.dash .live-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.dash .live-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1px;
+  margin: 0 0 12px 0;
+  /* The gap IS the rule: one background behind a 1px grid gap draws every
+     divider without a border on any cell. */
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dash .live-stat {
+  padding: 9px 11px;
+  background: #ffffff;
+}
+
+.dash .live-stat dt {
+  margin: 0 0 2px 0;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.dash .live-stat dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Wide tables scroll inside their own box; the page never scrolls sideways. */
+.dash .live-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.dash .live-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.dash .live-caption {
+  padding: 8px 11px;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash .live-table th {
+  position: sticky;
+  top: 0;
+  padding: 7px 11px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  white-space: nowrap;
+  background: #fffdf8;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash .live-table td {
+  padding: 7px 11px;
+  color: var(--ink);
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  /* Long ids and creative names are common and must not force the whole table
+     wide; the cell truncates and the title carries the full value. */
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Numbers right-align so they can be compared down the column; that is also
+   what makes the tabular figures above worth setting. */
+.dash .live-table .live-num {
+  text-align: right;
+}
+
+.dash .live-table tbody tr:first-child td {
+  border-top: none;
+}
+
+.dash .live-table tbody tr:hover td {
+  background: rgba(234, 157, 62, 0.05);
+}
+
+.dash .live-raw {
+  margin-top: 12px;
+}
+
+.dash .live-raw summary {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dash .live-raw summary:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.dash .live-raw pre {
+  max-height: 340px;
+  margin: 8px 0 0 0;
+  padding: 11px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fffdf8;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+@media (max-width: 620px) {
+  .dash .live-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dash .live-actions {
+    justify-content: space-between;
+  }
+}
