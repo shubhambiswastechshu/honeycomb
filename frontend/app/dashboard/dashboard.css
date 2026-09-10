@@ -3970,13 +3970,20 @@
   gap: 10px;
 }
 
+/* One line per connection: identity, what it is, and the URL to take away.
+   Laid out across the row rather than stacked down it -- stacked, the copy
+   button ended up a full column away from the URL it copies, and eight
+   connections needed a thousand pixels of scrolling to show three facts each.
+   The URL column is the wide one because it is what the page is for. */
 .dash .inv-row {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 15px 17px;
+  display: grid;
+  grid-template-columns: auto minmax(150px, 0.8fr) minmax(0, 0.95fr) minmax(0, 2.15fr);
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 9px;
+  padding: 11px 15px;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -3991,15 +3998,13 @@
   box-shadow: inset 3px 0 0 var(--error-text);
 }
 
-.dash .inv-head {
+/* Name and its error flag, so the flag sits against the thing it describes
+   instead of pinned to the far edge of the row. */
+.dash .inv-id {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.dash .inv-id {
+  gap: 8px;
   min-width: 0;
-  flex: 1;
 }
 
 .dash .inv-name {
@@ -4028,31 +4033,69 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
-  margin: 3px 0 0;
+  min-width: 0;
+  margin: 0;
   font-size: 12.5px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash .inv-flag {
   flex: none;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: 7px;
   background: #f7e2da;
   color: #7d2f19;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
 }
 
+/* The URL is already inside a row with its own border, so it drops the box it
+   carries elsewhere and sits as plain text beside its button. */
+.dash .inv-row .conn-url {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Truncated rather than wrapped: wrapping re-inflates the row it is meant to
+   flatten. The whole URL is still what the button copies and what a
+   select-all takes, so nothing is lost by not printing the tail. */
+.dash .inv-row .conn-url-text {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+}
+
 .dash .inv-error {
+  grid-column: 2 / -1;
   margin: 0;
-  padding: 9px 11px;
+  padding: 8px 11px;
   border-radius: 9px;
   background: #fdf3ef;
   color: var(--error-text);
   font-size: 12.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* Two lines: identity above, URL below. Below this the four columns are each
+   too narrow to read, and the URL is the first thing to become unusable. */
+@media (max-width: 1080px) {
+  .dash .inv-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dash .inv-meta,
+  .dash .inv-row .conn-url,
+  .dash .inv-error {
+    grid-column: 2 / -1;
+  }
 }
 
 @media (max-width: 620px) {

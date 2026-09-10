@@ -24,11 +24,6 @@ import type { Connection } from "@/lib/api";
 
 const LOAD_ERROR = "Could not load your connected MCPs.";
 
-/** "1 tool" / "3 tools" -- never a bare number with no noun. */
-function count(n: number, one: string, many: string): string {
-  return String(n) + " " + (n === 1 ? one : many);
-}
-
 export default function DataPage() {
   const [rows, setRows] = useState<Connection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,9 +70,7 @@ export default function DataPage() {
             }
           />
         ) : (
-          <>
-            <DataInventory rows={rows} />
-          </>
+          <DataInventory rows={rows} />
         )}
       </div>
     </div>

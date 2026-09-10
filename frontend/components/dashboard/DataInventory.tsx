@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Search, Wrench } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -42,38 +42,43 @@ function Row({ row }: { row: Connection }) {
   const live = row.tool_count - row.disabled_tools.length;
   return (
     <li className={failing ? "inv-row is-failing" : "inv-row"}>
-      <div className="inv-head">
-        <ConnectorMark slug={row.connector} label={row.connector_label || row.connector} />
-        <div className="inv-id">
-          <Link className="inv-name" href={"/dashboard/connectors/" + row.connector}>
-            {title(row)}
-          </Link>
-          <p className="inv-meta">
-            <span>{row.connector_label}</span>
-            <span className="inv-dot" aria-hidden="true" />
-            <Wrench size={12} strokeWidth={1.9} aria-hidden="true" />
-            <span>
-              {count(live, "tool", "tools")}
-              {row.disabled_tools.length > 0
-                ? " · " + String(row.disabled_tools.length) + " off"
-                : ""}
-            </span>
-            <span className="inv-dot" aria-hidden="true" />
-            <KeyRound size={12} strokeWidth={1.9} aria-hidden="true" />
-            <span>{count(row.key_count, "key", "keys")}</span>
-          </p>
-        </div>
+      <ConnectorMark slug={row.connector} label={row.connector_label || row.connector} />
+
+      <div className="inv-id">
+        <Link className="inv-name" href={"/dashboard/connectors/" + row.connector}>
+          {title(row)}
+        </Link>
         {/* No "Active" chip. A green badge on every healthy row is noise that
             makes the one red badge harder to find, and the group heading
             already says which state you are looking at. */}
         {failing ? <span className="inv-flag">Error</span> : null}
       </div>
 
+      {/* Icons dropped: at 12px beside the words they label they were texture,
+          not information. Zero keys is omitted rather than printed -- on a
+          workspace with none it was the same "0 keys" on every row. */}
+      <p className="inv-meta">
+        <span>{row.connector_label}</span>
+        <span className="inv-dot" aria-hidden="true" />
+        <span>
+          {count(live, "tool", "tools")}
+          {row.disabled_tools.length > 0
+            ? " · " + String(row.disabled_tools.length) + " off"
+            : ""}
+        </span>
+        {row.key_count > 0 ? (
+          <>
+            <span className="inv-dot" aria-hidden="true" />
+            <span>{count(row.key_count, "key", "keys")}</span>
+          </>
+        ) : null}
+      </p>
+
+      <McpUrl url={row.mcp_url} label={"Copy the MCP URL for " + title(row)} />
+
       {failing && row.last_error.length > 0 ? (
         <p className="inv-error">{row.last_error}</p>
       ) : null}
-
-      <McpUrl url={row.mcp_url} label={"Copy the MCP URL for " + title(row)} />
     </li>
   );
 }
@@ -132,8 +137,12 @@ export default function DataInventory({ rows }: DataInventoryProps) {
           <b>{count(rows.length, "connection", "connections")}</b>
           <span className="inv-dot" aria-hidden="true" />
           {count(totals.tools, "tool", "tools")}
-          <span className="inv-dot" aria-hidden="true" />
-          {count(totals.keys, "key", "keys")}
+          {totals.keys > 0 ? (
+            <>
+              <span className="inv-dot" aria-hidden="true" />
+              {count(totals.keys, "key", "keys")}
+            </>
+          ) : null}
         </p>
 
         {rows.length >= FILTER_FROM ? (
