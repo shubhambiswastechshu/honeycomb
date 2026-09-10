@@ -430,6 +430,13 @@ def _date_clause(args: dict, default: str = "LAST_30_DAYS") -> str:
     return f"DURING {dr}"
 
 
+# Ceiling for the high-volume reports, which get_search_terms is the only one
+# of so far. Kept at one googleAds:search page so a full pull is a single round
+# trip; see the note in get_search_terms.
+SEARCH_TERMS_DEFAULT = 1000
+SEARCH_TERMS_MAX = 10000
+
+
 def _limit(args: dict, default: int = 100, max_value: int = 500) -> int:
     try:
         n = int(args.get("limit", default))
@@ -1084,7 +1091,13 @@ async def get_keyword_performance(conn: Connection, db, args: dict) -> dict:
 async def get_search_terms(conn: Connection, db, args: dict) -> dict:
     cid = _customer_id(args)
     dr = _date_range(args)
-    limit = _limit(args)
+    # Search terms are the one report where the shared 500 ceiling is the wrong
+    # shape: a month of a mid-size account runs to tens of thousands of distinct
+    # queries, so 500 is not a safety valve, it is silent data loss. 10k is a
+    # deliberate stop -- googleAds:search pages at 10k, so this stays one round
+    # trip and cannot walk into the MCP tool timeout the way an uncapped pull
+    # would. Past it, narrow the date range.
+    limit = _limit(args, SEARCH_TERMS_DEFAULT, SEARCH_TERMS_MAX)
     query = (
         "SELECT search_term_view.search_term, segments.search_term_match_type, "
         "ad_group.id, ad_group.name, campaign.id, campaign.name, "
@@ -1111,7 +1124,17 @@ async def get_search_terms(conn: Connection, db, args: dict) -> dict:
                 "campaign_name": c.get("name", ""),
                 **_metrics(r),
             })
-        return {"customer_id": cid, "date_range": dr, "count": len(out), "rows": out}
+        return {
+            "customer_id": cid,
+            "date_range": dr,
+            "count": len(out),
+            # A capped pull and a complete one used to be indistinguishable --
+            # the caller saw a row count and no way to tell whether the rest
+            # existed. Saying so is what makes the ceiling honest.
+            "limit": limit,
+            "truncated": len(out) >= limit,
+            "rows": out,
+        }
 
     return await cached("google_ads", conn.id, "get_search_terms", TTL_MEDIUM, _load, args=args)
 
@@ -2682,6 +2705,10 @@ _DATE = {
     "default": "LAST_30_DAYS",
 }
 _LIMIT = {"type": "integer", "minimum": 1, "maximum": 500, "default": 100}
+_LIMIT_WIDE = {
+    "type": "integer", "minimum": 1,
+    "maximum": SEARCH_TERMS_MAX, "default": SEARCH_TERMS_DEFAULT,
+}
 _SD = {"type": "string", "description": "Optional explicit start date YYYY-MM-DD. With end_date, overrides date_range for any custom window (no 12-month limit). For full history you can also use date_range=ALL_TIME."}
 _ED = {"type": "string", "description": "Optional explicit end date YYYY-MM-DD. Use together with start_date."}
 _STATUS = {"type": "string", "enum": ["ENABLED", "PAUSED", "REMOVED"]}
@@ -2814,10 +2841,16 @@ CATALOG: dict[str, dict] = {
         ),
     },
     "get_search_terms": {
-        "description": "Search-term queries that triggered ads, with match type and impressions.",
+        "description": (
+            "Search-term queries that triggered ads, with match type and impressions. "
+            "Returns up to 10000 rows; the response carries `truncated` so a capped "
+            "pull is distinguishable from a complete one. Narrow the date range to "
+            "get the rest."
+        ),
         "input": _schema(
             {"customer_id": _CID, "login_customer_id": _LOGIN,
-             "date_range": _DATE, "start_date": _SD, "end_date": _ED, "limit": _LIMIT},
+             "date_range": _DATE, "start_date": _SD, "end_date": _ED,
+             "limit": _LIMIT_WIDE},
             ["customer_id"],
         ),
     },
