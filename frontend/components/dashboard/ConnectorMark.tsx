@@ -78,6 +78,9 @@ const MARKS: Record<string, LucideIcon> = {
   google_ads: Megaphone,
   google_keywords: Search,
   google_merchant: Store,
+  // A grid, because that is what a spreadsheet is. Not a document icon: the
+  // thing this connector reads is rows and columns, not prose.
+  google_sheets: Table2,
   gsc: Globe,
   linkedin_ads: Users,
   medicines: Pill,
@@ -99,7 +102,6 @@ const MARKS: Record<string, LucideIcon> = {
   gmail: Mail,
   image_gen: Sparkles,
   salesforce_commerce: ShoppingCart,
-  sheets: Table2,
   shopify: ShoppingCart,
   storage: HardDrive,
 };
