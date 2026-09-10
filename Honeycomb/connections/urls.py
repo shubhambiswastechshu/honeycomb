@@ -10,6 +10,7 @@ from django.urls import path
 from rest_framework.routers import SimpleRouter
 
 from .oauth import GoogleOAuthCallbackView, GoogleOAuthStartView
+from .plugin import download as plugin_download
 from .views import ConnectionViewSet, ConnectorCatalogView
 
 app_name = 'connections'
@@ -19,6 +20,10 @@ router.register('connections', ConnectionViewSet, basename='connection')
 
 urlpatterns = [
     path('connectors/', ConnectorCatalogView.as_view(), name='connector-list'),
+    # The WordPress connector cannot be set up without this file, so it is
+    # served from here rather than from a repository the user has no access to.
+    # Declared above the <slug> patterns, which would otherwise swallow it.
+    path('plugins/wordpress/', plugin_download, name='plugin-wordpress'),
     # Declared above connector-detail. <str:> cannot swallow a '/', so the
     # detail route could not match these anyway -- but the OAuth pair is the
     # more specific pattern and reads better where nothing has to be reasoned

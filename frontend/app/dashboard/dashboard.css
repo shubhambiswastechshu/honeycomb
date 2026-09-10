@@ -4373,3 +4373,83 @@
     justify-content: space-between;
   }
 }
+
+/* ==========================================================================
+   Plugin setup — the step before the WordPress form can be filled in.
+   ========================================================================== */
+.dash .plug {
+  padding: 12px 13px;
+  margin-bottom: 4px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(234, 157, 62, 0.06);
+}
+
+.dash .plug-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dash .plug-title {
+  margin: 0 0 3px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dash .plug-lede {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dash .plug-get {
+  flex: none;
+  height: 32px;
+  text-decoration: none;
+}
+
+.dash .plug-steps {
+  margin: 11px 0 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 7px;
+}
+
+.dash .plug-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* Numbered because these genuinely are a sequence -- step 3 cannot produce a
+   token until step 2 has run. */
+.dash .plug-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--amber-500);
+  color: var(--accent-contrast);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .dash .plug-get {
+    width: 100%;
+  }
+}

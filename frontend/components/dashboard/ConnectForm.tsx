@@ -26,6 +26,7 @@
  */
 
 import { useState } from "react";
+import PluginSetup from "@/components/dashboard/PluginSetup";
 import type { FormEvent } from "react";
 import { createConnection, startGoogleOAuth, updateConnection } from "@/lib/api";
 import type { Connection, ConnectorSpec } from "@/lib/api";
@@ -290,6 +291,13 @@ export default function ConnectForm({
       description={description}
     >
       <form className="acct-form" onSubmit={handleSubmit}>
+        {/* Above the fields, not beside them: the token this form asks for does
+            not exist until the plugin is installed, so the instructions have to
+            come first or the form is a dead end. Only WordPress needs it --
+            every other connector's credentials come from a provider console the
+            user already has. */}
+        {connector.slug === "wordpress" && editing === null ? <PluginSetup /> : null}
+
         <TextField
           id="connect-name"
           label="Name"
