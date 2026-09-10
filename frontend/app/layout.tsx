@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Roboto, Roboto_Mono } from "next/font/google";
 import AppChrome from "@/components/dashboard/AppChrome";
 import "./globals.css";
 
@@ -12,23 +12,18 @@ import "./globals.css";
  * no layout shift when they swap in -- the metrics are known before the page
  * is sent. It is part of Next itself, so this costs no new dependency.
  *
- * Plus Jakarta Sans for everything read: warmer and rounder than the system
- * stack, which suits a product whose whole identity is amber and hexagons,
- * while staying plain enough for a dashboard full of small labels.
- *
- * JetBrains Mono wherever the product shows machine text -- tool names, MCP
- * URLs, key prefixes. That is a lot of this app, and the system monospace
- * stack renders as something different on every machine. It also has the
- * disambiguation this content needs: a slashed zero and distinguishable
- * l/1/I, which matters when someone is checking a pasted endpoint slug.
+ * Roboto ships as static cuts rather than a variable axis, so the weights the
+ * stylesheets ask for have to be listed. It has no 600: CSS font matching
+ * resolves the app's `font-weight: 600` rules up to 700.
  */
-const sans = Plus_Jakarta_Sans({
+const sans = Roboto({
   subsets: ["latin"],
   display: "swap",
+  weight: ["300", "400", "500", "700"],
   variable: "--font-sans",
 });
 
-const mono = JetBrains_Mono({
+const mono = Roboto_Mono({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-mono",

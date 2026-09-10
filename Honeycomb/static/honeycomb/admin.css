@@ -114,17 +114,14 @@ html[data-theme="light"],
 
   /* The admin routes every font through this one variable, so a single
      declaration re-faces the whole thing -- including widgets that build their
-     own markup in JS. Google Sans Flex is a 400-700 variable font; the fallback
-     stack is the admin's own, so a blocked fonts.googleapis.com costs a
-     different face and nothing else. */
+     own markup in JS. The fallback stack is the admin's own, so a blocked
+     fonts.googleapis.com costs a different face and nothing else. */
   --font-family-primary:
-    "Google Sans Flex",
-    "Google Sans",
+    "Roboto",
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     system-ui,
-    Roboto,
     "Helvetica Neue",
     Arial,
     sans-serif,
