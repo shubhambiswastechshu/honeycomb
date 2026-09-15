@@ -100,6 +100,16 @@ def daily_cap():
     return max(1, _int_setting('HONEYCOMB_PUBLIC_CRAWL_DAILY', 100))
 
 
+def whole_site_max():
+    """The ceiling on a "whole site" crawl.
+
+    There is no login in front of this page, and the worker runs one crawl at a
+    time. Without a ceiling, anyone could point it at a site with millions of
+    pages and hold it for days. High enough for any real site; configurable.
+    """
+    return max(max_pages(), _int_setting('HONEYCOMB_PUBLIC_CRAWL_WHOLE_SITE_MAX', 50000))
+
+
 def public_tenant():
     slug = (getattr(settings, 'HONEYCOMB_PUBLIC_CRAWL_TENANT', '') or '').strip()
     if not slug:
@@ -213,6 +223,7 @@ def _job_payload(job, queue_position=None):
         'seed_url': job.seed_url,
         'status': job.status,
         'max_pages': config.get('limit'),
+        'whole_site': bool(config.get('whole_site')),
         'pages_crawled': job.pages_crawled,
         'pages_queued': job.pages_queued,
         'urls_discovered': job.urls_discovered,
@@ -269,6 +280,7 @@ def _overview(tenant):
             'max_pages': max_pages(),
             'max_active': max_active(),
             'daily': daily_cap(),
+            'whole_site_max': whole_site_max(),
             'requests_per_second': PUBLIC_RPS,
         },
     }
@@ -323,16 +335,28 @@ class PublicJobs(PublicView):
                 'detail': 'The public crawler has reached its limit for today. Try again tomorrow.',
             }, status=http.HTTP_429_TOO_MANY_REQUESTS)
 
-        try:
-            pages = int(data.get('max_pages') or 200)
-        except (TypeError, ValueError):
-            pages = 200
-        pages = max(10, min(pages, max_pages()))
+        requested = data.get('max_pages')
+        whole_site = str(requested).strip().lower() in ('all', 'whole', 'whole_site')
+        if whole_site:
+            pages = whole_site_max()
+        else:
+            try:
+                pages = int(requested or 200)
+            except (TypeError, ValueError):
+                pages = 200
+            pages = max(10, min(pages, max_pages()))
         config = {
             'limit': pages,
+            'whole_site': whole_site,
             'rps': PUBLIC_RPS,
             'concurrency': PUBLIC_CONCURRENCY,
             'per_host': PUBLIC_PER_HOST,
+            # Every public crawl stays on the exact site it was given: other
+            # subdomains are treated as external, and a redirect to any other
+            # site is recorded but never requested. Links to other sites were
+            # already never fetched; these close the last two ways out.
+            'include_subdomains': False,
+            'offsite_redirects': False,
         }
         try:
             depth = int(data.get('depth')) if data.get('depth') not in (None, '') else None

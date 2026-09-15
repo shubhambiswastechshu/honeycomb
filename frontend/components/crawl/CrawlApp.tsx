@@ -40,6 +40,8 @@ import type {
 } from "@/lib/crawl";
 
 const PAGE_SIZES = [50, 100, 200, 500];
+/** The select's value for "Whole site"; sent to the server as "all". */
+const WHOLE_SITE = 0;
 const ROWS_PER_LOAD = 100;
 const MAX_LOG = 300;
 const STORE_KEY = "honeycomb.crawl.mine";
@@ -112,6 +114,13 @@ function codeClass(code: number | null): string {
 
 function progress(job: PublicJob): number {
   if (job.status === "done") return 100;
+  // A whole-site crawl's max_pages is a safety ceiling in the tens of
+  // thousands, so measuring against it would show a bar that never moves.
+  // Crawled against known-so-far is the honest measure there.
+  if (job.whole_site) {
+    const known = job.pages_crawled + job.pages_queued;
+    return known > 0 ? (100 * job.pages_crawled) / known : 0;
+  }
   const cap = job.max_pages || 0;
   if (cap > 0) return Math.min(100, (100 * job.pages_crawled) / cap);
   const known = job.pages_crawled + job.pages_queued;
@@ -199,7 +208,7 @@ export default function CrawlApp() {
     setStarting(true);
     setStartError(null);
     try {
-      const res = await startPublicCrawl(url.trim(), maxPages);
+      const res = await startPublicCrawl(url.trim(), maxPages === WHOLE_SITE ? "all" : maxPages);
       if (res.cancel_token) {
         const next = { ...loadMine(), [String(res.job.id)]: res.cancel_token };
         saveMine(next);
@@ -281,6 +290,7 @@ export default function CrawlApp() {
                   </option>
                 );
               })}
+              <option value={WHOLE_SITE}>Whole site</option>
             </select>
           </label>
           <button className="cr-btn cr-btn-go" type="submit" disabled={starting || url.trim() === ""}>
@@ -295,8 +305,9 @@ export default function CrawlApp() {
         ) : null}
         {overview ? (
           <p className="cr-fine">
-            Public sites only · follows links on the same site · respects robots.txt · max{" "}
-            {overview.limits.max_pages} pages, {overview.limits.requests_per_second} requests a second
+            This site only: no subdomains, and no request is ever sent to another site · respects
+            robots.txt · whole site up to {num(overview.limits.whole_site_max)} pages ·{" "}
+            {overview.limits.requests_per_second} requests a second
           </p>
         ) : null}
         {overview && overview.workers_online === 0 ? (
@@ -344,7 +355,9 @@ export default function CrawlApp() {
                         {STATUS_WORD[job.status] || job.status}
                         {job.status === "queued" && typeof job.queue_position === "number"
                           ? " · " + (job.queue_position === 0 ? "next" : job.queue_position + " ahead")
-                          : " · " + num(job.pages_crawled) + (job.max_pages ? " / " + num(job.max_pages) : "") + " pages"}
+                          : " · " +
+                            num(job.pages_crawled) +
+                            (job.whole_site ? " pages · whole site" : job.max_pages ? " / " + num(job.max_pages) + " pages" : " pages")}
                       </span>
                       {active ? (
                         <span className="cr-bar" aria-hidden="true">
@@ -509,7 +522,10 @@ function JobView({
       </div>
 
       <dl className="cr-stats">
-        <Stat label="Crawled" value={num(job.pages_crawled) + (job.max_pages ? " / " + num(job.max_pages) : "")} />
+        <Stat
+          label={job.whole_site ? "Crawled · whole site" : "Crawled"}
+          value={num(job.pages_crawled) + (!job.whole_site && job.max_pages ? " / " + num(job.max_pages) : "")}
+        />
         <Stat label="Discovered" value={num(job.urls_discovered)} />
         <Stat label="Links" value={num(job.links_found)} />
         <Stat label="Failures" value={num(job.failures)} tone={job.failures > 0 ? "bad" : undefined} />

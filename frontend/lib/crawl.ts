@@ -17,6 +17,8 @@ export interface PublicJob {
   seed_url: string;
   status: CrawlStatus;
   max_pages: number | null;
+  /** Started with "Whole site": max_pages is only a safety ceiling, not a target. */
+  whole_site: boolean;
   pages_crawled: number;
   pages_queued: number;
   urls_discovered: number;
@@ -37,7 +39,13 @@ export interface Overview {
   workers_online: number;
   private_crawls_active: number;
   public_crawls_active: number;
-  limits: { max_pages: number; max_active: number; daily: number; requests_per_second: number };
+  limits: {
+    max_pages: number;
+    max_active: number;
+    daily: number;
+    whole_site_max: number;
+    requests_per_second: number;
+  };
 }
 
 export interface CrawlEventLine {
@@ -118,9 +126,10 @@ export function listPublicCrawls(): Promise<{ overview: Overview; jobs: PublicJo
   return call("/jobs/");
 }
 
+/** "all" asks for the whole site, up to the server's safety ceiling. */
 export function startPublicCrawl(
   url: string,
-  maxPages: number,
+  maxPages: number | "all",
 ): Promise<{ job: PublicJob; cancel_token?: string; existing?: boolean }> {
   return call("/jobs/", { method: "POST", body: JSON.stringify({ url: url, max_pages: maxPages }) });
 }
