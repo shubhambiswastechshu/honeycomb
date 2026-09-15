@@ -385,7 +385,8 @@ export default function ToolSwitches({
                   {pending.writes.map(titleOf).join(", ")})
                 </>
               )}
-              . Once on, any AI client using this connection can call them. You can switch them off again at any time.
+              . Once on, any AI client using this connection can call {pending.writes.length === 1 ? "it" : "them"}.
+              You can switch {pending.writes.length === 1 ? "it" : "them"} off again at any time.
             </>
           ) : (
             ""
