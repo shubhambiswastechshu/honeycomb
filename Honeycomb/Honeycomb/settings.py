@@ -386,6 +386,12 @@ REST_FRAMEWORK = {
         # off this process, and nobody legitimately configures twenty
         # integrations a minute.
         'connect': '20/min',
+        # The public crawler. Starting a crawl puts load on a real machine and on
+        # somebody's website, with no account behind the request -- so the
+        # ceiling is per client address and low. Reads are the live view
+        # polling every couple of seconds, so they need real headroom.
+        'public_crawl': '6/hour',
+        'public_crawl_read': '240/min',
         # Minting an MCP key is the single most sensitive write in the portal:
         # each one hands out a bearer token with no cookie and no CSRF in front
         # of it. Same ceiling as 'connect', for the same reason -- a human
@@ -704,6 +710,14 @@ GOOGLE_ADS_API_VERSION = os.environ.get('GOOGLE_ADS_API_VERSION', 'v23')
 # The client still only reaches its own registered redirect_uri, and every
 # silent approval is logged, but the human check is gone. Set to 0 to restore it.
 HONEYCOMB_OAUTH_AUTO_APPROVE = _env_flag('HONEYCOMB_OAUTH_AUTO_APPROVE', 'True')
+
+# The public crawler (foraging/public.py): a page where anyone can watch crawls
+# and start one without an account. Off unless this names the organization whose
+# workers should run them. The other three are its hard limits.
+HONEYCOMB_PUBLIC_CRAWL_TENANT = os.environ.get('HONEYCOMB_PUBLIC_CRAWL_TENANT', '').strip()
+HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES', '500'))
+HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE', '3'))
+HONEYCOMB_PUBLIC_CRAWL_DAILY = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_DAILY', '100'))
 
 HONEYCOMB_FRONTEND_BASE = os.environ.get(
     'HONEYCOMB_FRONTEND_BASE', 'http://localhost:3000'

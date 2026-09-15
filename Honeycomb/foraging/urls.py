@@ -6,7 +6,7 @@ split by path so the difference is obvious at a glance in the router.
 """
 from django.urls import path
 
-from . import views
+from . import public, views
 
 app_name = 'foraging'
 
@@ -27,6 +27,17 @@ urlpatterns = [
     path('jobs/<int:job_id>/pages/', views.job_pages, name='job-pages'),
     path('jobs/<int:job_id>/cancel/', views.cancel_job, name='job-cancel'),
     path('workers/', views.workers, name='workers'),
+
+    # Public plane: no login. Everything it allows, and every limit on it, is
+    # documented in public.py.
+    path('public/jobs/', public.PublicJobs.as_view(), name='public-jobs'),
+    path('public/jobs/<int:job_id>/', public.PublicJobDetail.as_view(), name='public-job'),
+    path('public/jobs/<int:job_id>/pages/', public.PublicJobPages.as_view(),
+         name='public-job-pages'),
+    path('public/jobs/<int:job_id>/export.csv', public.PublicJobExport.as_view(),
+         name='public-job-export'),
+    path('public/jobs/<int:job_id>/cancel/', public.PublicJobCancel.as_view(),
+         name='public-job-cancel'),
 ]
 
 # The console page is a plain server-rendered route, not under /api/. It is
