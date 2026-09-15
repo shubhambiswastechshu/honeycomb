@@ -13,6 +13,7 @@ import { Download } from "lucide-react";
 import { compareCrawls, listReports, runReport, sitemapUrl } from "@/lib/crawlWorkspace";
 import type { CompareResult, ReportResult, ReportSummary, Severity, Workspace } from "@/lib/crawlWorkspace";
 import type { PublicJob } from "@/lib/crawl";
+import SiteTree from "@/components/crawl/SiteTree";
 import { codeClass, num, pathOf } from "@/components/crawl/format";
 
 const SEVERITIES: { key: Severity; label: string }[] = [
@@ -48,6 +49,7 @@ export default function Insights({
   activeIssue,
   onPick,
   onIssue,
+  onFolder,
   compareWith,
 }: {
   jobId: number;
@@ -57,8 +59,10 @@ export default function Insights({
   activeIssue: string;
   onPick: (tab: string, filter: string) => void;
   onIssue: (code: string) => void;
+  onFolder: (path: string) => void;
   compareWith: PublicJob[];
 }) {
+  const [treeOpen, setTreeOpen] = useState(false);
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -131,6 +135,7 @@ export default function Insights({
                       <button
                         type="button"
                         className={activeIssue === i.code ? "ins-row is-on" : "ins-row"}
+                        title={i.why || undefined}
                         onClick={function onClick() {
                           onIssue(i.code);
                         }}
@@ -178,9 +183,16 @@ export default function Insights({
         })}
       </details>
 
-      <details className="ins-sec">
+      <details
+        className="ins-sec"
+        onToggle={function toggled(e) {
+          if ((e.currentTarget as HTMLDetailsElement).open) setTreeOpen(true);
+        }}
+      >
         <summary>Site structure</summary>
-        <p className="ins-note">URLs by crawl depth (clicks from the start page).</p>
+        {treeOpen ? <SiteTree jobId={jobId} onFolder={onFolder} /> : null}
+        <p className="ins-group-title ins-pad">Crawl depth</p>
+        <p className="ins-note">URLs by clicks from the start page.</p>
         <Bars rows={data.structure.map((s) => ({ label: "Depth " + s.depth, value: s.pages }))} />
       </details>
 

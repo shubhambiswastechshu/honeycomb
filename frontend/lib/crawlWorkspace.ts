@@ -12,7 +12,7 @@ import type { PublicJob } from "@/lib/crawl";
 
 const BASE = API_BASE + "/forager/public/jobs/";
 
-export type ColumnType = "url" | "text" | "int" | "float" | "ms" | "bytes" | "code" | "list" | "index";
+export type ColumnType = "url" | "text" | "int" | "float" | "ms" | "bytes" | "code" | "list" | "index" | "bool";
 export type Severity = "high" | "medium" | "low";
 
 export interface GridColumn {
@@ -33,16 +33,24 @@ export interface WorkspaceTab {
   filters: TabFilter[];
 }
 
-export interface IssueRow {
+export interface IssueHelp {
   code: string;
   label: string;
   severity: Severity;
+  /** Why it matters, in plain words. Empty for codes with no write-up. */
+  why: string;
+  /** What to change. */
+  fix: string;
+}
+
+export interface IssueRow extends IssueHelp {
   pages: number;
 }
 
 export interface Workspace {
   job: PublicJob;
   pages_total: number;
+  links_total: number;
   tabs: WorkspaceTab[];
   issues: IssueRow[];
   issue_totals: Record<Severity, number>;
@@ -58,6 +66,8 @@ export type GridRow = Record<string, unknown>;
 
 export interface GridResponse {
   tab: string;
+  /** "images" rows are image files from the link graph, not crawled pages. */
+  source: "pages" | "images";
   filter: string;
   issue: string;
   issue_label: string;
@@ -80,11 +90,21 @@ export interface GridQuery {
   limit: number;
 }
 
+export interface DetailField {
+  key: string;
+  label: string;
+  type: ColumnType;
+  value: unknown;
+}
+
 export interface UrlDetail {
   url: string;
-  fields: { key: string; label: string; type: ColumnType; value: unknown }[];
-  issues: { code: string; label: string; severity: Severity }[];
+  fields: DetailField[];
+  issues: IssueHelp[];
   content_hash: string | null;
+  headers: Record<string, string>;
+  /** Null when the crawl did not render JavaScript. */
+  javascript: DetailField[] | null;
   serp: {
     url: string;
     title: string;
@@ -120,6 +140,42 @@ export interface CompareResult {
   status_changed: { url: string; was: number | null; now: number | null }[];
   title_changed: { url: string; was: string; now: string }[];
   truncated: boolean;
+}
+
+export type LinkDirection = "in" | "out";
+
+export interface LinkRow {
+  /** The other end: the linking page for inlinks, the target for outlinks. */
+  url: string;
+  status_code: number | null;
+  /** Anchor text, or alt text for an image. Null means the attribute is missing. */
+  anchor: string | null;
+  rel: string;
+  kind: string;
+  internal: boolean;
+  position: number;
+}
+
+export interface LinksResponse {
+  url: string;
+  dir: LinkDirection;
+  kind: string;
+  kinds: Record<string, number>;
+  total: number;
+  links_stored: boolean;
+  rows: LinkRow[];
+}
+
+export interface TreeNode {
+  name: string;
+  path: string;
+  pages: number;
+  errors: number;
+  redirects: number;
+  noindex: number;
+  status: number | null;
+  more: number;
+  children: TreeNode[];
 }
 
 async function call<T>(path: string): Promise<T> {
@@ -167,6 +223,22 @@ export function gridExportUrl(jobId: number, query: GridQuery): string {
 
 export function getUrlDetail(jobId: number, url: string): Promise<UrlDetail> {
   return call(jobId + "/url/?u=" + encodeURIComponent(url));
+}
+
+export function getLinks(
+  jobId: number,
+  url: string,
+  dir: LinkDirection,
+  kind: string,
+  limit: number,
+): Promise<LinksResponse> {
+  const params = new URLSearchParams({ u: url, dir: dir, limit: String(limit) });
+  if (kind) params.set("kind", kind);
+  return call(jobId + "/links/?" + params.toString());
+}
+
+export function getSiteTree(jobId: number): Promise<{ tree: TreeNode; truncated: boolean }> {
+  return call(jobId + "/tree/");
 }
 
 export function listReports(jobId: number): Promise<{ reports: ReportSummary[] }> {

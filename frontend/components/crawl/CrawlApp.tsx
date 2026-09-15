@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Loader2, Play, Square } from "lucide-react";
+import { Download, Loader2, Play, SlidersHorizontal, Square } from "lucide-react";
 import Workspace from "@/components/crawl/Workspace";
 import { LogoMark } from "@/components/ui/Logo";
 import {
@@ -101,6 +101,14 @@ function progress(job: PublicJob): number {
   return known > 0 ? (100 * job.pages_crawled) / known : 0;
 }
 
+/** One rule per line or comma, blanks dropped. */
+function splitRules(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /** Crawls started in this browser, and the token that lets it stop each one. */
 function loadMine(): Record<string, string> {
   try {
@@ -138,6 +146,15 @@ export default function CrawlApp() {
   const [maxPages, setMaxPages] = useState(200);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [include, setInclude] = useState("");
+  const [exclude, setExclude] = useState("");
+  const [depth, setDepth] = useState("");
+  const [ignoreParams, setIgnoreParams] = useState(false);
+  const [renderJs, setRenderJs] = useState(false);
+  const activeSettings =
+    (include.trim() ? 1 : 0) + (exclude.trim() ? 1 : 0) + (depth ? 1 : 0) + (ignoreParams ? 1 : 0) + (renderJs ? 1 : 0);
 
   useEffect(function readMine() {
     setMine(loadMine());
@@ -190,7 +207,13 @@ export default function CrawlApp() {
     setStarting(true);
     setStartError(null);
     try {
-      const res = await startPublicCrawl(url.trim(), maxPages === WHOLE_SITE ? "all" : maxPages);
+      const res = await startPublicCrawl(url.trim(), maxPages === WHOLE_SITE ? "all" : maxPages, {
+        include: splitRules(include),
+        exclude: splitRules(exclude),
+        depth: depth ? Number(depth) : null,
+        ignore_params: ignoreParams,
+        render: renderJs,
+      });
       if (res.cancel_token) {
         const next = { ...loadMine(), [String(res.job.id)]: res.cancel_token };
         saveMine(next);
@@ -270,6 +293,19 @@ export default function CrawlApp() {
               <option value={WHOLE_SITE}>Whole site</option>
             </select>
           </label>
+          <button
+            type="button"
+            className={settingsOpen ? "cr-btn cr-set-btn is-open" : "cr-btn cr-set-btn"}
+            aria-expanded={settingsOpen}
+            aria-controls="cr-settings"
+            onClick={function toggle() {
+              setSettingsOpen((v) => !v);
+            }}
+          >
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            Settings
+            {activeSettings > 0 ? <span className="cr-set-n">{activeSettings}</span> : null}
+          </button>
           <button className="cr-btn cr-btn-go" type="submit" disabled={starting || url.trim() === ""}>
             {starting ? <Loader2 size={15} className="cr-spin" aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
             {starting ? "Starting…" : "Start crawl"}
@@ -277,6 +313,53 @@ export default function CrawlApp() {
         </form>
       </TopBar>
       <h1 className="cr-sr">Site crawler</h1>
+      {settingsOpen ? (
+        <section id="cr-settings" className="cr-settings" aria-label="Crawl settings">
+          <label className="cr-set-field">
+            <span>Only crawl URLs containing</span>
+            <textarea
+              rows={2}
+              placeholder={"/blog/\n/products/*/reviews"}
+              value={include}
+              onChange={(e) => setInclude(e.target.value)}
+            />
+          </label>
+          <label className="cr-set-field">
+            <span>Skip URLs containing</span>
+            <textarea
+              rows={2}
+              placeholder={"?sort=\n/tag/"}
+              value={exclude}
+              onChange={(e) => setExclude(e.target.value)}
+            />
+          </label>
+          <div className="cr-set-col">
+            <label className="cr-set-field">
+              <span>Maximum depth</span>
+              <select value={depth} onChange={(e) => setDepth(e.target.value)}>
+                <option value="">Any depth</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? "click" : "clicks"} from start
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="cr-set-check">
+              <input type="checkbox" checked={ignoreParams} onChange={(e) => setIgnoreParams(e.target.checked)} />
+              <span>Ignore query strings (treat ?page=2 as the same URL)</span>
+            </label>
+            <label className="cr-set-check">
+              <input type="checkbox" checked={renderJs} onChange={(e) => setRenderJs(e.target.checked)} />
+              <span>Render JavaScript (first 500 pages, slower)</span>
+            </label>
+          </div>
+          <p className="cr-set-note">
+            One rule per line or comma. Rules match any part of the URL, and <code>*</code> matches anything. The
+            start page is always crawled.
+          </p>
+        </section>
+      ) : null}
       {startError ? (
         <p className="cr-error cr-strip" role="alert">
           {startError}
@@ -496,6 +579,8 @@ function JobView({
             {job.status === "queued" && typeof job.queue_position === "number"
               ? " · " + (job.queue_position === 0 ? "starts next" : job.queue_position + " crawls ahead")
               : ""}
+            {job.settings?.render ? " · JS rendered" : ""}
+            {job.settings && (job.settings.include.length || job.settings.exclude.length) ? " · URL rules" : ""}
           </p>
         </div>
 

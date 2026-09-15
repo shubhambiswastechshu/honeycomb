@@ -304,6 +304,27 @@ class CrawlPage(models.Model):
     # feed can produce thousands per page and the row must stay a row.
     structured_data_findings = models.JSONField(default=list, blank=True)
 
+    # --- Response detail ---------------------------------------------------
+    # For a redirected URL, status_code is the first hop's 3xx -- what that URL
+    # actually answered -- and these say where the chain ended. Null when the
+    # URL did not redirect.
+    final_status_code = models.IntegerField(null=True, blank=True)
+    http_version = models.CharField(max_length=16, blank=True)
+    # The headers an SEO or security review reads (the worker's KEEP_HEADERS),
+    # with lower-cased names. Empty on crawls from workers that predate it.
+    response_headers = models.JSONField(default=dict, blank=True)
+
+    # --- JavaScript rendering, when the crawl asked for it -----------------
+    js_rendered = models.BooleanField(default=False)
+    rendered_word_count = models.IntegerField(default=0)
+    js_added_words = models.IntegerField(default=0)
+    js_added_links = models.IntegerField(default=0)
+    js_dependent = models.BooleanField(
+        default=False,
+        help_text='Rendering added links or text the raw HTML did not have.',
+    )
+    js_console_errors = models.IntegerField(default=0)
+
     class Meta:
         indexes = [
             models.Index(fields=['job', 'status_code'], name='forage_page_job_status_idx'),
@@ -318,6 +339,46 @@ class CrawlPage(models.Model):
 
     def __str__(self):
         return self.url
+
+
+class CrawlLink(models.Model):
+    """One edge of a crawl's link graph: an <a>, an <img>, a canonical, ...
+
+    The source end is a URL hash, joined to CrawlPage.url_hash, because the
+    source is always a crawled page. The target keeps its full URL as well,
+    because it often is not one -- an image, a script, another site -- and has
+    no row to join. For an <img> the anchor column holds the alt text, with
+    None meaning the attribute is missing and "" meaning it is empty.
+
+    Capped per crawl on the worker. The complete graph always stays in the
+    worker's crawl database; this table exists to answer "what links here".
+    """
+
+    job = models.ForeignKey(CrawlJob, on_delete=models.CASCADE, related_name='links')
+    # The worker's own row id, so a re-sent batch is ignored instead of doubled.
+    source_id = models.BigIntegerField()
+    from_hash = models.BinaryField(max_length=16)
+    to_hash = models.BinaryField(max_length=16)
+    to_url = models.CharField(max_length=2000)
+    anchor = models.CharField(max_length=500, null=True, blank=True)
+    rel = models.CharField(max_length=100, blank=True)
+    kind = models.CharField(max_length=16)
+    internal = models.BooleanField(default=True)
+    position = models.IntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['job', 'from_hash'], name='forage_link_from_idx'),
+            models.Index(fields=['job', 'to_hash'], name='forage_link_to_idx'),
+            models.Index(fields=['job', 'kind'], name='forage_link_kind_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['job', 'source_id'],
+                                    name='forage_link_unique_source'),
+        ]
+
+    def __str__(self):
+        return self.to_url
 
 
 class CrawlSegment(TenantOwnedModel):

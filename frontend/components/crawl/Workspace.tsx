@@ -44,6 +44,8 @@ function Cell({ column, row }: { column: GridColumn; row: GridRow }) {
     }
     case "code":
       return <span className={codeClass(value)}>{typeof value === "number" ? value : "—"}</span>;
+    case "bool":
+      return value ? <span className="ws-flag">Yes</span> : <span className="cr-muted">No</span>;
     case "index":
       return (
         <span className={isIndexable(value) ? "cr-idx is-yes" : "cr-idx"}>
@@ -156,6 +158,21 @@ export default function Workspace({ jobId, live, compareWith }: WorkspaceProps) 
     setQuery((prev) => ({ ...prev, issue: code, sort: "", dir: "", limit: PAGE_STEP }));
   }
 
+  /** From the site tree: list the URLs under one folder. */
+  function showFolder(path: string) {
+    setSearch(path);
+    setQuery((prev) => ({
+      ...prev,
+      tab: prev.tab === "image_files" ? "internal" : prev.tab,
+      filter: prev.tab === "image_files" ? "all" : prev.filter,
+      issue: "",
+      q: path,
+      limit: PAGE_STEP,
+    }));
+  }
+
+  const activeIssue = query.issue && data ? data.issues.find((i) => i.code === query.issue) : undefined;
+
   function sortBy(key: string) {
     setQuery((prev) => {
       const sameKey = (grid?.sort || prev.sort) === key;
@@ -255,6 +272,17 @@ export default function Workspace({ jobId, live, compareWith }: WorkspaceProps) 
             {sideOpen ? "Hide insights" : "Show insights"}
           </button>
         </div>
+
+        {activeIssue && (activeIssue.why || activeIssue.fix) ? (
+          <div className={"ws-help is-" + activeIssue.severity} role="note">
+            {activeIssue.why ? <p>{activeIssue.why}</p> : null}
+            {activeIssue.fix ? (
+              <p>
+                <strong>How to fix:</strong> {activeIssue.fix}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? <p className="cr-error cr-pad">{error}</p> : null}
 
@@ -379,6 +407,7 @@ export default function Workspace({ jobId, live, compareWith }: WorkspaceProps) 
             onClose={function close() {
               setSelected(null);
             }}
+            onSelect={setSelected}
           />
         ) : (
           <p className="ws-hint">Select a row to see everything the crawler found on that URL.</p>
@@ -394,6 +423,7 @@ export default function Workspace({ jobId, live, compareWith }: WorkspaceProps) 
           activeIssue={query.issue}
           onPick={pick}
           onIssue={pickIssue}
+          onFolder={showFolder}
           compareWith={compareWith}
         />
       ) : null}

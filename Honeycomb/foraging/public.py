@@ -30,6 +30,7 @@ workers should run public crawls.
 """
 import csv
 import ipaddress
+import re
 import socket
 from datetime import timedelta
 from urllib.parse import urlsplit, urlunsplit
@@ -60,6 +61,43 @@ PUBLIC_RPS = 2.0
 PUBLIC_CONCURRENCY = 4
 PUBLIC_PER_HOST = 2
 MAX_DEPTH = 10
+
+#: URL rules from the settings panel. Plain "contains" text with * as a
+#: wildcard, never raw regular expressions: the worker runs these against every
+#: URL it finds, and a pathological regex from an open form could stall it.
+MAX_PATTERNS = 10
+MAX_PATTERN_CHARS = 100
+
+#: Rendering is ~100x the cost of a fetch, so it covers at most this many pages.
+RENDER_MAX_PAGES = 500
+
+
+def _truthy(value):
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def url_rules(value):
+    """(as typed, as the worker's regexes) for one list of "contains" rules.
+
+    Accepts a list or text separated by commas or new lines. Each rule is
+    escaped, so only * means anything: "/blog/*/2024" matches any segment.
+    """
+    if isinstance(value, str):
+        items = re.split(r'[\n,]', value)
+    elif isinstance(value, (list, tuple)):
+        items = [str(v) for v in value]
+    else:
+        return [], []
+    typed = []
+    for item in items:
+        item = item.strip()[:MAX_PATTERN_CHARS]
+        if item and item not in typed:
+            typed.append(item)
+        if len(typed) >= MAX_PATTERNS:
+            break
+    # The worker tests these with re.search, so a bare rule already means
+    # "contains"; escaping leaves * as the only operator.
+    return typed, [re.escape(rule).replace(r'\*', '.*') for rule in typed]
 
 #: The columns the results table shows. A deliberate subset of CrawlPage: enough
 #: to read like a crawler's main grid, without shipping every analysis column.
@@ -237,6 +275,13 @@ def _job_payload(job, queue_position=None):
         'created_at': job.created_at,
         'started_at': job.started_at,
         'finished_at': job.finished_at,
+        'settings': {
+            'include': config.get('include_rules') or [],
+            'exclude': config.get('exclude_rules') or [],
+            'depth': config.get('depth'),
+            'ignore_params': bool(config.get('strip_all_params')),
+            'render': bool(config.get('render')),
+        },
     }
     if queue_position is not None:
         payload['queue_position'] = queue_position
@@ -364,6 +409,22 @@ class PublicJobs(PublicView):
             depth = None
         if depth is not None:
             config['depth'] = max(1, min(depth, MAX_DEPTH))
+
+        include_typed, include = url_rules(data.get('include'))
+        exclude_typed, exclude = url_rules(data.get('exclude'))
+        if include:
+            # The start page always qualifies. Without this, "only /blog/" on a
+            # homepage seed would stop at the first URL and crawl nothing.
+            config['include'] = include + ['^' + re.escape(seed) + '$']
+            config['include_rules'] = include_typed
+        if exclude:
+            config['exclude'] = exclude
+            config['exclude_rules'] = exclude_typed
+        if _truthy(data.get('ignore_params')):
+            config['strip_all_params'] = True
+        if _truthy(data.get('render')):
+            config['render'] = True
+            config['render_limit'] = min(pages, RENDER_MAX_PAGES)
 
         job = CrawlJob.objects.create(
             tenant=self.tenant, seed_url=seed, config=config, source=SOURCE)

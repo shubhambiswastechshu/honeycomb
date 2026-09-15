@@ -36,6 +36,7 @@ export function pathOf(url: string): string {
 
 /** Plain text for a value, used for CSV-like copying and titles. */
 export function text(value: unknown, type: ColumnType): string {
+  if (type === "bool") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "";
   switch (type) {
     case "int":

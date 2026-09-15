@@ -25,13 +25,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CrawlEvent, CrawlJob, CrawlPage, Worker
+from .models import CrawlEvent, CrawlJob, CrawlLink, CrawlPage, Worker
 from .serializers import CrawlJobSerializer, CrawlPageSerializer, WorkerSerializer
 
 # The worker sends events in bulk; cap what one post can carry so a buggy or
 # hostile worker cannot push an unbounded write into the request thread.
 MAX_EVENTS_PER_POST = 500
 MAX_PAGES_PER_POST = 1000
+MAX_LINKS_PER_POST = 5000
+MAX_HEADERS_PER_PAGE = 40
 
 # A page's JSON columns are worker-supplied, and a worker that sends a string
 # where a list belongs would otherwise store a shape every reader has to guard
@@ -45,6 +47,53 @@ def _as_list(value):
     if value in (None, ''):
         return []
     return [value]
+
+
+def _as_headers(value):
+    """A header mapping of short strings, whatever the worker sent."""
+    if not isinstance(value, dict):
+        return {}
+    out = {}
+    for key, val in list(value.items())[:MAX_HEADERS_PER_PAGE]:
+        out[str(key).lower()[:60]] = str(val)[:500]
+    return out
+
+
+def _hash16(value):
+    """16 bytes from a hex string, or None if it is not one."""
+    try:
+        raw = bytes.fromhex(value or '')
+    except (TypeError, ValueError):
+        return None
+    return raw if len(raw) == 16 else None
+
+
+def _optional_int(value):
+    try:
+        return int(value) if value not in (None, '') else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _ndjson(request):
+    """The body's NDJSON lines as dicts, or None for a malformed gzip body."""
+    raw = request.body
+    if request.META.get('HTTP_CONTENT_ENCODING') == 'gzip':
+        try:
+            raw = gzip.decompress(raw)
+        except (OSError, EOFError):
+            return None
+    out = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(item, dict):
+            out.append(item)
+    return out
 
 
 class WorkerAuthMixin:
@@ -344,6 +393,15 @@ class AgentPages(WorkerAuthMixin, APIView):
                 structured_data_errors=int(d.get('structured_data_errors') or 0),
                 structured_data_warnings=int(d.get('structured_data_warnings') or 0),
                 structured_data_findings=_as_list(d.get('structured_data_findings')),
+                final_status_code=_optional_int(d.get('final_status_code')),
+                http_version=str(d.get('http_version') or '')[:16],
+                response_headers=_as_headers(d.get('response_headers')),
+                js_rendered=bool(d.get('js_rendered')),
+                rendered_word_count=int(d.get('rendered_word_count') or 0),
+                js_added_words=int(d.get('js_added_words') or 0),
+                js_added_links=int(d.get('js_added_links') or 0),
+                js_dependent=bool(d.get('js_dependent')),
+                js_console_errors=int(d.get('js_console_errors') or 0),
             ))
 
         # Upsert, not insert-or-ignore. The worker re-sends every row once its
@@ -364,6 +422,55 @@ class AgentPages(WorkerAuthMixin, APIView):
             ],
             batch_size=500,
         )
+        return Response({'stored': len(rows)})
+
+
+class AgentLinks(WorkerAuthMixin, APIView):
+    """Link-graph rows, gzipped NDJSON, in the same shape of protocol as pages.
+
+    Insert-or-ignore on (job, source_id): a link never changes after it is
+    written, so a re-sent batch is a no-op rather than an update.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = []
+
+    def post(self, request, job_id):
+        worker = self.worker_from(request)
+        if worker is None:
+            return DENIED
+
+        job = CrawlJob.objects.filter(pk=job_id, worker=worker).first()
+        if job is None:
+            return Response({'detail': 'No such job for this worker.'},
+                            status=http.HTTP_404_NOT_FOUND)
+
+        items = _ndjson(request)
+        if items is None:
+            return Response({'detail': 'Malformed gzip body.'},
+                            status=http.HTTP_400_BAD_REQUEST)
+
+        rows = []
+        for d in items[:MAX_LINKS_PER_POST]:
+            from_hash, to_hash = _hash16(d.get('from_hash')), _hash16(d.get('to_hash'))
+            source_id = _optional_int(d.get('id'))
+            if from_hash is None or to_hash is None or source_id is None or not d.get('to_url'):
+                continue
+            anchor = d.get('anchor')
+            rows.append(CrawlLink(
+                job=job,
+                source_id=source_id,
+                from_hash=from_hash,
+                to_hash=to_hash,
+                to_url=str(d['to_url'])[:2000],
+                anchor=None if anchor is None else str(anchor)[:500],
+                rel=str(d.get('rel') or '')[:100],
+                kind=str(d.get('kind') or '')[:16],
+                internal=bool(d.get('internal')),
+                position=_optional_int(d.get('position')) or 0,
+            ))
+        CrawlLink.objects.bulk_create(rows, ignore_conflicts=True, batch_size=1000)
         return Response({'stored': len(rows)})
 
 

@@ -33,6 +33,16 @@ export interface PublicJob {
   started_at: string | null;
   finished_at: string | null;
   queue_position?: number | null;
+  settings?: CrawlSettings;
+}
+
+/** Options from the settings panel. Rules are plain "contains" text; * is a wildcard. */
+export interface CrawlSettings {
+  include: string[];
+  exclude: string[];
+  depth: number | null;
+  ignore_params: boolean;
+  render: boolean;
 }
 
 export interface Overview {
@@ -130,8 +140,12 @@ export function listPublicCrawls(): Promise<{ overview: Overview; jobs: PublicJo
 export function startPublicCrawl(
   url: string,
   maxPages: number | "all",
+  settings?: Partial<CrawlSettings>,
 ): Promise<{ job: PublicJob; cancel_token?: string; existing?: boolean }> {
-  return call("/jobs/", { method: "POST", body: JSON.stringify({ url: url, max_pages: maxPages }) });
+  return call("/jobs/", {
+    method: "POST",
+    body: JSON.stringify({ ...(settings || {}), url: url, max_pages: maxPages }),
+  });
 }
 
 export function getPublicCrawl(
