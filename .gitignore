@@ -60,3 +60,6 @@ client_secret*.json
 
 # Operational reference: contains live production secrets.
 DEPLOYMENT.local.md
+# Security audit: names unfixed weaknesses and where they are. Useful to us,
+# a map to anyone else.
+AUDIT.local.md
