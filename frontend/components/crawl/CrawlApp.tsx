@@ -176,6 +176,14 @@ export default function CrawlApp() {
     [refreshList],
   );
 
+  // Open the top crawl straight away rather than showing an empty panel.
+  useEffect(
+    function openLatest() {
+      if (selectedId === null && jobs && jobs.length > 0) select(jobs[0].id);
+    },
+    [selectedId, jobs, select],
+  );
+
   async function onStart(event: FormEvent) {
     event.preventDefault();
     if (starting || url.trim() === "") return;
@@ -224,13 +232,8 @@ export default function CrawlApp() {
 
   return (
     <div className="cr">
-      <TopBar overview={overview} />
-
-      <section className="cr-start" aria-labelledby="cr-start-title">
-        <h1 id="cr-start-title" className="cr-start-title">
-          Crawl a website
-        </h1>
-        <form className="cr-form" onSubmit={onStart}>
+      <TopBar overview={overview}>
+        <form className="cr-form" onSubmit={onStart} aria-label="Crawl a website">
           <label className="cr-url">
             <span className="cr-sr">Website address</span>
             <input
@@ -247,7 +250,7 @@ export default function CrawlApp() {
             />
           </label>
           <label className="cr-size">
-            <span>Up to</span>
+            <span className="cr-sr">How many pages</span>
             <select
               value={maxPages}
               disabled={starting}
@@ -272,24 +275,18 @@ export default function CrawlApp() {
             {starting ? "Starting…" : "Start crawl"}
           </button>
         </form>
-        {startError ? (
-          <p className="cr-error" role="alert">
-            {startError}
-          </p>
-        ) : null}
-        {overview ? (
-          <p className="cr-fine">
-            This site only: no subdomains, and no request is ever sent to another site · respects
-            robots.txt · whole site up to {num(overview.limits.whole_site_max)} pages ·{" "}
-            {overview.limits.requests_per_second} requests a second
-          </p>
-        ) : null}
-        {overview && overview.workers_online === 0 ? (
-          <p className="cr-warn" role="status">
-            No crawler machine is online right now. Crawls you start will wait in the queue until one connects.
-          </p>
-        ) : null}
-      </section>
+      </TopBar>
+      <h1 className="cr-sr">Site crawler</h1>
+      {startError ? (
+        <p className="cr-error cr-strip" role="alert">
+          {startError}
+        </p>
+      ) : null}
+      {overview && overview.workers_online === 0 ? (
+        <p className="cr-warn cr-strip" role="status">
+          No crawler machine is online right now. Crawls you start will wait in the queue until one connects.
+        </p>
+      ) : null}
 
       <div className="cr-body">
         <aside className="cr-queue" aria-label="Crawls">
@@ -344,12 +341,20 @@ export default function CrawlApp() {
               );
             })}
           </ul>
+          {overview ? (
+            <p className="cr-fine">
+              Crawls stay on the site you enter: no subdomains, no other sites. Respects robots.txt,{" "}
+              {overview.limits.requests_per_second} requests a second, whole site up to{" "}
+              {num(overview.limits.whole_site_max)} pages.
+            </p>
+          ) : null}
         </aside>
 
         <main className="cr-detail">
           {selectedId === null ? (
             <div className="cr-empty">
-              <p>Pick a crawl on the left, or start one above, to see its pages as they are found.</p>
+              <strong>{jobs !== null && jobs.length === 0 ? "No crawls yet" : "Opening the latest crawl…"}</strong>
+              <p>Paste a website address in the bar above and press Start crawl.</p>
             </div>
           ) : (
             <JobView
@@ -376,7 +381,7 @@ export default function CrawlApp() {
 
 /* ---------------------------------------------------------------- top bar */
 
-function TopBar({ overview }: { overview: Overview | null }) {
+function TopBar({ overview, children }: { overview: Overview | null; children?: React.ReactNode }) {
   const online = overview ? overview.workers_online : null;
   return (
     <header className="cr-top">
@@ -385,6 +390,7 @@ function TopBar({ overview }: { overview: Overview | null }) {
         <span>Honeycomb</span>
         <span className="cr-brand-sub">Site crawler</span>
       </Link>
+      {children}
       <div className="cr-top-right">
         {online !== null ? (
           <span className={online > 0 ? "cr-pill is-on" : "cr-pill"} role="status">
@@ -480,7 +486,9 @@ function JobView({
     <div className="cr-job-view">
       <div className="cr-head">
         <div className="cr-head-main">
-          <h2 className="cr-head-host">{hostOf(job.seed_url)}</h2>
+          <h2 className="cr-head-host" title={job.seed_url}>
+            {hostOf(job.seed_url)}
+          </h2>
           <p className="cr-head-meta" aria-live="polite">
             <span className={"cr-dot is-" + job.status} aria-hidden="true" />
             {STATUS_WORD[job.status] || job.status}
@@ -488,22 +496,8 @@ function JobView({
             {job.status === "queued" && typeof job.queue_position === "number"
               ? " · " + (job.queue_position === 0 ? "starts next" : job.queue_position + " crawls ahead")
               : ""}
-            <span className="cr-head-url">{job.seed_url}</span>
           </p>
         </div>
-        <div className="cr-head-actions">
-          {cancelToken && active && !job.cancel_requested ? (
-            <button type="button" className="cr-btn cr-btn-ghost" onClick={stop} disabled={stopping}>
-              <Square size={13} aria-hidden="true" />
-              {stopping ? "Stopping…" : "Stop"}
-            </button>
-          ) : null}
-          <a className="cr-btn cr-btn-ghost" href={publicExportUrl(job.id)} download>
-            <Download size={14} aria-hidden="true" />
-            Export CSV
-          </a>
-        </div>
-      </div>
 
       <dl className="cr-stats">
         <Stat
@@ -517,34 +511,49 @@ function JobView({
         <Stat label="Elapsed" value={clock(job.duration_seconds)} />
         <Stat label="Downloaded" value={bytes(job.bytes_downloaded)} />
       </dl>
-      <div className="cr-bar cr-bar-lg" aria-hidden="true">
-        <span style={{ width: progress(job) + "%" }} />
-      </div>
 
-      <div className="cr-tabs" role="tablist" aria-label="Crawl views">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "pages"}
-          className={tab === "pages" ? "cr-tab is-on" : "cr-tab"}
-          onClick={function show() {
-            setTab("pages");
-          }}
-        >
-          Workspace
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "console"}
-          className={tab === "console" ? "cr-tab is-on" : "cr-tab"}
-          onClick={function show() {
-            setTab("console");
-          }}
-        >
-          Live log
-        </button>
+        <div className="cr-head-actions">
+          <div className="cr-seg" role="tablist" aria-label="Crawl views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "pages"}
+              className={tab === "pages" ? "is-on" : undefined}
+              onClick={function show() {
+                setTab("pages");
+              }}
+            >
+              Workspace
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "console"}
+              className={tab === "console" ? "is-on" : undefined}
+              onClick={function show() {
+                setTab("console");
+              }}
+            >
+              Live log
+            </button>
+          </div>
+          {cancelToken && active && !job.cancel_requested ? (
+            <button type="button" className="cr-btn cr-btn-ghost" onClick={stop} disabled={stopping}>
+              <Square size={13} aria-hidden="true" />
+              {stopping ? "Stopping…" : "Stop"}
+            </button>
+          ) : null}
+          <a className="cr-btn cr-btn-ghost" href={publicExportUrl(job.id)} download>
+            <Download size={14} aria-hidden="true" />
+            Export all
+          </a>
+        </div>
       </div>
+      {active ? (
+        <div className="cr-bar cr-bar-lg" aria-hidden="true">
+          <span style={{ width: progress(job) + "%" }} />
+        </div>
+      ) : null}
 
       {tab === "pages" ? (
         <Workspace jobId={job.id} live={active} compareWith={compareWith} />

@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import { getUrlDetail } from "@/lib/crawlWorkspace";
 import type { UrlDetail } from "@/lib/crawlWorkspace";
 import { codeClass, isIndexable, text } from "@/components/crawl/format";
@@ -87,6 +87,16 @@ export default function UrlPane({
         <span className="ws-pane-url" title={url}>
           {url}
         </span>
+        <a
+          className="ws-pane-close"
+          href={url}
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="Open this URL in a new tab"
+          title="Open in a new tab"
+        >
+          <ExternalLink size={14} aria-hidden="true" />
+        </a>
         <button type="button" className="ws-pane-close" aria-label="Close URL details" onClick={onClose}>
           <X size={15} aria-hidden="true" />
         </button>

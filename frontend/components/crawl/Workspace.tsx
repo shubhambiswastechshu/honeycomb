@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Download, ExternalLink, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Search, X } from "lucide-react";
 import { getGrid, getWorkspace, gridExportUrl } from "@/lib/crawlWorkspace";
 import type { GridColumn, GridQuery, GridResponse, GridRow, Workspace as WorkspaceData } from "@/lib/crawlWorkspace";
 import type { PublicJob } from "@/lib/crawl";
@@ -383,13 +383,6 @@ export default function Workspace({ jobId, live, compareWith }: WorkspaceProps) 
         ) : (
           <p className="ws-hint">Select a row to see everything the crawler found on that URL.</p>
         )}
-        {selected ? (
-          <p className="ws-open">
-            <a href={selected} target="_blank" rel="noreferrer noopener">
-              Open {pathOf(selected)} <ExternalLink size={12} aria-hidden="true" />
-            </a>
-          </p>
-        ) : null}
       </div>
 
       {sideOpen && data ? (
