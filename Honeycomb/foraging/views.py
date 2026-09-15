@@ -274,9 +274,10 @@ class AgentProgress(WorkerAuthMixin, APIView):
         CrawlJob.objects.filter(pk=job.pk).update(**fields)
         self._append_events(job, body.get('events') or [])
 
-        job.refresh_from_db(fields=['cancel_requested', 'status'])
+        job.refresh_from_db(fields=['cancel_requested', 'pause_requested', 'status'])
         return Response({
             'cancel': job.cancel_requested or job.status == CrawlJob.Status.CANCELLED,
+            'pause': job.pause_requested,
         })
 
     @staticmethod
@@ -492,11 +493,21 @@ class AgentComplete(WorkerAuthMixin, APIView):
         outcome = body.get('status', CrawlJob.Status.DONE)
         if outcome not in dict(CrawlJob.Status.choices):
             outcome = CrawlJob.Status.DONE
+        # A stop that arrived while the worker was pausing wins: the person
+        # asked for the crawl to end, not to be resumable.
+        if outcome == CrawlJob.Status.PAUSED and job.cancel_requested:
+            outcome = CrawlJob.Status.CANCELLED
+        paused = outcome == CrawlJob.Status.PAUSED
 
         counters = body.get('counters') or {}
         CrawlJob.objects.filter(pk=job.pk).update(
             status=outcome,
-            finished_at=timezone.now(),
+            finished_at=None if paused else timezone.now(),
+            pause_requested=False,
+            # A paused job goes back to any worker when resumed; holding the
+            # old claim would make it look busy on this one.
+            worker=None if paused else job.worker,
+            claimed_at=None if paused else job.claimed_at,
             error=str(body.get('error') or '')[:2000],
             pages_crawled=int(counters.get('pages_crawled') or job.pages_crawled),
             pages_queued=int(counters.get('pages_queued') or 0),

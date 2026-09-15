@@ -108,6 +108,9 @@ class CrawlJob(TenantOwnedModel):
         QUEUED = 'queued', 'Queued'
         CLAIMED = 'claimed', 'Claimed'
         RUNNING = 'running', 'Running'
+        # Stopped on request with its crawl database kept on the worker, so it
+        # continues from where it was when resumed. Never claimed while paused.
+        PAUSED = 'paused', 'Paused'
         DONE = 'done', 'Done'
         FAILED = 'failed', 'Failed'
         CANCELLED = 'cancelled', 'Cancelled'
@@ -147,6 +150,9 @@ class CrawlJob(TenantOwnedModel):
     # Requested from the dashboard or an MCP tool; the worker reads it on its
     # next progress post and stops. Nothing here can reach into the worker.
     cancel_requested = models.BooleanField(default=False)
+    # The same handshake for pausing: the worker stops gracefully on its next
+    # progress post and reports the job as paused rather than done.
+    pause_requested = models.BooleanField(default=False)
     error = models.TextField(blank=True)
 
     class Meta:

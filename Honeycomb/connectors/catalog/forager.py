@@ -198,7 +198,8 @@ async def cancel_crawl(conn, db, args):
                .filter(tenant=conn.tenant, pk=job_id).first())
         if job is None:
             return None
-        if job.status == CrawlJob.Status.QUEUED:
+        if job.status in (CrawlJob.Status.QUEUED, CrawlJob.Status.PAUSED):
+            # Nothing is running, so there is no worker to read a flag.
             job.status = CrawlJob.Status.CANCELLED
             job.finished_at = timezone.now()
             job.save(update_fields=['status', 'finished_at'])
@@ -1311,8 +1312,8 @@ CATALOG = {
             'properties': {
                 'limit': {'type': 'integer'},
                 'status': {'type': 'string',
-                           'enum': ['queued', 'claimed', 'running', 'done',
-                                    'failed', 'cancelled']},
+                           'enum': ['queued', 'claimed', 'running', 'paused',
+                                    'done', 'failed', 'cancelled']},
             },
         },
     },

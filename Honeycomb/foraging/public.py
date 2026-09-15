@@ -272,6 +272,7 @@ def _job_payload(job, queue_position=None):
         'rate': round(job.rate, 2),
         'duration_seconds': round(job.duration_seconds, 1),
         'cancel_requested': job.cancel_requested,
+        'pause_requested': job.pause_requested,
         'created_at': job.created_at,
         'started_at': job.started_at,
         'finished_at': job.finished_at,
@@ -550,6 +551,29 @@ class PublicJobExport(PublicView):
         return response
 
 
+def _holds_token(request, job):
+    """Whether the request carries the token handed out when `job` was started."""
+    token = (request.data or {}).get('cancel_token') if isinstance(request.data, dict) else None
+    try:
+        claim = signing.loads(token or '', salt=CANCEL_SALT, max_age=CANCEL_MAX_AGE)
+    except signing.BadSignature:
+        return False
+    return isinstance(claim, dict) and claim.get('job') == job.id
+
+
+def _stop(job):
+    S = CrawlJob.Status
+    if job.status in (S.QUEUED, S.PAUSED):
+        # Nothing is running, so there is no worker to ask.
+        job.status = S.CANCELLED
+        job.finished_at = timezone.now()
+        job.pause_requested = False
+        job.save(update_fields=['status', 'finished_at', 'pause_requested'])
+    elif job.status in ACTIVE:
+        job.cancel_requested = True
+        job.save(update_fields=['cancel_requested'])
+
+
 class PublicJobCancel(PublicView):
     """Stop a public crawl -- only with the token its starter was given."""
 
@@ -561,21 +585,71 @@ class PublicJobCancel(PublicView):
         job = _public_job(self.tenant, job_id)
         if job is None:
             return Response({'detail': 'No such public crawl.'}, status=http.HTTP_404_NOT_FOUND)
-
-        token = (request.data or {}).get('cancel_token') if isinstance(request.data, dict) else None
-        try:
-            claim = signing.loads(token or '', salt=CANCEL_SALT, max_age=CANCEL_MAX_AGE)
-        except signing.BadSignature:
-            claim = None
-        if not isinstance(claim, dict) or claim.get('job') != job.id:
+        if not _holds_token(request, job):
             return Response({'detail': 'Only the browser that started this crawl can stop it.'},
                             status=http.HTTP_403_FORBIDDEN)
-
-        if job.status == CrawlJob.Status.QUEUED:
-            job.status = CrawlJob.Status.CANCELLED
-            job.finished_at = timezone.now()
-            job.save(update_fields=['status', 'finished_at'])
-        elif job.status in ACTIVE:
-            job.cancel_requested = True
-            job.save(update_fields=['cancel_requested'])
+        _stop(job)
         return Response({'job': _job_payload(job)})
+
+
+class PublicJobControl(PublicView):
+    """Stop, pause or resume a public crawl -- only with its starter's token.
+
+    Pausing a running crawl is a request, like stopping: the worker reads it on
+    its next progress post, stops gracefully and keeps the crawl's database, so
+    a resume continues from the pages already fetched. A queued crawl pauses
+    at once. Resuming puts the crawl back in the queue at its original place,
+    and counts against the public limit on crawls running at once.
+    """
+
+    write_scope = 'public_crawl_read'
+    ACTIONS = ('stop', 'pause', 'resume')
+
+    def post(self, request, job_id):
+        if self.tenant is None:
+            return self.disabled()
+        job = _public_job(self.tenant, job_id)
+        if job is None:
+            return Response({'detail': 'No such public crawl.'}, status=http.HTTP_404_NOT_FOUND)
+        action = request.data.get('action') if isinstance(request.data, dict) else None
+        if action not in self.ACTIONS:
+            return Response({'detail': 'Action must be stop, pause or resume.'},
+                            status=http.HTTP_400_BAD_REQUEST)
+        if not _holds_token(request, job):
+            return Response({'detail': 'Only the browser that started this crawl can {0} it.'.format(action)},
+                            status=http.HTTP_403_FORBIDDEN)
+
+        S = CrawlJob.Status
+        if action == 'stop':
+            _stop(job)
+        elif action == 'pause':
+            if job.status == S.QUEUED:
+                job.status = S.PAUSED
+                job.save(update_fields=['status'])
+            elif job.status in (S.CLAIMED, S.RUNNING) and not job.cancel_requested:
+                job.pause_requested = True
+                job.save(update_fields=['pause_requested'])
+            else:
+                return Response({'detail': 'Only a queued or running crawl can be paused.'},
+                                status=http.HTTP_409_CONFLICT)
+        else:  # resume
+            if job.status in ACTIVE and job.pause_requested:
+                # Changed their mind before the worker got the message.
+                job.pause_requested = False
+                job.save(update_fields=['pause_requested'])
+            elif job.status == S.PAUSED:
+                running = CrawlJob.objects.filter(tenant=self.tenant, source=SOURCE, status__in=ACTIVE)
+                if running.count() >= max_active():
+                    return Response({
+                        'detail': '{0} public crawls are already running. Resume this one in a few '
+                                  'minutes.'.format(max_active()),
+                    }, status=http.HTTP_429_TOO_MANY_REQUESTS)
+                job.status = S.QUEUED
+                job.pause_requested = False
+                job.save(update_fields=['status', 'pause_requested'])
+            else:
+                return Response({'detail': 'Only a paused crawl can be resumed.'},
+                                status=http.HTTP_409_CONFLICT)
+
+        job.refresh_from_db()
+        return Response({'job': _job_payload(job, _queue_position(self.tenant, job))})

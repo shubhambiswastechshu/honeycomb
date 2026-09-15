@@ -275,7 +275,7 @@
     el("bar").style.width = known ? (100 * job.pages_crawled / known) + "%" : "0";
 
     const running = ["queued", "claimed", "running"].includes(job.status);
-    el("jdot").className = "dot " + (running ? "live" : job.status === "done" ? "idle" : "bad");
+    el("jdot").className = "dot " + (running ? "live" : ["done", "paused"].includes(job.status) ? "idle" : "bad");
     el("jtext").textContent = job.status + (job.worker_name ? " · " + job.worker_name : "");
     el("stop").disabled = !running;
     el("go").disabled = running;

@@ -19,19 +19,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Loader2, Play, SlidersHorizontal, Square } from "lucide-react";
+import { Download, Loader2, MoreVertical, Pause, Play, SlidersHorizontal, Square } from "lucide-react";
+import CrawlMenu from "@/components/crawl/CrawlMenu";
+import type { MenuAction } from "@/components/crawl/CrawlMenu";
 import Workspace from "@/components/crawl/Workspace";
 import { LogoMark } from "@/components/ui/Logo";
 import {
   CrawlApiError,
-  cancelPublicCrawl,
+  controlPublicCrawl,
   getPublicCrawl,
   isActive,
   listPublicCrawls,
   publicExportUrl,
   startPublicCrawl,
 } from "@/lib/crawl";
-import type { CrawlEventLine, Overview, PublicJob } from "@/lib/crawl";
+import type { CrawlAction, CrawlEventLine, Overview, PublicJob } from "@/lib/crawl";
 
 const PAGE_SIZES = [50, 100, 200, 500];
 /** The select's value for "Whole site"; sent to the server as "all". */
@@ -45,6 +47,7 @@ const STATUS_WORD: Record<string, string> = {
   queued: "Queued",
   claimed: "Starting",
   running: "Crawling",
+  paused: "Paused",
   done: "Finished",
   failed: "Failed",
   cancelled: "Stopped",
@@ -141,6 +144,26 @@ export default function CrawlApp() {
   const [listError, setListError] = useState<string | null>(null);
   const [disabled, setDisabled] = useState(false);
   const [mine, setMine] = useState<Record<string, string>>({});
+  const [menu, setMenu] = useState<{ job: PublicJob; x: number; y: number } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Where focus goes back to when the menu closes: the crawl it was opened on.
+  const menuReturn = useRef<HTMLElement | null>(null);
+
+  const closeMenu = useCallback(function closeMenu() {
+    setMenu(null);
+    menuReturn.current?.focus();
+  }, []);
+
+  useEffect(
+    function hideNotice() {
+      if (!notice) return;
+      const id = window.setTimeout(() => setNotice(null), 5000);
+      return function stop() {
+        window.clearTimeout(id);
+      };
+    },
+    [notice],
+  );
 
   const [url, setUrl] = useState("");
   const [maxPages, setMaxPages] = useState(200);
@@ -201,6 +224,65 @@ export default function CrawlApp() {
     [selectedId, jobs, select],
   );
 
+  function rememberToken(id: number, token: string) {
+    const next = { ...loadMine(), [String(id)]: token };
+    saveMine(next);
+    setMine(next);
+  }
+
+  /** Everything the Crawls menu can do. */
+  async function runAction(job: PublicJob, action: MenuAction) {
+    setMenu(null);
+    const token = mine[String(job.id)];
+    try {
+      if (action === "open") {
+        select(job.id);
+      } else if (action === "pause" || action === "resume" || action === "stop") {
+        if (!token) return;
+        if (
+          action === "stop" &&
+          !window.confirm(
+            "Stop crawling " + hostOf(job.seed_url) + "? Pages already crawled are kept, but the crawl cannot be resumed.",
+          )
+        ) {
+          return;
+        }
+        await controlPublicCrawl(job.id, action, token);
+        setNotice(
+          action === "pause"
+            ? job.status === "queued"
+              ? "Crawl paused. It will not start until you resume it."
+              : "Pausing. The crawler finishes the pages in progress, then stops."
+            : action === "resume"
+              ? "Crawl resumed. It continues from where it stopped."
+              : "Stopping the crawl.",
+        );
+        void refreshList();
+      } else if (action === "again") {
+        const res = await startPublicCrawl(
+          job.seed_url,
+          job.whole_site ? "all" : job.max_pages || 200,
+          job.settings ? { ...job.settings } : undefined,
+        );
+        if (res.cancel_token) rememberToken(res.job.id, res.cancel_token);
+        select(res.job.id);
+        setNotice(
+          res.existing ? "That site is already being crawled, so this is that crawl." : "Crawl started again with the same settings.",
+        );
+        void refreshList();
+      } else if (action === "visit") {
+        window.open(job.seed_url, "_blank", "noopener,noreferrer");
+      } else if (action === "copy") {
+        await navigator.clipboard.writeText(job.seed_url);
+        setNotice("Address copied.");
+      } else if (action === "export") {
+        window.location.href = publicExportUrl(job.id);
+      }
+    } catch (caught) {
+      setNotice(caught instanceof Error ? caught.message : "That did not work. Try again.");
+    }
+  }
+
   async function onStart(event: FormEvent) {
     event.preventDefault();
     if (starting || url.trim() === "") return;
@@ -214,11 +296,7 @@ export default function CrawlApp() {
         ignore_params: ignoreParams,
         render: renderJs,
       });
-      if (res.cancel_token) {
-        const next = { ...loadMine(), [String(res.job.id)]: res.cancel_token };
-        saveMine(next);
-        setMine(next);
-      }
+      if (res.cancel_token) rememberToken(res.job.id, res.cancel_token);
       setUrl("");
       select(res.job.id);
       void refreshList();
@@ -365,6 +443,11 @@ export default function CrawlApp() {
           {startError}
         </p>
       ) : null}
+      {notice ? (
+        <p className="cr-warn cr-strip" role="status">
+          {notice}
+        </p>
+      ) : null}
       {overview && overview.workers_online === 0 ? (
         <p className="cr-warn cr-strip" role="status">
           No crawler machine is online right now. Crawls you start will wait in the queue until one connects.
@@ -390,13 +473,18 @@ export default function CrawlApp() {
             {(jobs || []).map(function row(job) {
               const active = isActive(job.status);
               return (
-                <li key={job.id}>
+                <li key={job.id} className="cr-job-item">
                   <button
                     type="button"
                     className={job.id === selectedId ? "cr-job is-selected" : "cr-job"}
                     aria-current={job.id === selectedId ? "true" : undefined}
                     onClick={function pick() {
                       select(job.id);
+                    }}
+                    onContextMenu={function openMenu(e) {
+                      e.preventDefault();
+                      menuReturn.current = e.currentTarget;
+                      setMenu({ job: job, x: e.clientX, y: e.clientY });
                     }}
                   >
                     <span className={"cr-dot is-" + job.status} aria-hidden="true" />
@@ -407,6 +495,7 @@ export default function CrawlApp() {
                       </span>
                       <span className="cr-job-meta">
                         {STATUS_WORD[job.status] || job.status}
+                        {job.pause_requested && active ? " · pausing" : ""}
                         {job.status === "queued" && typeof job.queue_position === "number"
                           ? " · " + (job.queue_position === 0 ? "next" : job.queue_position + " ahead")
                           : " · " +
@@ -419,6 +508,20 @@ export default function CrawlApp() {
                         </span>
                       ) : null}
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="cr-job-more"
+                    aria-label={"Actions for " + hostOf(job.seed_url)}
+                    aria-haspopup="menu"
+                    aria-expanded={menu !== null && menu.job.id === job.id}
+                    onClick={function openMenu(e) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      menuReturn.current = e.currentTarget;
+                      setMenu({ job: job, x: rect.right - 220, y: rect.bottom + 4 });
+                    }}
+                  >
+                    <MoreVertical size={15} aria-hidden="true" />
                   </button>
                 </li>
               );
@@ -458,6 +561,19 @@ export default function CrawlApp() {
           )}
         </main>
       </div>
+
+      {menu ? (
+        <CrawlMenu
+          job={menu.job}
+          x={menu.x}
+          y={menu.y}
+          canControl={Boolean(mine[String(menu.job.id)])}
+          onAction={function act(action) {
+            void runAction(menu.job, action);
+          }}
+          onClose={closeMenu}
+        />
+      ) : null}
     </div>
   );
 }
@@ -512,6 +628,27 @@ function JobView({
   const since = useRef(0);
 
   const active = job ? isActive(job.status) : true;
+  const paused = job ? job.status === "paused" : false;
+
+  // A pause, resume or stop made from the Crawls menu reaches this view through
+  // the list. Taking it means a paused view starts polling again on resume.
+  useEffect(
+    function takeListChanges() {
+      if (!fromList) return;
+      setJob(function merge(prev) {
+        if (
+          prev &&
+          (prev.status !== fromList.status ||
+            prev.pause_requested !== fromList.pause_requested ||
+            prev.cancel_requested !== fromList.cancel_requested)
+        ) {
+          return { ...prev, ...fromList };
+        }
+        return prev;
+      });
+    },
+    [fromList],
+  );
 
   const refresh = useCallback(
     async function refresh() {
@@ -544,15 +681,18 @@ function JobView({
     [refresh, active],
   );
 
-  async function stop() {
+  async function control(action: CrawlAction) {
     if (!cancelToken || stopping) return;
+    if (action === "stop" && !window.confirm("Stop this crawl? Pages already crawled are kept, but it cannot be resumed.")) {
+      return;
+    }
     setStopping(true);
     try {
-      const data = await cancelPublicCrawl(jobId, cancelToken);
+      const data = await controlPublicCrawl(jobId, action, cancelToken);
       setJob(data.job);
       onChanged();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not stop the crawl.");
+      setError(caught instanceof Error ? caught.message : "That did not work. Try again.");
     } finally {
       setStopping(false);
     }
@@ -576,6 +716,7 @@ function JobView({
             <span className={"cr-dot is-" + job.status} aria-hidden="true" />
             {STATUS_WORD[job.status] || job.status}
             {job.cancel_requested && active ? " · stopping" : ""}
+            {job.pause_requested && active && !job.cancel_requested ? " · pausing" : ""}
             {job.status === "queued" && typeof job.queue_position === "number"
               ? " · " + (job.queue_position === 0 ? "starts next" : job.queue_position + " crawls ahead")
               : ""}
@@ -622,10 +763,37 @@ function JobView({
               Live log
             </button>
           </div>
-          {cancelToken && active && !job.cancel_requested ? (
-            <button type="button" className="cr-btn cr-btn-ghost" onClick={stop} disabled={stopping}>
+          {cancelToken && active && !job.cancel_requested && !job.pause_requested ? (
+            <button
+              type="button"
+              className="cr-btn cr-btn-ghost"
+              onClick={() => void control("pause")}
+              disabled={stopping}
+            >
+              <Pause size={13} aria-hidden="true" />
+              Pause
+            </button>
+          ) : null}
+          {cancelToken && (paused || (active && job.pause_requested)) && !job.cancel_requested ? (
+            <button
+              type="button"
+              className="cr-btn cr-btn-ghost"
+              onClick={() => void control("resume")}
+              disabled={stopping}
+            >
+              <Play size={13} aria-hidden="true" />
+              {paused ? "Resume" : "Keep crawling"}
+            </button>
+          ) : null}
+          {cancelToken && (active || paused) && !job.cancel_requested ? (
+            <button
+              type="button"
+              className="cr-btn cr-btn-ghost"
+              onClick={() => void control("stop")}
+              disabled={stopping}
+            >
               <Square size={13} aria-hidden="true" />
-              {stopping ? "Stopping…" : "Stop"}
+              Stop
             </button>
           ) : null}
           <a className="cr-btn cr-btn-ghost" href={publicExportUrl(job.id)} download>

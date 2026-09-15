@@ -10,7 +10,9 @@ import { API_BASE } from "@/lib/api";
 
 const BASE = API_BASE + "/forager/public";
 
-export type CrawlStatus = "queued" | "claimed" | "running" | "done" | "failed" | "cancelled";
+export type CrawlStatus = "queued" | "claimed" | "running" | "paused" | "done" | "failed" | "cancelled";
+
+export type CrawlAction = "stop" | "pause" | "resume";
 
 export interface PublicJob {
   id: number;
@@ -29,6 +31,8 @@ export interface PublicJob {
   rate: number;
   duration_seconds: number;
   cancel_requested: boolean;
+  /** Pause asked for; the worker has not stopped yet. */
+  pause_requested: boolean;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -170,6 +174,14 @@ export function getPublicPages(
 
 export function cancelPublicCrawl(id: number, token: string): Promise<{ job: PublicJob }> {
   return call("/jobs/" + id + "/cancel/", { method: "POST", body: JSON.stringify({ cancel_token: token }) });
+}
+
+/** Stop, pause or resume. Needs the token this browser got when it started the crawl. */
+export function controlPublicCrawl(id: number, action: CrawlAction, token: string): Promise<{ job: PublicJob }> {
+  return call("/jobs/" + id + "/control/", {
+    method: "POST",
+    body: JSON.stringify({ action: action, cancel_token: token }),
+  });
 }
 
 export function publicExportUrl(id: number): string {
