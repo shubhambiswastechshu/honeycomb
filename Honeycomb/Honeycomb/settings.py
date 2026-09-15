@@ -716,7 +716,7 @@ HONEYCOMB_OAUTH_AUTO_APPROVE = _env_flag('HONEYCOMB_OAUTH_AUTO_APPROVE', 'True')
 # workers should run them. The other three are its hard limits.
 HONEYCOMB_PUBLIC_CRAWL_TENANT = os.environ.get('HONEYCOMB_PUBLIC_CRAWL_TENANT', '').strip()
 HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES', '500'))
-HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE', '3'))
+HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE', '6'))
 HONEYCOMB_PUBLIC_CRAWL_DAILY = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_DAILY', '100'))
 # Ceiling for a "whole site" crawl. No login and one worker: without a ceiling,
 # a single request could hold the crawler for days on a very large site.

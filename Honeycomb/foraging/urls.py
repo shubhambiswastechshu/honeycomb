@@ -42,6 +42,8 @@ urlpatterns = [
          name='public-job-cancel'),
     path('public/jobs/<int:job_id>/control/', public.PublicJobControl.as_view(),
          name='public-job-control'),
+    path('public/jobs/<int:job_id>/delete/', public.PublicJobDelete.as_view(),
+         name='public-job-delete'),
 
     # The crawler workspace: tabs, filters, issues, URL details, reports,
     # sitemap and comparison. Same scope and limits as the routes above.

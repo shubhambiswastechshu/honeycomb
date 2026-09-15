@@ -11,11 +11,22 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { Copy, Download, ExternalLink, FolderOpen, Pause, Play, RotateCw, Square } from "lucide-react";
+import { Copy, Download, ExternalLink, FolderOpen, Pause, Pin, PinOff, Play, RotateCw, Square, Trash2 } from "lucide-react";
 import { isActive } from "@/lib/crawl";
 import type { PublicJob } from "@/lib/crawl";
 
-export type MenuAction = "open" | "pause" | "resume" | "stop" | "again" | "visit" | "copy" | "export";
+export type MenuAction =
+  | "open"
+  | "pin"
+  | "unpin"
+  | "pause"
+  | "resume"
+  | "stop"
+  | "again"
+  | "visit"
+  | "copy"
+  | "export"
+  | "delete";
 
 interface Item {
   action: MenuAction;
@@ -30,6 +41,7 @@ export default function CrawlMenu({
   x,
   y,
   canControl,
+  pinned,
   onAction,
   onClose,
 }: {
@@ -37,6 +49,7 @@ export default function CrawlMenu({
   x: number;
   y: number;
   canControl: boolean;
+  pinned: boolean;
   onAction: (action: MenuAction) => void;
   onClose: () => void;
 }) {
@@ -60,15 +73,29 @@ export default function CrawlMenu({
     }
   }
 
-  const opening: Item[] = [{ action: "open", label: "Open crawl", icon: <FolderOpen size={14} /> }];
+  const opening: Item[] = [
+    { action: "open", label: "Open crawl", icon: <FolderOpen size={14} /> },
+    pinned
+      ? { action: "unpin", label: "Unpin", icon: <PinOff size={14} /> }
+      : { action: "pin", label: "Pin to top", icon: <Pin size={14} /> },
+  ];
+  // A worker is still crawling: deleting now would orphan that work.
+  const busy = job.status === "claimed" || job.status === "running";
+  const removal: Item[] = [
+    { action: "delete", label: "Delete crawl…", icon: <Trash2 size={14} />, disabled: locked || busy, danger: true },
+  ];
   const everyone: Item[] = [
     { action: "again", label: "Crawl again", icon: <RotateCw size={14} /> },
     { action: "visit", label: "Open website", icon: <ExternalLink size={14} /> },
     { action: "copy", label: "Copy address", icon: <Copy size={14} /> },
     { action: "export", label: "Export CSV", icon: <Download size={14} /> },
   ];
-  const groups: Item[][] = [opening, controls, everyone].filter((g) => g.length > 0);
-  const showLockNote = locked && groups.some((g) => g.some((i) => i.action === "pause" || i.action === "resume" || i.action === "stop"));
+  const groups: Item[][] = [opening, controls, everyone, removal].filter((g) => g.length > 0);
+  const note = locked
+    ? "Only the browser that started this crawl can pause, stop or delete it."
+    : busy
+      ? "Stop the crawl before deleting it."
+      : "";
 
   // Keep the whole menu on screen, however near an edge the click was.
   useLayoutEffect(
@@ -164,9 +191,7 @@ export default function CrawlMenu({
           </div>
         );
       })}
-      {showLockNote ? (
-        <p className="cr-menu-note">Only the browser that started this crawl can pause or stop it.</p>
-      ) : null}
+      {note ? <p className="cr-menu-note">{note}</p> : null}
     </div>
   );
 }

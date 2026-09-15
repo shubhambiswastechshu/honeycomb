@@ -33,6 +33,8 @@ from .serializers import CrawlJobSerializer, CrawlPageSerializer, WorkerSerializ
 MAX_EVENTS_PER_POST = 500
 MAX_PAGES_PER_POST = 1000
 MAX_LINKS_PER_POST = 5000
+# A ceiling on what a worker may claim to handle at once, whatever it says.
+MAX_JOBS_PER_WORKER = 10
 MAX_HEADERS_PER_PAGE = 40
 
 # A page's JSON columns are worker-supplied, and a worker that sends a string
@@ -165,7 +167,13 @@ class AgentPoll(WorkerAuthMixin, APIView):
         )
         worker.refresh_from_db()
 
-        if worker.paused or int(body.get('active_jobs') or 0) > 0:
+        # How many jobs this worker runs side by side. Workers that predate the
+        # field send nothing and keep the one-at-a-time behaviour they had.
+        try:
+            capacity = max(1, min(MAX_JOBS_PER_WORKER, int(body.get('max_jobs') or 1)))
+        except (TypeError, ValueError):
+            capacity = 1
+        if worker.paused or int(body.get('active_jobs') or 0) >= capacity:
             return Response({'job': None, 'paused': worker.paused})
 
         job = self._claim(worker)

@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Loader2, MoreVertical, Pause, Play, SlidersHorizontal, Square } from "lucide-react";
+import { Download, Loader2, MoreVertical, Pause, Pin, Play, SlidersHorizontal, Square } from "lucide-react";
 import CrawlMenu from "@/components/crawl/CrawlMenu";
 import type { MenuAction } from "@/components/crawl/CrawlMenu";
 import Workspace from "@/components/crawl/Workspace";
@@ -27,6 +27,7 @@ import { LogoMark } from "@/components/ui/Logo";
 import {
   CrawlApiError,
   controlPublicCrawl,
+  deletePublicCrawl,
   getPublicCrawl,
   isActive,
   listPublicCrawls,
@@ -41,6 +42,7 @@ const WHOLE_SITE = 0;
 
 const MAX_LOG = 300;
 const STORE_KEY = "honeycomb.crawl.mine";
+const PIN_KEY = "honeycomb.crawl.pinned";
 
 
 const STATUS_WORD: Record<string, string> = {
@@ -131,6 +133,24 @@ function saveMine(mine: Record<string, string>): void {
   }
 }
 
+/** Crawls pinned in this browser, most recently pinned first. */
+function loadPins(): number[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PIN_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((n) => Number.isInteger(n)).slice(0, 50) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePins(pins: number[]): void {
+  try {
+    window.localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+  } catch {
+    /* storage blocked: pins last until the page is reloaded */
+  }
+}
+
 /* ------------------------------------------------------------------- app */
 
 export default function CrawlApp() {
@@ -144,6 +164,21 @@ export default function CrawlApp() {
   const [listError, setListError] = useState<string | null>(null);
   const [disabled, setDisabled] = useState(false);
   const [mine, setMine] = useState<Record<string, string>>({});
+  const [pins, setPins] = useState<number[]>([]);
+  // Read by the list poll without restarting its timer on every pin change.
+  const pinsRef = useRef<number[]>([]);
+
+  /** Pinned crawls first, in pin order, then everything else as the server sent it. */
+  const ordered = useMemo(
+    function order() {
+      const list = jobs || [];
+      const pinnedJobs = pins
+        .map((id) => list.find((j) => j.id === id))
+        .filter((j): j is PublicJob => j !== undefined);
+      return pinnedJobs.concat(list.filter((j) => !pins.includes(j.id)));
+    },
+    [jobs, pins],
+  );
   const [menu, setMenu] = useState<{ job: PublicJob; x: number; y: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Where focus goes back to when the menu closes: the crawl it was opened on.
@@ -181,7 +216,16 @@ export default function CrawlApp() {
 
   useEffect(function readMine() {
     setMine(loadMine());
+    const stored = loadPins();
+    pinsRef.current = stored;
+    setPins(stored);
   }, []);
+
+  function updatePins(next: number[]) {
+    pinsRef.current = next;
+    savePins(next);
+    setPins(next);
+  }
 
   const select = useCallback(
     function select(id: number | null) {
@@ -192,7 +236,7 @@ export default function CrawlApp() {
 
   const refreshList = useCallback(async function refreshList() {
     try {
-      const data = await listPublicCrawls();
+      const data = await listPublicCrawls(pinsRef.current);
       setOverview(data.overview);
       setJobs(data.jobs);
       setListError(null);
@@ -219,9 +263,9 @@ export default function CrawlApp() {
   // Open the top crawl straight away rather than showing an empty panel.
   useEffect(
     function openLatest() {
-      if (selectedId === null && jobs && jobs.length > 0) select(jobs[0].id);
+      if (selectedId === null && ordered.length > 0) select(ordered[0].id);
     },
-    [selectedId, jobs, select],
+    [selectedId, ordered, select],
   );
 
   function rememberToken(id: number, token: string) {
@@ -237,6 +281,30 @@ export default function CrawlApp() {
     try {
       if (action === "open") {
         select(job.id);
+      } else if (action === "pin" || action === "unpin") {
+        const rest = pins.filter((id) => id !== job.id);
+        updatePins(action === "pin" ? [job.id, ...rest].slice(0, 50) : rest);
+        setNotice(action === "pin" ? "Pinned to the top of your list." : "Unpinned.");
+        if (action === "pin") void refreshList();
+      } else if (action === "delete") {
+        if (!token) return;
+        if (
+          !window.confirm(
+            "Delete the crawl of " + hostOf(job.seed_url) + " and everything it found? This cannot be undone.",
+          )
+        ) {
+          return;
+        }
+        await deletePublicCrawl(job.id, token);
+        const nextMine = { ...loadMine() };
+        delete nextMine[String(job.id)];
+        saveMine(nextMine);
+        setMine(nextMine);
+        updatePins(pins.filter((id) => id !== job.id));
+        setJobs((prev) => (prev ? prev.filter((j) => j.id !== job.id) : prev));
+        if (selectedId === job.id) select(null);
+        setNotice("Crawl deleted.");
+        void refreshList();
       } else if (action === "pause" || action === "resume" || action === "stop") {
         if (!token) return;
         if (
@@ -470,7 +538,7 @@ export default function CrawlApp() {
             <p className="cr-muted cr-pad">No crawls yet. Start one above.</p>
           ) : null}
           <ul className="cr-queue-list">
-            {(jobs || []).map(function row(job) {
+            {ordered.map(function row(job) {
               const active = isActive(job.status);
               return (
                 <li key={job.id} className="cr-job-item">
@@ -490,7 +558,10 @@ export default function CrawlApp() {
                     <span className={"cr-dot is-" + job.status} aria-hidden="true" />
                     <span className="cr-job-main">
                       <span className="cr-job-host">
-                        {hostOf(job.seed_url)}
+                        {pins.includes(job.id) ? (
+                          <Pin size={12} className="cr-pin" aria-label="Pinned" />
+                        ) : null}
+                        <span className="cr-job-name">{hostOf(job.seed_url)}</span>
                         {mine[String(job.id)] ? <span className="cr-mine">yours</span> : null}
                       </span>
                       <span className="cr-job-meta">
@@ -568,6 +639,7 @@ export default function CrawlApp() {
           x={menu.x}
           y={menu.y}
           canControl={Boolean(mine[String(menu.job.id)])}
+          pinned={pins.includes(menu.job.id)}
           onAction={function act(action) {
             void runAction(menu.job, action);
           }}

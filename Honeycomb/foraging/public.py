@@ -37,6 +37,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
 from django.core import signing
+from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status as http
@@ -46,7 +47,10 @@ from rest_framework.views import APIView
 
 from accounts.models import Tenant
 
-from .models import CrawlEvent, CrawlJob, CrawlPage, Worker
+from .models import CrawlEvent, CrawlJob, CrawlLink, CrawlPage, Worker
+
+#: How many pinned crawls a browser may ask to have included in the list.
+MAX_PINNED = 50
 
 SOURCE = 'public'
 CANCEL_SALT = 'foraging.public.cancel'
@@ -341,7 +345,17 @@ class PublicJobs(PublicView):
     def get(self, request):
         if self.tenant is None:
             return self.disabled()
-        rows = CrawlJob.objects.filter(tenant=self.tenant, source=SOURCE)[:30]
+        rows = list(CrawlJob.objects.filter(tenant=self.tenant, source=SOURCE)[:30])
+        # Pins live in the visitor's browser, so the page names them here. A
+        # pinned crawl older than the recent thirty would otherwise vanish.
+        pinned = []
+        for part in (request.GET.get('pinned') or '').split(',')[:MAX_PINNED]:
+            if part.strip().isdigit():
+                pinned.append(int(part))
+        shown = {job.id for job in rows}
+        missing = [pk for pk in pinned if pk not in shown]
+        if missing:
+            rows.extend(CrawlJob.objects.filter(tenant=self.tenant, source=SOURCE, pk__in=missing))
         return Response({
             'overview': _overview(self.tenant),
             'jobs': [_job_payload(job, _queue_position(self.tenant, job)) for job in rows],
@@ -590,6 +604,40 @@ class PublicJobCancel(PublicView):
                             status=http.HTTP_403_FORBIDDEN)
         _stop(job)
         return Response({'job': _job_payload(job)})
+
+
+class PublicJobDelete(PublicView):
+    """Delete a public crawl and everything it found -- only with its starter's token.
+
+    A crawl a worker is still running is refused: deleting it would leave the
+    worker crawling a site for a job that no longer exists. Stop it first.
+
+    The rows go in one DELETE per table rather than through the ORM's cascade,
+    which loads every related row into memory first -- on a whole-site crawl
+    that is hundreds of thousands of links in the web process.
+    """
+
+    write_scope = 'public_crawl_read'
+
+    def post(self, request, job_id):
+        if self.tenant is None:
+            return self.disabled()
+        job = _public_job(self.tenant, job_id)
+        if job is None:
+            return Response({'detail': 'No such public crawl.'}, status=http.HTTP_404_NOT_FOUND)
+        if not _holds_token(request, job):
+            return Response({'detail': 'Only the browser that started this crawl can delete it.'},
+                            status=http.HTTP_403_FORBIDDEN)
+        if job.status in (CrawlJob.Status.CLAIMED, CrawlJob.Status.RUNNING):
+            return Response({'detail': 'This crawl is still running. Stop it, then delete it.'},
+                            status=http.HTTP_409_CONFLICT)
+
+        with transaction.atomic():
+            CrawlLink.objects.filter(job=job).delete()
+            CrawlPage.objects.filter(job=job).delete()
+            CrawlEvent.objects.filter(job=job).delete()
+            job.delete()
+        return Response({'deleted': job_id})
 
 
 class PublicJobControl(PublicView):

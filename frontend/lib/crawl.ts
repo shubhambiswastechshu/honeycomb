@@ -136,8 +136,14 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function listPublicCrawls(): Promise<{ overview: Overview; jobs: PublicJob[] }> {
-  return call("/jobs/");
+/** Recent crawls, plus any pinned in this browser that are no longer recent. */
+export function listPublicCrawls(pinned: number[] = []): Promise<{ overview: Overview; jobs: PublicJob[] }> {
+  return call("/jobs/" + (pinned.length ? "?pinned=" + pinned.join(",") : ""));
+}
+
+/** Delete a crawl and its results. Needs this browser's token; refused while it runs. */
+export function deletePublicCrawl(id: number, token: string): Promise<{ deleted: number }> {
+  return call("/jobs/" + id + "/delete/", { method: "POST", body: JSON.stringify({ cancel_token: token }) });
 }
 
 /** "all" asks for the whole site, up to the server's safety ceiling. */
