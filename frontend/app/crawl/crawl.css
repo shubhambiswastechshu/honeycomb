@@ -780,7 +780,7 @@ button.ins-row:hover { background: rgba(234, 157, 62, 0.08); }
   border-bottom: 1px solid var(--border);
   background: var(--cr-surface);
 }
-.cr-set-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.cr-set-field { display: grid; gap: 4px; align-content: start; font-size: 12px; color: var(--muted); }
 .cr-set-field textarea,
 .cr-set-field select {
   width: 100%;
