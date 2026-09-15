@@ -19,42 +19,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Loader2, Play, Search, Square } from "lucide-react";
+import { Download, Loader2, Play, Square } from "lucide-react";
+import Workspace from "@/components/crawl/Workspace";
 import { LogoMark } from "@/components/ui/Logo";
 import {
   CrawlApiError,
   cancelPublicCrawl,
   getPublicCrawl,
-  getPublicPages,
   isActive,
   listPublicCrawls,
   publicExportUrl,
   startPublicCrawl,
 } from "@/lib/crawl";
-import type {
-  CrawlEventLine,
-  Overview,
-  PageBucket,
-  PagesResponse,
-  PublicJob,
-} from "@/lib/crawl";
+import type { CrawlEventLine, Overview, PublicJob } from "@/lib/crawl";
 
 const PAGE_SIZES = [50, 100, 200, 500];
 /** The select's value for "Whole site"; sent to the server as "all". */
 const WHOLE_SITE = 0;
-const ROWS_PER_LOAD = 100;
+
 const MAX_LOG = 300;
 const STORE_KEY = "honeycomb.crawl.mine";
 
-const BUCKETS: { key: PageBucket; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "2xx", label: "2xx" },
-  { key: "3xx", label: "3xx" },
-  { key: "4xx", label: "4xx" },
-  { key: "5xx", label: "5xx" },
-  { key: "errors", label: "No response" },
-  { key: "noindex", label: "Non-indexable" },
-];
 
 const STATUS_WORD: Record<string, string> = {
   queued: "Queued",
@@ -75,14 +60,6 @@ function hostOf(url: string): string {
   }
 }
 
-function pathOf(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.pathname + u.search;
-  } catch {
-    return url;
-  }
-}
 
 function num(n: number | null | undefined): string {
   return typeof n === "number" ? n.toLocaleString("en-GB") : "—";
@@ -100,9 +77,6 @@ function clock(seconds: number): string {
   return m + ":" + String(s % 60).padStart(2, "0");
 }
 
-function isIndexable(value: string): boolean {
-  return value.toLowerCase() === "indexable";
-}
 
 function codeClass(code: number | null): string {
   if (code === null) return "cr-code is-none";
@@ -384,6 +358,14 @@ export default function CrawlApp() {
               fromList={selected}
               cancelToken={mine[String(selectedId)] || null}
               onChanged={refreshList}
+              compareWith={(jobs || []).filter(function sameSite(j) {
+                return (
+                  j.id !== selectedId &&
+                  j.status === "done" &&
+                  selected !== undefined &&
+                  hostOf(j.seed_url) === hostOf(selected.seed_url)
+                );
+              })}
             />
           )}
         </main>
@@ -425,11 +407,13 @@ function JobView({
   fromList,
   cancelToken,
   onChanged,
+  compareWith,
 }: {
   jobId: number;
   fromList: PublicJob | undefined;
   cancelToken: string | null;
   onChanged: () => void;
+  compareWith: PublicJob[];
 }) {
   const [job, setJob] = useState<PublicJob | null>(fromList || null);
   const [error, setError] = useState<string | null>(null);
@@ -547,7 +531,7 @@ function JobView({
             setTab("pages");
           }}
         >
-          Pages
+          Workspace
         </button>
         <button
           type="button"
@@ -562,7 +546,11 @@ function JobView({
         </button>
       </div>
 
-      {tab === "pages" ? <PagesGrid jobId={job.id} live={active} /> : <Console lines={log} live={active} />}
+      {tab === "pages" ? (
+        <Workspace jobId={job.id} live={active} compareWith={compareWith} />
+      ) : (
+        <Console lines={log} live={active} />
+      )}
     </div>
   );
 }
@@ -572,163 +560,6 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ba
     <div className={tone === "bad" ? "cr-stat is-bad" : "cr-stat"}>
       <dt>{label}</dt>
       <dd>{value}</dd>
-    </div>
-  );
-}
-
-/* ----------------------------------------------------------- pages grid */
-
-function PagesGrid({ jobId, live }: { jobId: number; live: boolean }) {
-  const [bucket, setBucket] = useState<PageBucket>("all");
-  const [query, setQuery] = useState("");
-  const [shown, setShown] = useState(ROWS_PER_LOAD);
-  const [data, setData] = useState<PagesResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(
-    async function load() {
-      try {
-        setData(await getPublicPages(jobId, { status: bucket, q: query, offset: 0, limit: shown }));
-        setError(null);
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Could not load pages.");
-      }
-    },
-    [jobId, bucket, query, shown],
-  );
-
-  useEffect(
-    function poll() {
-      // A short debounce so typing a filter is one request, not one per key.
-      const first = window.setTimeout(load, 250);
-      const id = live ? window.setInterval(load, 5000) : undefined;
-      return function stop() {
-        window.clearTimeout(first);
-        if (id !== undefined) window.clearInterval(id);
-      };
-    },
-    [load, live],
-  );
-
-  return (
-    <div className="cr-grid">
-      <div className="cr-grid-bar">
-        <div className="cr-chips" role="group" aria-label="Filter by status">
-          {BUCKETS.map(function chip(b) {
-            const count = data ? data.counts[b.key] : null;
-            return (
-              <button
-                key={b.key}
-                type="button"
-                aria-pressed={bucket === b.key}
-                className={bucket === b.key ? "cr-chip is-on" : "cr-chip"}
-                onClick={function pick() {
-                  setBucket(b.key);
-                  setShown(ROWS_PER_LOAD);
-                }}
-              >
-                {b.label}
-                <span className="cr-chip-n">{count === null ? "" : num(count)}</span>
-              </button>
-            );
-          })}
-        </div>
-        <label className="cr-filter">
-          <Search size={14} aria-hidden="true" />
-          <span className="cr-sr">Filter pages by address</span>
-          <input
-            type="search"
-            placeholder="Filter by URL"
-            value={query}
-            onChange={function onChange(e) {
-              setQuery(e.target.value);
-              setShown(ROWS_PER_LOAD);
-            }}
-          />
-        </label>
-      </div>
-
-      {error ? <p className="cr-error cr-pad">{error}</p> : null}
-
-      <div className="cr-table-wrap">
-        <table className="cr-table">
-          <thead>
-            <tr>
-              <th scope="col">Address</th>
-              <th scope="col" className="is-num">Status</th>
-              <th scope="col">Title</th>
-              <th scope="col" className="is-num">Words</th>
-              <th scope="col">Indexability</th>
-              <th scope="col" className="is-num">Time</th>
-              <th scope="col" className="is-num">Inlinks</th>
-              <th scope="col" className="is-num">Depth</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data === null && !error ? (
-              <tr>
-                <td colSpan={8} className="cr-table-empty">
-                  Loading pages…
-                </td>
-              </tr>
-            ) : null}
-            {data && data.results.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="cr-table-empty">
-                  {live ? "No pages here yet. They appear as the crawler finds them." : "No pages match."}
-                </td>
-              </tr>
-            ) : null}
-            {(data ? data.results : []).map(function row(p) {
-              return (
-                <tr key={p.url}>
-                  <td className="cr-cell-url" title={p.url}>
-                    <a href={p.url} target="_blank" rel="noreferrer noopener">
-                      {pathOf(p.url)}
-                    </a>
-                  </td>
-                  <td className="is-num">
-                    <span className={codeClass(p.status_code)}>{p.status_code ?? "—"}</span>
-                  </td>
-                  <td className="cr-cell-title" title={p.title}>
-                    {p.title || <span className="cr-muted">—</span>}
-                  </td>
-                  <td className="is-num">{p.word_count ? num(p.word_count) : "—"}</td>
-                  <td>
-                    <span className={isIndexable(p.indexability) ? "cr-idx is-yes" : "cr-idx"}>
-                      {isIndexable(p.indexability)
-                        ? "Indexable"
-                        : p.indexability_status || p.indexability || "—"}
-                    </span>
-                  </td>
-                  <td className="is-num">{p.response_time_ms === null ? "—" : num(p.response_time_ms) + " ms"}</td>
-                  <td className="is-num">{num(p.inlinks)}</td>
-                  <td className="is-num">{num(p.depth)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {data && data.total > data.results.length ? (
-        <div className="cr-more">
-          <span className="cr-muted">
-            Showing {num(data.results.length)} of {num(data.total)}
-          </span>
-          <button
-            type="button"
-            className="cr-btn cr-btn-ghost"
-            onClick={function more() {
-              setShown(function next(n) {
-                return n + ROWS_PER_LOAD;
-              });
-            }}
-          >
-            Load more
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

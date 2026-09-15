@@ -6,7 +6,7 @@ split by path so the difference is obvious at a glance in the router.
 """
 from django.urls import path
 
-from . import public, views
+from . import public, public_workspace, views
 
 app_name = 'foraging'
 
@@ -38,6 +38,25 @@ urlpatterns = [
          name='public-job-export'),
     path('public/jobs/<int:job_id>/cancel/', public.PublicJobCancel.as_view(),
          name='public-job-cancel'),
+
+    # The crawler workspace: tabs, filters, issues, URL details, reports,
+    # sitemap and comparison. Same scope and limits as the routes above.
+    path('public/jobs/<int:job_id>/workspace/', public_workspace.PublicWorkspace.as_view(),
+         name='public-job-workspace'),
+    path('public/jobs/<int:job_id>/grid/', public_workspace.PublicGrid.as_view(),
+         name='public-job-grid'),
+    path('public/jobs/<int:job_id>/grid.csv', public_workspace.PublicGridExport.as_view(),
+         name='public-job-grid-export'),
+    path('public/jobs/<int:job_id>/url/', public_workspace.PublicUrlDetail.as_view(),
+         name='public-job-url'),
+    path('public/jobs/<int:job_id>/reports/', public_workspace.PublicReports.as_view(),
+         name='public-job-reports'),
+    path('public/jobs/<int:job_id>/reports/<slug:name>/', public_workspace.PublicReport.as_view(),
+         name='public-job-report'),
+    path('public/jobs/<int:job_id>/sitemap.xml', public_workspace.PublicSitemap.as_view(),
+         name='public-job-sitemap'),
+    path('public/jobs/<int:job_id>/compare/', public_workspace.PublicCompare.as_view(),
+         name='public-job-compare'),
 ]
 
 # The console page is a plain server-rendered route, not under /api/. It is
