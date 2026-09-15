@@ -53,13 +53,13 @@ import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
 import McpKeyPanel from "@/components/dashboard/McpKeyPanel";
 import LiveData from "@/components/dashboard/LiveData";
+import ToolSwitches from "@/components/dashboard/ToolSwitches";
 import {
   deleteConnection,
   getConnector,
   listConnectionActivity,
   listConnectionTools,
   listConnections,
-  toggleConnectionTool,
 } from "@/lib/api";
 import type {
   ActivityRow,
@@ -902,6 +902,10 @@ function LiveDataTab({ connection }: { connection: Connection }) {
   );
 }
 
+/**
+ * Grouped, searchable switches for every tool, with bulk switches per group.
+ * Keyed by connection so switching instances starts from that one's own state.
+ */
 function ToolsTab({
   connector,
   connection,
@@ -909,144 +913,12 @@ function ToolsTab({
   connector: ConnectorDetail;
   connection: Connection | null;
 }) {
-  const [tools, setTools] = useState<ConnectorTool[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const aliveRef = useRef<boolean>(true);
-  useEffect(function trackMounted() {
-    aliveRef.current = true;
-    return function unmount() {
-      aliveRef.current = false;
-    };
-  }, []);
-
-  const connectionId = connection !== null ? connection.id : null;
-
-  useEffect(
-    function loadTools() {
-      if (connectionId === null) {
-        setTools(null);
-        setError(null);
-        return;
-      }
-      let alive = true;
-      setTools(null);
-      setError(null);
-      listConnectionTools(connectionId)
-        .then(function apply(rows: ConnectorTool[]) {
-          if (alive) {
-            setTools(rows);
-          }
-        })
-        .catch(function fail(caught: unknown) {
-          if (alive) {
-            setError(messageOf(caught, "The tool list could not be loaded."));
-          }
-        });
-      return function stop() {
-        alive = false;
-      };
-    },
-    [connectionId]
-  );
-
-  function toggle(tool: ConnectorTool): void {
-    if (connectionId === null || busy !== null) {
-      return;
-    }
-    const next = tool.enabled === false;
-    setBusy(tool.name);
-    setError(null);
-    void toggleConnectionTool(connectionId, tool.name, next)
-      .then(function apply(rows: ConnectorTool[]) {
-        if (aliveRef.current) {
-          setTools(rows);
-        }
-      })
-      .catch(function fail(caught: unknown) {
-        if (aliveRef.current) {
-          setError(messageOf(caught, "That tool could not be changed."));
-        }
-      })
-      .then(function settle() {
-        if (aliveRef.current) {
-          setBusy(null);
-        }
-      });
-  }
-
-  const catalog = connection === null ? connector.tools : tools;
-
   return (
-    <div className="acct-stack">
-      {connection === null ? (
-        <p className="conn-note">
-          This is what {connector.label} can do. Connect it to choose which of
-          these tools Claude is allowed to call.
-        </p>
-      ) : null}
-
-      {error !== null ? (
-        <p className="error acct-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {catalog === null && error === null ? (
-        <p className="conn-loading">Loading tools…</p>
-      ) : null}
-
-      {catalog !== null && catalog.length === 0 ? (
-        <EmptyState
-          icon={Wrench}
-          title="No tools"
-          description="This connector publishes no tools yet."
-        />
-      ) : null}
-
-      {catalog !== null && catalog.length > 0 ? (
-        <ul className="conn-list conn-list-framed">
-          {catalog.map(function renderTool(tool: ConnectorTool) {
-            const enabled = tool.enabled !== false;
-            return (
-              <li className="conn-row conn-tool" key={tool.name}>
-                <div className="conn-row-body">
-                  <p className="conn-row-title">
-                    <code className="conn-tool-name">{tool.name}</code>
-                    {tool.write ? (
-                      <span className="conn-badge conn-badge-write">
-                        Writes data
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="conn-row-meta">{tool.description}</p>
-                </div>
-                <div className="conn-row-actions">
-                  {connection === null ? null : (
-                    <button
-                      type="button"
-                      className="conn-switch"
-                      role="switch"
-                      aria-checked={enabled}
-                      aria-label={
-                        (enabled ? "Disable " : "Enable ") + tool.name
-                      }
-                      disabled={busy !== null}
-                      onClick={function onToggle() {
-                        toggle(tool);
-                      }}
-                    >
-                      <span className="conn-switch-knob" aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
+    <ToolSwitches
+      key={connection !== null ? connection.id : "catalog"}
+      connector={connector}
+      connection={connection}
+    />
   );
 }
 

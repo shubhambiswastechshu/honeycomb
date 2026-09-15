@@ -642,6 +642,10 @@ export interface ConnectorTool {
   required?: string[];
   /** Every argument it accepts, so a form can label and describe the fields. */
   params?: Record<string, { type: string; description: string }>;
+  /** Section the connector files this tool under, e.g. "Instagram". Empty when it sets none. */
+  group?: string;
+  /** Provider permission the tool needs, e.g. "read_insights". Empty when it declares none. */
+  permission?: string;
 }
 
 /** A connector plus its full tool list, from GET /connectors/<slug>/. */
@@ -829,6 +833,23 @@ export function toggleConnectionTool(
   return request<ConnectorTool[]>("/connections/" + id + "/tools/", {
     method: "POST",
     body: { tool: tool, enabled: enabled },
+    authenticated: true,
+  });
+}
+
+/**
+ * Enable or disable several tools on one connection in a single request --
+ * a whole group's switch, or "turn on everything shown". Same answer as
+ * toggleConnectionTool: the whole refreshed list.
+ */
+export function toggleConnectionTools(
+  id: number,
+  tools: string[],
+  enabled: boolean
+): Promise<ConnectorTool[]> {
+  return request<ConnectorTool[]>("/connections/" + id + "/tools/", {
+    method: "POST",
+    body: { tools: tools, enabled: enabled },
     authenticated: true,
   });
 }

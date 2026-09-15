@@ -153,11 +153,11 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
                 data=request.data, context={'connection': connection, 'request': request}
             )
             serializer.is_valid(raise_exception=True)
-            tool = serializer.validated_data['tool']
+            names = serializer.validated_data['tools']
             enabled = serializer.validated_data['enabled']
-            disabled = [name for name in (connection.disabled_tools or []) if name != tool]
+            disabled = [name for name in (connection.disabled_tools or []) if name not in names]
             if not enabled:
-                disabled.append(tool)
+                disabled.extend(names)
             connection.disabled_tools = disabled
             connection.save(update_fields=['disabled_tools', 'updated_at'])
         return Response(self._tool_rows(connection), status=status.HTTP_200_OK)

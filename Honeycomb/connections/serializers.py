@@ -39,6 +39,11 @@ def catalog_tools(connector) -> list:
             'name': name,
             'description': entry.get('description') or '',
             'write': bool(entry.get('write', False)),
+            # Optional layout hints a connector may set: the dashboard groups its
+            # switches by `group` and shows `permission` as what the provider
+            # must have granted for the tool to work.
+            'group': str(entry.get('group') or ''),
+            'permission': str(entry.get('permission') or ''),
             # Carried so the dashboard can tell a tool it can run on sight from
             # one that needs an argument first. Only the two fields a form
             # needs, not the whole JSON Schema -- the MCP plane already serves
@@ -217,6 +222,11 @@ class ConnectionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         creds = validated_data.pop('creds', None)
         connection = Connection(**validated_data)
+        connector = registry.get(connection.connector)
+        if connector is not None and not connection.disabled_tools:
+            # The same rule the OAuth callback applies: tools that change data
+            # start switched off, and a person turns each one on deliberately.
+            connection.disabled_tools = list(getattr(connector, 'write_tools', ()) or ())
         connection.set_creds(creds or {})
         connection.save()
         return connection
@@ -277,25 +287,39 @@ class ToolRunSerializer(serializers.Serializer):
 class ToolToggleSerializer(serializers.Serializer):
     """Body of POST /api/connections/<id>/tools/.
 
+    Either {tool, enabled} for one switch, or {tools: [...], enabled} to flip a
+    whole group at once -- one request and one write, rather than a burst of
+    single toggles racing each other on the same JSON column. validated_data
+    always carries `tools` as a de-duplicated list.
+
     Needs `connection` in the serializer context: a tool name is only valid
     against the catalog of the connector that connection belongs to.
     """
 
-    tool = serializers.CharField(max_length=64)
+    tool = serializers.CharField(max_length=64, required=False)
+    tools = serializers.ListField(
+        child=serializers.CharField(max_length=64), required=False,
+        allow_empty=False, max_length=500,
+    )
     enabled = serializers.BooleanField()
 
-    def validate_tool(self, value):
+    def validate(self, attrs):
+        names = list(attrs.get('tools') or [])
+        if attrs.get('tool'):
+            names.append(attrs['tool'])
+        if not names:
+            raise serializers.ValidationError({'tool': 'Name a tool, or pass tools as a list.'})
         connection = self.context['connection']
         connector = registry.get(connection.connector)
         if connector is None:
-            raise serializers.ValidationError(
-                'This connection points at a connector that is no longer installed.'
-            )
-        names = {tool['name'] for tool in catalog_tools(connector)}
-        if value not in names:
+            raise serializers.ValidationError({
+                'tool': 'This connection points at a connector that is no longer installed.'})
+        known = {tool['name'] for tool in catalog_tools(connector)}
+        unknown = [name for name in names if name not in known]
+        if unknown:
             # Names the connector rather than listing its tools; the catalog is
             # already readable at /api/connectors/<slug>/.
-            raise serializers.ValidationError(
-                'No tool named "{0}" on {1}.'.format(value, connector.label)
-            )
-        return value
+            raise serializers.ValidationError({
+                'tool': 'No tool named "{0}" on {1}.'.format(unknown[0], connector.label)})
+        attrs['tools'] = list(dict.fromkeys(names))
+        return attrs
