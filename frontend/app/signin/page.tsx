@@ -73,6 +73,7 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
 
   const destinationRef = useRef(DEFAULT_DESTINATION);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
 
   // Read ?next= from the location rather than useSearchParams(), which would
   // opt the whole page out of prerendering unless it sat behind a Suspense
@@ -125,6 +126,17 @@ export default function SignInPage() {
         );
       } else {
         setError(caught instanceof Error ? caught.message : "Sign in failed.");
+        // Wrong credentials: the fix is almost always the password, so put the
+        // cursor back in it with the text selected -- typing replaces it, and
+        // nobody has to reach for the mouse to try again. After paint, because
+        // the input is still disabled while `loading` is true.
+        window.requestAnimationFrame(function backToPassword() {
+          const input = passwordRef.current;
+          if (input !== null) {
+            input.focus();
+            input.select();
+          }
+        });
       }
       setLoading(false);
     }
@@ -156,6 +168,8 @@ export default function SignInPage() {
           onChange={setPassword}
           autoComplete="current-password"
           disabled={loading}
+          inputRef={passwordRef}
+          revealable
         />
         {organizations !== null ? (
           <OrganizationField

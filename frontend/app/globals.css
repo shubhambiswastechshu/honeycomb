@@ -343,6 +343,50 @@ body {
   opacity: 0.6;
 }
 
+/* ---- Password reveal ---- */
+
+.field-reveal {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Room for the button, so a long password never runs underneath it. */
+.input-revealable {
+  padding-right: 44px;
+}
+
+.reveal {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.reveal:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(49, 47, 23, 0.06);
+}
+
+.reveal:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.reveal:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .button {
   width: 100%;
   margin-top: 22px;

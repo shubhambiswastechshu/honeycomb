@@ -1,6 +1,8 @@
 "use client";
 
-import type { ChangeEvent, ReactNode } from "react";
+import { useState } from "react";
+import type { ChangeEvent, MutableRefObject, ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import type { OrganizationChoice } from "@/lib/api";
 import Logo from "@/components/ui/Logo";
 
@@ -54,6 +56,14 @@ interface FieldProps {
   disabled: boolean;
   placeholder?: string;
   minLength?: number;
+  /** Lets the page put the cursor back here -- after a rejected password, say. */
+  inputRef?: MutableRefObject<HTMLInputElement | null>;
+  /**
+   * Adds a Show / Hide button. For a password people type from memory into a
+   * field they cannot read, being able to look is what stops the second
+   * attempt failing the same way as the first.
+   */
+  revealable?: boolean;
 }
 
 export function Field({
@@ -66,29 +76,66 @@ export function Field({
   disabled,
   placeholder,
   minLength,
+  inputRef,
+  revealable,
 }: FieldProps) {
+  const [revealed, setRevealed] = useState(false);
+
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     onChange(event.target.value);
   }
+
+  const input = (
+    <input
+      ref={inputRef}
+      className={revealable ? "input input-revealable" : "input"}
+      id={id}
+      name={id}
+      type={revealable && revealed ? "text" : type}
+      value={value}
+      onChange={handleChange}
+      autoComplete={autoComplete}
+      placeholder={placeholder}
+      minLength={minLength}
+      disabled={disabled}
+      required
+    />
+  );
 
   return (
     <div className="field">
       <label className="label" htmlFor={id}>
         {label}
       </label>
-      <input
-        className="input"
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        onChange={handleChange}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        minLength={minLength}
-        disabled={disabled}
-        required
-      />
+      {revealable ? (
+        <div className="field-reveal">
+          {input}
+          <button
+            type="button"
+            className="reveal"
+            /* aria-pressed, not a label that changes: screen readers announce
+               the state without the button's name shifting under the cursor. */
+            aria-pressed={revealed}
+            aria-controls={id}
+            aria-label={revealed ? "Hide password" : "Show password"}
+            title={revealed ? "Hide password" : "Show password"}
+            disabled={disabled}
+            onClick={function toggle() {
+              setRevealed(function flip(current) {
+                return !current;
+              });
+            }}
+          >
+            {revealed ? (
+              <EyeOff size={16} strokeWidth={1.9} aria-hidden="true" />
+            ) : (
+              <Eye size={16} strokeWidth={1.9} aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      ) : (
+        input
+      )}
     </div>
   );
 }
