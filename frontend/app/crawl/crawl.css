@@ -988,3 +988,120 @@ button.ins-row:hover { background: rgba(234, 157, 62, 0.08); }
 /* ---- pinned crawls ---- */
 .cr-pin { flex: none; color: var(--amber-500); fill: rgba(234, 157, 62, 0.35); transform: rotate(35deg); }
 .cr-job-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* ==========================================================================
+   Sitemap audit
+   The sitemap is a list of promises. This panel is the three ways it breaks.
+   ========================================================================== */
+.sma { padding-bottom: 10px; }
+.sma-tabs { display: flex; gap: 4px; margin: 0 12px 8px; }
+.sma-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--cr-surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sma-tab > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sma-tab:hover { color: var(--ink); border-color: var(--amber-500); }
+.sma-tab.is-on { background: rgba(234, 157, 62, 0.16); border-color: var(--amber-500); color: var(--ink); }
+.sma-n {
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.sma-n.is-hot { background: rgba(234, 157, 62, 0.28); color: #6f4a12; }
+.sma-blurb { margin-bottom: 6px; }
+.sma-list {
+  margin: 0 12px;
+  padding: 0;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--cr-surface);
+}
+.sma-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 9px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.sma-item:last-child { border-bottom: 0; }
+.sma-item a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.sma-item:hover { background: rgba(234, 157, 62, 0.08); }
+.sma-note { margin-left: auto; flex: none; font-size: 11.5px; color: var(--cr-client); }
+.sma-warn { color: var(--cr-redirect); }
+.sma-spin { animation: cr-spin 0.9s linear infinite; }
+
+/* ==========================================================================
+   Motion
+   One place for every transition in the crawler, so the app moves like one
+   thing. Everything here is decoration: it changes how a state arrives, never
+   which state you are in.
+   ========================================================================== */
+.ws-tab,
+.ins-row,
+.sma-tab,
+.sma-item,
+.cr-btn,
+.cr-menu-item,
+.cr-job,
+.tree-row,
+.ins-sec > summary {
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+.cr-btn:active:not(:disabled) { transform: translateY(1px); }
+.ws-grid tbody tr { transition: background-color 0.12s ease; }
+.ins-sec > summary::after { transition: color 0.16s ease; }
+
+/* Opening a section, a pane or a menu: a short rise, so the eye follows it
+   rather than discovering it. */
+@keyframes cr-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes cr-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.ins-sec[open] > :not(summary) { animation: cr-fade 0.18s ease both; }
+.ws-pane { animation: cr-rise 0.18s ease both; }
+.cr-menu { animation: cr-rise 0.12s ease both; }
+.sma-list { animation: cr-fade 0.16s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-tab,
+  .ins-row,
+  .sma-tab,
+  .sma-item,
+  .cr-btn,
+  .cr-menu-item,
+  .cr-job,
+  .tree-row,
+  .ins-sec > summary,
+  .ws-grid tbody tr { transition: none; }
+  .cr-btn:active:not(:disabled) { transform: none; }
+  .sma-spin { animation: none; }
+  .ins-sec[open] > :not(summary),
+  .ws-pane,
+  .cr-menu,
+  .sma-list { animation: none; }
+}

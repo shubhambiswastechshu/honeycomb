@@ -65,6 +65,8 @@ urlpatterns = [
          name='public-job-report'),
     path('public/jobs/<int:job_id>/sitemap.xml', public_workspace.PublicSitemap.as_view(),
          name='public-job-sitemap'),
+    path('public/jobs/<int:job_id>/sitemap-audit/', public_workspace.PublicSitemapAudit.as_view(),
+         name='public-job-sitemap-audit'),
     path('public/jobs/<int:job_id>/compare/', public_workspace.PublicCompare.as_view(),
          name='public-job-compare'),
 ]

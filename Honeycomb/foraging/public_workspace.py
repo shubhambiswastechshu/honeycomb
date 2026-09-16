@@ -34,6 +34,7 @@ from rest_framework.response import Response
 
 from connectors.catalog import forager as fg
 
+from . import sitemap_audit
 from .models import CrawlLink, CrawlPage
 from .public import PublicView, _job_payload, _public_job, _queue_position
 
@@ -1027,6 +1028,23 @@ class PublicSiteTree(PublicView):
             }
 
         return Response({'tree': shape(root), 'truncated': job.pages_crawled > TREE_MAX_URLS})
+
+
+class PublicSitemapAudit(PublicView):
+    """The site's live sitemaps, checked against what the crawl found.
+
+    Fetched at request time rather than read from the crawl: a URL the crawler
+    never reached leaves no row behind, and those are exactly the ones worth
+    knowing about. Cached for an hour per crawl, with ?refresh=1 to look again.
+    """
+
+    def get(self, request, job_id):
+        if self.tenant is None:
+            return self.disabled()
+        job = _public_job(self.tenant, job_id)
+        if job is None:
+            return _not_found()
+        return Response(sitemap_audit.audit(job, refresh=request.GET.get('refresh') == '1'))
 
 
 class PublicReports(PublicView):

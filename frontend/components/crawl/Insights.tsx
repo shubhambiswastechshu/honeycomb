@@ -14,6 +14,7 @@ import { compareCrawls, listReports, runReport, sitemapUrl } from "@/lib/crawlWo
 import type { CompareResult, ReportResult, ReportSummary, Severity, Workspace } from "@/lib/crawlWorkspace";
 import type { PublicJob } from "@/lib/crawl";
 import SiteTree from "@/components/crawl/SiteTree";
+import SitemapAudit from "@/components/crawl/SitemapAudit";
 import { codeClass, num, pathOf } from "@/components/crawl/format";
 
 const SEVERITIES: { key: Severity; label: string }[] = [
@@ -63,6 +64,7 @@ export default function Insights({
   compareWith: PublicJob[];
 }) {
   const [treeOpen, setTreeOpen] = useState(false);
+  const [sitemapOpen, setSitemapOpen] = useState(false);
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -223,6 +225,16 @@ export default function Insights({
             );
           })}
         </ul>
+      </details>
+
+      <details
+        className="ins-sec"
+        onToggle={function toggled(e) {
+          if ((e.currentTarget as HTMLDetailsElement).open) setSitemapOpen(true);
+        }}
+      >
+        <summary>Sitemap audit</summary>
+        {sitemapOpen ? <SitemapAudit jobId={jobId} /> : null}
       </details>
 
       <details className="ins-sec">

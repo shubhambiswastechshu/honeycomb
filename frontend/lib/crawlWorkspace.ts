@@ -178,6 +178,38 @@ export interface TreeNode {
   children: TreeNode[];
 }
 
+export interface SitemapFile {
+  url: string;
+  kind: "index" | "urlset";
+  entries: number;
+}
+
+export interface SitemapProblem {
+  url: string;
+  problem: string;
+  detail: string | number | null;
+}
+
+export interface SitemapAudit {
+  checked_at: number;
+  seed_url: string;
+  files: SitemapFile[];
+  errors: string[];
+  truncated: boolean;
+  counts: {
+    in_sitemap: number;
+    crawled: number;
+    in_both: number;
+    missing_from_crawl: number;
+    missing_from_sitemap: number;
+    problems: number;
+  };
+  missing_from_crawl: string[];
+  missing_from_sitemap: string[];
+  problems: SitemapProblem[];
+  list_limit: number;
+}
+
 async function call<T>(path: string): Promise<T> {
   let res: Response;
   try {
@@ -251,6 +283,10 @@ export function runReport(jobId: number, name: string): Promise<ReportResult> {
 
 export function sitemapUrl(jobId: number): string {
   return BASE + jobId + "/sitemap.xml";
+}
+
+export function getSitemapAudit(jobId: number, refresh: boolean): Promise<SitemapAudit> {
+  return call(jobId + "/sitemap-audit/" + (refresh ? "?refresh=1" : ""));
 }
 
 export function compareCrawls(jobId: number, against: number): Promise<CompareResult> {
