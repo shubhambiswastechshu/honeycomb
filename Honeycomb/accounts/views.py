@@ -1,5 +1,8 @@
 from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
 from django.db import IntegrityError
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -26,9 +29,12 @@ from .exceptions import (
     AmbiguousOrganizationError,
 )
 from .models import User
+from notifications import mail
 from .serializers import (
     ChangeEmailSerializer,
     ChangePasswordSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     ProfileUpdateSerializer,
     SignInSerializer,
     SignUpCheckSerializer,
@@ -280,6 +286,64 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(identity_payload(user), status=status.HTTP_200_OK)
+
+
+class PasswordResetRequestView(PublicAPIView):
+    """Emails a reset link, and says the same thing whether or not the address exists.
+
+    The response never reveals whether an account was found. A different
+    answer for "no such user" turns this endpoint into a way to test whether
+    someone has an account here, which is worth more to an attacker than it is
+    to the person who mistyped their address.
+
+    An address is unique per organization, not globally, so one request can
+    match several accounts. Each gets its own link naming its organization --
+    resetting one leaves the others alone.
+    """
+
+    throttle_scope = 'password_reset'
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        for user in User.objects.filter(email__iexact=email, is_active=True).select_related('tenant'):
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            mail.send(
+                'password_reset',
+                user.email,
+                'Reset your Honeycomb password',
+                context={
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'organization': user.tenant.name if user.tenant_id else '',
+                    'reset_url': mail.app_url(
+                        '/reset-password?uid={0}&token={1}'.format(uid, token)),
+                    'expires_hours': max(1, settings.PASSWORD_RESET_TIMEOUT // 3600),
+                },
+                tenant=user.tenant,
+                user=user,
+            )
+        return Response({'ok': True}, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(PublicAPIView):
+    """Redeems a link and sets the new password."""
+
+    throttle_scope = 'password_reset_confirm'
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        user.set_password(serializer.validated_data['new_password'])
+        user.save(update_fields=['password'])
+        # No cookies are set: whoever holds the link is not yet known to be the
+        # account owner, and they can sign in with the password they just chose.
+        # Changing the hash also invalidates the token, so the link is spent.
+        return Response({'ok': True}, status=status.HTTP_200_OK)
 
 
 class ChangeEmailView(APIView):

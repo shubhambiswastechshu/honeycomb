@@ -106,6 +106,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'accounts',
+    # Transactional email: the send helper, its templates, and a log of every
+    # attempt. Owns no behaviour of its own -- other apps call notifications.mail.
+    'notifications',
     # The MCP portal, split three ways because the three halves have genuinely
     # different lifecycles.
     #
@@ -371,6 +374,12 @@ REST_FRAMEWORK = {
         # attacker on an unlocked browser guessing the current password.
         'change_password': '5/hour',
         'change_email': '5/hour',
+        # Asking for a reset link sends mail to an address the caller named, so
+        # the ceiling is about not letting anyone use this as a mailer.
+        'password_reset': '5/hour',
+        # Redeeming one is a guess against a signed token; low enough that
+        # brute force is hopeless, high enough for a mistyped new password.
+        'password_reset_confirm': '20/hour',
         # Read on every page load and written rarely; generous but bounded.
         'profile': '30/min',
         # One per expired access token, plus retries. An access token lives an
@@ -636,6 +645,52 @@ HONEYCOMB_PUBLIC_BASE = os.environ.get(
 # gunicorn's --timeout is deliberately well above it: a worker killed mid-call
 # returns nothing an MCP client can interpret, which reads to the user as the
 # session dying rather than as one slow tool.
+# Where people actually browse: the Next.js app, which is a different origin
+# from this API. Links inside an email have to point here, because a URL built
+# from the request would point at the API and 404. Falls back to the first
+# configured public origin so a normal deployment needs no extra variable.
+HONEYCOMB_APP_BASE = (
+    os.environ.get('HONEYCOMB_APP_BASE', '').strip()
+    or (CORS_ALLOWED_ORIGINS[0] if CORS_ALLOWED_ORIGINS else '')
+    or ('http://localhost:3000' if DEBUG else '')
+).rstrip('/')
+
+# --------------------------------------------------------------------------- #
+# Email
+# --------------------------------------------------------------------------- #
+# SMTP, which every provider speaks -- Brevo, Resend, Postmark, SES, Gmail.
+# Point EMAIL_HOST at the provider and paste the credentials it gives you.
+#
+# With no EMAIL_HOST set, email is OFF rather than broken: notifications.mail
+# records each message it would have sent as "skipped" and the request that
+# triggered it still succeeds. In DEBUG the console backend prints them
+# instead, so a developer sees the reset link without any provider at all.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '').strip()
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = _env_flag('EMAIL_USE_TLS', 'True')
+EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL', 'False')
+# A cap on how long a request can sit waiting on a mail server. Email is sent
+# inline, so this number is a page load somebody is watching.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'Honeycomb <no-reply@localhost>')
+SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+
+HONEYCOMB_EMAIL_ENABLED = bool(EMAIL_HOST) or DEBUG
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+elif DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
+
+# How long a password-reset link stays redeemable. Django's default is three
+# days, which is a long time for a link that grants an account; an hour is
+# enough to read your mail.
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
+
 HONEYCOMB_MCP_TOOL_TIMEOUT = int(
     os.environ.get('HONEYCOMB_MCP_TOOL_TIMEOUT', '45')
 )

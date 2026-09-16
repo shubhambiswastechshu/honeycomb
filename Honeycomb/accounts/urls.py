@@ -3,6 +3,8 @@ from django.urls import path
 from .views import (
     ChangeEmailView,
     ChangePasswordView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     CookieTokenRefreshView,
     CsrfView,
     LogoutView,
@@ -25,6 +27,9 @@ urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
     path('change-email/', ChangeEmailView.as_view(), name='change-email'),
     path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password-reset'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(),
+         name='password-reset-confirm'),
 ]
 
 #: Mounted at /api/ rather than /api/auth/, so it is a separate list the root

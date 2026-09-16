@@ -434,6 +434,10 @@ const FIELD_PREFIXES = [
   "full name: ",
   "email: ",
   "password: ",
+  // The reset endpoints answer with these two field names. A banner that
+  // reads "token: This reset link is invalid" names a field nobody typed.
+  "new password: ",
+  "token: ",
 ];
 
 function stripFieldPrefix(message: string): string {
@@ -483,6 +487,42 @@ export async function signUp(payload: SignUpPayload): Promise<Session> {
   // The server rotated the CSRF token along with the new identity.
   forgetCsrf();
   return session;
+}
+
+/**
+ * Asks for a reset link. Resolves the same way whether or not the address has
+ * an account -- the server will not say, so neither can this.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await request<{ ok: boolean }>("/auth/password-reset/", {
+    method: "POST",
+    body: { email: email },
+  });
+}
+
+/** Redeems a reset link and sets the new password. No session is created. */
+export async function confirmPasswordReset(payload: {
+  uid: string;
+  token: string;
+  newPassword: string;
+}): Promise<void> {
+  try {
+    await request<{ ok: boolean }>("/auth/password-reset/confirm/", {
+      method: "POST",
+      body: {
+        uid: payload.uid,
+        token: payload.token,
+        new_password: payload.newPassword,
+      },
+    });
+  } catch (caught) {
+    // Both of this endpoint's errors are about something the page already
+    // labels, so the field name in front of the message is noise.
+    if (caught instanceof Error) {
+      throw new Error(stripFieldPrefix(caught.message));
+    }
+    throw caught;
+  }
 }
 
 /** Auth cookies arrive in the response; nothing about them is readable here. */

@@ -1,0 +1,31 @@
+{% comment %}
+The shell every message renders into: one centred card, inline styles only.
+Mail clients strip <style> blocks and know nothing of CSS variables, so the
+colours are written out literally here and nowhere else.
+{% endcomment %}<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ subject }}</title>
+  </head>
+  <body style="margin:0;padding:24px 12px;background:#fbf8f1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#312f17;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;margin:0 auto;">
+      <tr>
+        <td style="padding:0 0 18px 4px;font-size:16px;font-weight:700;letter-spacing:-0.01em;">
+          {{ product }}
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#ffffff;border:1px solid #e3d9bf;border-radius:12px;padding:28px 26px;">
+          {% block content %}{% endblock %}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:16px 4px 0;font-size:12px;line-height:1.6;color:#7a7357;">
+          {% block footer %}You are receiving this because someone used this address with {{ product }}.{% endblock %}
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

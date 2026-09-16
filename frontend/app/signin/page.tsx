@@ -186,6 +186,9 @@ export default function SignInPage() {
         </button>
       </form>
       <p className="footnote">
+        <Link href="/forgot-password">Forgot your password?</Link>
+      </p>
+      <p className="footnote">
         Need an account? <Link href="/signup">Create one</Link>
       </p>
     </AuthCard>

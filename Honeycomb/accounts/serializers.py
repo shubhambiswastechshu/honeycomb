@@ -1,7 +1,10 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -201,6 +204,46 @@ class ChangePasswordSerializer(serializers.Serializer):
             validate_password(attrs['new_password'], user=self.context['request'].user)
         except DjangoValidationError as exc:
             raise serializers.ValidationError({'new_password': list(exc.messages)})
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Just an address. Whether it exists is deliberately not reported back."""
+
+    email = serializers.EmailField(max_length=254)
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """The link's two halves plus the new password.
+
+    The token is Django's own: signed, single-use (it stops verifying once the
+    password hash or last_login changes), and expiring on
+    PASSWORD_RESET_TIMEOUT. That is why no table of reset tokens exists here.
+    """
+
+    uid = serializers.CharField(max_length=64)
+    token = serializers.CharField(max_length=64)
+    new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+
+    #: One message for every way a link can be no good. Saying which -- expired,
+    #: already used, never existed -- tells whoever holds it something they did
+    #: not have, and the person who needs it does the same thing either way.
+    INVALID = 'This reset link is invalid or has expired. Ask for a new one.'
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(pk=force_str(urlsafe_base64_decode(attrs['uid'])))
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError({'token': [self.INVALID]})
+        if not user.is_active or not default_token_generator.check_token(user, attrs['token']):
+            raise serializers.ValidationError({'token': [self.INVALID]})
+        try:
+            # Against the real user, so the similarity validator can reject a
+            # password that is just their own address again.
+            validate_password(attrs['new_password'], user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'new_password': list(exc.messages)})
+        attrs['user'] = user
         return attrs
 
 
