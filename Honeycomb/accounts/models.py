@@ -1,3 +1,8 @@
+import hashlib
+import secrets
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
@@ -130,6 +135,83 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.full_name.split(' ')[0] if self.full_name else self.email
+
+
+class Invitation(models.Model):
+    """An open offer to join one organization, redeemable once.
+
+    The emailed token is never stored -- only its SHA-256, the same bargain
+    McpKey and Worker make with theirs. A leaked database therefore hands over
+    no usable invitation, and "resend" mints a new one rather than recovering
+    the old.
+
+    Kept even after it is accepted or revoked: who invited whom, and when, is
+    the only record of how someone got access to a workspace.
+    """
+
+    #: How long an invitation stays redeemable. Long enough to survive a
+    #: holiday, short enough that a forwarded mailbox is not a standing door.
+    LIFETIME = timedelta(days=7)
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='invitations')
+    email = models.EmailField(max_length=254, db_index=True)
+    role = models.CharField(
+        max_length=16,
+        choices=[(User.Role.ADMIN.value, 'Admin'), (User.Role.MEMBER.value, 'Member')],
+        default=User.Role.MEMBER,
+        help_text='Owner is deliberately not offerable: an organization has the '
+                  'owner it was created with.',
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='invitations_sent')
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return '{0} to {1}'.format(self.email, self.tenant_id)
+
+    @staticmethod
+    def hash_token(plain):
+        return hashlib.sha256(plain.encode()).hexdigest()
+
+    @classmethod
+    def mint(cls, tenant, email, role, invited_by=None):
+        """Create one and return (row, plaintext token). The token is shown once."""
+        plain = secrets.token_urlsafe(32)
+        row = cls.objects.create(
+            tenant=tenant,
+            email=email.strip().lower()[:254],
+            role=role,
+            invited_by=invited_by,
+            token_hash=cls.hash_token(plain),
+            expires_at=timezone.now() + cls.LIFETIME,
+        )
+        return row, plain
+
+    @property
+    def is_pending(self):
+        return (
+            self.accepted_at is None
+            and self.revoked_at is None
+            and self.expires_at > timezone.now()
+        )
+
+    @property
+    def state(self):
+        if self.accepted_at is not None:
+            return 'accepted'
+        if self.revoked_at is not None:
+            return 'revoked'
+        if self.expires_at <= timezone.now():
+            return 'expired'
+        return 'pending'
 
 
 class TenantOwnedModel(models.Model):

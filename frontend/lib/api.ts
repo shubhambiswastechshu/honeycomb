@@ -489,6 +489,81 @@ export async function signUp(payload: SignUpPayload): Promise<Session> {
   return session;
 }
 
+/** One person in the workspace, as the team endpoint returns them. */
+export interface TeamInvitation {
+  id: number;
+  email: string;
+  role: string;
+  /** pending | accepted | revoked | expired -- only pending ones are listed. */
+  state: string;
+  invited_by: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface Team {
+  members: User[];
+  invitations: TeamInvitation[];
+  /** False for a member: the page hides the invite form rather than failing it. */
+  can_manage: boolean;
+}
+
+/** Everyone in the caller's organization, plus the invitations still open. */
+export function getTeam(): Promise<Team> {
+  return request<Team>("/team/", { method: "GET", authenticated: true });
+}
+
+/** Invites one person and sends them the email carrying the only token. */
+export function inviteTeammate(email: string, role: string): Promise<TeamInvitation> {
+  return request<TeamInvitation>("/team/invites/", {
+    method: "POST",
+    body: { email: email, role: role },
+    authenticated: true,
+  });
+}
+
+/** Withdraws an invitation that has not been accepted. */
+export function revokeInvitation(id: number): Promise<TeamInvitation> {
+  return request<TeamInvitation>("/team/invites/" + id + "/revoke/", {
+    method: "POST",
+    body: {},
+    authenticated: true,
+  });
+}
+
+/** What an invitation is for, read from its token before anyone signs up. */
+export interface InvitationSummary {
+  organization: string;
+  email: string;
+  role: string;
+  invited_by: string;
+}
+
+export function getInvitation(token: string): Promise<InvitationSummary> {
+  return request<InvitationSummary>("/auth/invite/?token=" + encodeURIComponent(token), {
+    method: "GET",
+  });
+}
+
+/** Creates the invited account and signs it in. Auth cookies arrive in the response. */
+export async function acceptInvitation(payload: {
+  token: string;
+  fullName: string;
+  password: string;
+}): Promise<Session> {
+  const session = await request<Session>("/auth/invite/accept/", {
+    method: "POST",
+    body: {
+      token: payload.token,
+      full_name: payload.fullName,
+      password: payload.password,
+    },
+  });
+  // A new identity, so the server rotated the CSRF token with it.
+  forgetCsrf();
+  return session;
+}
+
 /**
  * Asks for a reset link. Resolves the same way whether or not the address has
  * an account -- the server will not say, so neither can this.

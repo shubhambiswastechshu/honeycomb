@@ -1,0 +1,40 @@
+{% extends "notifications/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-0.01em;">
+  {% if failed %}Your crawl of {{ host }} stopped{% else %}Your crawl of {{ host }} is done{% endif %}
+</h1>
+<p style="margin:0 0 16px;font-size:14.5px;line-height:1.6;">
+  {% if failed %}
+    It ran into an error and stopped early. Everything it had already found is kept.
+  {% else %}
+    It finished after {{ duration }}. Here is what it found.
+  {% endif %}
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid #e3d9bf;border-radius:10px;border-collapse:separate;overflow:hidden;">
+  <tr>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:13px;color:#7a7357;">Pages crawled</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:14px;font-weight:600;text-align:right;">{{ pages }}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:13px;color:#7a7357;">Links found</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:14px;font-weight:600;text-align:right;">{{ links }}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px;font-size:13px;color:#7a7357;">Failed requests</td>
+    <td style="padding:10px 14px;font-size:14px;font-weight:600;text-align:right;{% if failures %}color:#b3401f;{% endif %}">{{ failures }}</td>
+  </tr>
+</table>
+
+{% if error %}
+<p style="margin:0 0 16px;padding:10px 12px;border-radius:8px;background:rgba(155,61,34,0.07);font-size:13px;line-height:1.55;color:#9b3d22;">
+  {{ error }}
+</p>
+{% endif %}
+
+{% include "notifications/_button.html" with url=crawl_url label="Open the crawl" %}
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#7a7357;">
+  Started from <span style="word-break:break-all;">{{ seed_url }}</span>.
+</p>
+{% endblock %}

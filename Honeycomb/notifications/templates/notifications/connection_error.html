@@ -1,0 +1,22 @@
+{% extends "notifications/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-0.01em;">
+  {{ connector_label }} has stopped working
+</h1>
+<p style="margin:0 0 16px;font-size:14.5px;line-height:1.6;">
+  The connection <strong>{{ connection_name }}</strong> could not reach {{ connector_label }},
+  so anything asking it for data is getting nothing back. Usually the credential
+  expired or was revoked at the other end.
+</p>
+
+<p style="margin:0 0 18px;padding:10px 12px;border-radius:8px;background:rgba(155,61,34,0.07);font-size:13px;line-height:1.55;color:#9b3d22;">
+  {{ reason }}
+</p>
+
+{% include "notifications/_button.html" with url=connection_url label="Reconnect it" %}
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#7a7357;">
+  You will not get another message about this connection for a day, even if it
+  keeps failing.
+</p>
+{% endblock %}

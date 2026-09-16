@@ -377,6 +377,12 @@ REST_FRAMEWORK = {
         # Asking for a reset link sends mail to an address the caller named, so
         # the ceiling is about not letting anyone use this as a mailer.
         'password_reset': '5/hour',
+        # Each invitation sends mail to an address the caller typed, so this is
+        # a mailer limit as much as a write limit.
+        'invite': '30/hour',
+        # Redeeming one is unauthenticated: low enough that guessing tokens is
+        # hopeless, high enough for a mistyped password.
+        'invite_accept': '20/hour',
         # Redeeming one is a guess against a signed token; low enough that
         # brute force is hopeless, high enough for a mistyped new password.
         'password_reset_confirm': '20/hour',

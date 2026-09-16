@@ -1,0 +1,19 @@
+{% extends "notifications/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-0.01em;">
+  Join {{ organization }} on {{ product }}
+</h1>
+<p style="margin:0 0 4px;font-size:14.5px;line-height:1.6;">
+  {{ inviter }} invited you to the {{ organization }} workspace as
+  <strong>{{ role }}</strong>. Choose a password and you are in.
+</p>
+{% include "notifications/_button.html" with url=accept_url label="Accept the invitation" %}
+<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#7a7357;">
+  This invitation expires in {{ expires_days }} days and can be used once.
+  If the button does not work, paste this into your browser:<br />
+  <span style="word-break:break-all;color:#312f17;">{{ accept_url }}</span>
+</p>
+<p style="margin:0;font-size:13px;line-height:1.6;color:#7a7357;">
+  Not expecting this? Ignore it — no account is created until someone uses the link.
+</p>
+{% endblock %}

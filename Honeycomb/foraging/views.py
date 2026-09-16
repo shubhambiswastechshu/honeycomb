@@ -25,6 +25,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import notify
 from .models import CrawlEvent, CrawlJob, CrawlLink, CrawlPage, Worker
 from .serializers import CrawlJobSerializer, CrawlPageSerializer, WorkerSerializer
 
@@ -526,6 +527,10 @@ class AgentComplete(WorkerAuthMixin, APIView):
             status_counts=counters.get('status_counts') or job.status_counts,
         )
         AgentProgress._append_events(job, body.get('events') or [])
+        # Tell whoever started it. Read back first: the counters above were
+        # written with .update(), so this instance is still the old row.
+        job.refresh_from_db()
+        notify.crawl_finished(job)
         return Response({'ok': True})
 
 

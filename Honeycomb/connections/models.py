@@ -155,10 +155,52 @@ class Connection(TenantOwnedModel):
         Callers pass an already-redacted string; the cap here is the second
         line of defence, because last_error is rendered in the dashboard and an
         upstream stack trace is neither useful nor safe at full length.
+
+        Also emails the people who can fix it. A dead connection is silent by
+        nature -- the AI client gets an error, the person who connected the
+        account hears nothing -- so this is the one moment worth interrupting
+        them for.
         """
         self.status = self.Status.ERROR
         self.last_error = (message or '')[:2000]
         self.save(update_fields=['status', 'last_error', 'updated_at'])
+        self._email_owners()
+
+    def _email_owners(self) -> None:
+        """Tell the organization's owners and admins. Never raises.
+
+        Imported here rather than at module scope: notifications imports
+        accounts, and a top-level import in a model module is how app loading
+        ends up in a cycle.
+        """
+        from accounts.models import User
+        from connectors import registry
+        from notifications import mail
+
+        connector = registry.get(self.connector)
+        label = connector.label if connector is not None else self.connector
+        recipients = User.objects.filter(
+            tenant_id=self.tenant_id, is_active=True,
+            role__in=(User.Role.OWNER, User.Role.ADMIN),
+        )
+        for person in recipients:
+            mail.send(
+                'connection_error',
+                person.email,
+                '{0} needs reconnecting'.format(label),
+                context={
+                    'connector_label': label,
+                    'connection_name': self.name or label,
+                    'reason': self.last_error or 'No reason was reported.',
+                    'connection_url': mail.app_url(
+                        '/dashboard/connectors/{0}'.format(self.connector)),
+                },
+                tenant=self.tenant,
+                user=person,
+                # Broken stays broken: one message a day per connection, not one
+                # per failed call.
+                once_every_hours=24,
+            )
 
 
 class ConnectorOAuthState(models.Model):

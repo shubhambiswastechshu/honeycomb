@@ -1,0 +1,14 @@
+{% autoescape off %}{{ connector_label }} has stopped working
+
+The connection "{{ connection_name }}" could not reach {{ connector_label }}, so
+anything asking it for data is getting nothing back. Usually the credential
+expired or was revoked at the other end.
+
+  {{ reason }}
+
+Reconnect it:
+{{ connection_url }}
+
+You will not get another message about this connection for a day, even if it
+keeps failing.
+{% endautoescape %}

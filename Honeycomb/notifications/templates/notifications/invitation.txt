@@ -1,0 +1,13 @@
+{% autoescape off %}Join {{ organization }} on {{ product }}
+
+{{ inviter }} invited you to the {{ organization }} workspace as {{ role }}.
+Choose a password and you are in.
+
+Accept the invitation:
+{{ accept_url }}
+
+This invitation expires in {{ expires_days }} days and can be used once.
+
+Not expecting this? Ignore it - no account is created until someone uses the
+link.
+{% endautoescape %}

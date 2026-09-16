@@ -1,0 +1,18 @@
+{% autoescape off %}{% if failed %}Your crawl of {{ host }} stopped
+
+It ran into an error and stopped early. Everything it had already found is
+kept.{% else %}Your crawl of {{ host }} is done
+
+It finished after {{ duration }}. Here is what it found.{% endif %}
+
+Pages crawled:    {{ pages }}
+Links found:      {{ links }}
+Failed requests:  {{ failures }}
+{% if error %}
+Error: {{ error }}
+{% endif %}
+Open the crawl:
+{{ crawl_url }}
+
+Started from {{ seed_url }}.
+{% endautoescape %}

@@ -13,10 +13,12 @@ moment it stops being true the fix is a queue behind this one function, not a
 change at any call site.
 """
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from .models import EmailLog
 
@@ -36,13 +38,19 @@ def app_url(path=''):
     return '{0}/{1}'.format(base, str(path).lstrip('/'))
 
 
-def send(template, to, subject, context=None, tenant=None, user=None):
+def send(template, to, subject, context=None, tenant=None, user=None,
+         once_every_hours=None):
     """Render `template` and send it to one address. True when it went out.
 
     `template` names a pair under notifications/templates/notifications/:
     <template>.txt is the message, <template>.html the same thing styled.
     Both are always sent -- plain text is what a mail client falls back to and
     what a spam filter reads.
+
+    `once_every_hours` is for alerts: a thing that is broken is usually broken
+    repeatedly, and the second identical email in an hour is the one that
+    teaches people to ignore the first. The same template, address and subject
+    inside the window is dropped rather than sent.
     """
     address = str(to or '').strip()
     row = EmailLog(
@@ -66,6 +74,19 @@ def send(template, to, subject, context=None, tenant=None, user=None):
         row.save()
         logger.warning('Email not configured; skipped %s to %s', template, address)
         return False
+
+    if once_every_hours:
+        since = timezone.now() - timedelta(hours=once_every_hours)
+        already = EmailLog.objects.filter(
+            template=row.template, to_email=row.to_email, subject=row.subject,
+            status=EmailLog.SENT, created_at__gte=since,
+        ).exists()
+        if already:
+            row.status = EmailLog.SKIPPED
+            row.error = 'An identical message went out in the last {0} hours.'.format(
+                once_every_hours)
+            row.save()
+            return False
 
     payload = dict(context or {})
     payload.setdefault('subject', subject)

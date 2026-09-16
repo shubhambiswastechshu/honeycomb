@@ -10,7 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from .backends import AMBIGUOUS_TENANTS_ATTR
 from .exceptions import TENANTLESS_DETAIL, AmbiguousOrganizationError
-from .models import Tenant, User
+from .models import Invitation, Tenant, User
 
 
 class TenantSerializer(serializers.ModelSerializer):
@@ -204,6 +204,49 @@ class ChangePasswordSerializer(serializers.Serializer):
             validate_password(attrs['new_password'], user=self.context['request'].user)
         except DjangoValidationError as exc:
             raise serializers.ValidationError({'new_password': list(exc.messages)})
+        return attrs
+
+
+class InvitationCreateSerializer(serializers.Serializer):
+    """Who to invite, and as what. Refuses people who are already here."""
+
+    email = serializers.EmailField(max_length=254)
+    role = serializers.ChoiceField(
+        choices=[User.Role.ADMIN.value, User.Role.MEMBER.value],
+        default=User.Role.MEMBER.value,
+    )
+
+    def validate_email(self, value):
+        email = value.strip().lower()
+        tenant = self.context['request'].user.tenant
+        if User.objects.filter(tenant=tenant, email__iexact=email).exists():
+            raise serializers.ValidationError('That person is already in this organization.')
+        return email
+
+
+class InvitationAcceptSerializer(serializers.Serializer):
+    """The token from the email, plus the account being created behind it."""
+
+    token = serializers.CharField(max_length=128)
+    full_name = serializers.CharField(max_length=150, allow_blank=True, default='')
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+
+    INVALID = 'This invitation is no longer valid. Ask for a new one.'
+
+    def validate(self, attrs):
+        # Imported here: team.py imports this module, so importing it at module
+        # scope would close the loop.
+        from .team import _redeemable
+
+        invitation = _redeemable(attrs['token'])
+        if invitation is None:
+            raise serializers.ValidationError({'token': [self.INVALID]})
+        probe = User(email=invitation.email, full_name=attrs.get('full_name', ''))
+        try:
+            validate_password(attrs['password'], user=probe)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+        attrs['invitation'] = invitation
         return attrs
 
 
