@@ -1,7 +1,12 @@
 """LinkedIn Ads connector — LinkedIn Marketing (Versioned REST) API.
 
-Auth: api_key. The user pastes a member access token with the
-`r_ads` / `r_ads_reporting` (and related) marketing scopes.
+Auth: linkedin_oauth. "Continue with LinkedIn" stores the member's access
+token (60 days), its expiry and, where LinkedIn issues one, a refresh token
+(a year). The access token is used until it is nearly spent and then renewed
+with the refresh token, and the renewed one is saved back to the connection,
+so a renewal happens once per token lifetime rather than once per call.
+Connections made earlier by pasting an access token keep working until that
+token expires.
 
 Endpoints used (base https://api.linkedin.com/rest):
   - me                   GET /v2/userinfo  | GET /v2/me   (legacy, no version header)
@@ -16,20 +21,34 @@ All requests send the versioned + Rest.li-2.0.0 headers LinkedIn requires.
 Monetary metrics (costInLocalCurrency) come back as decimal strings already in
 account currency, so they are surfaced as-is (no micros conversion needed).
 """
+import asyncio
 import datetime
+import time
 from collections import Counter
 from urllib.parse import quote
+
+from asgiref.sync import sync_to_async
+from django.conf import settings
+from django.utils import timezone
 
 from connectors import registry
 from connectors.registry import Connector
 from connectors.shims.cache import TTL_LONG, TTL_MEDIUM, TTL_SHORT, cached
 from connectors.shims.concurrency import limit_for
 from connectors.shims.errors import ConnectorError
-from connectors.shims.http import UpstreamUnavailable, get as http_get
+from connectors.shims.http import UpstreamUnavailable, get as http_get, post as http_post
+from connections import linkedin
 from connections.models import Connection
 
 BASE = "https://api.linkedin.com/rest"
-LINKEDIN_VERSION = "202509"
+#: LinkedIn retires each monthly version about a year after release, and a
+#: retired one answers 426 "Requested version ... is not active". Bump it
+#: before then; https://learn.microsoft.com/linkedin/marketing/versioning lists
+#: the live ones.
+LINKEDIN_VERSION = "202609"
+
+#: Renew this long before LinkedIn's expiry rather than race it.
+RENEW_BEFORE_SECONDS = 24 * 3600
 
 STATUS_LABELS = {
     "ACTIVE": "ACTIVE",
@@ -43,16 +62,94 @@ STATUS_LABELS = {
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
-def _token(conn: Connection) -> str:
-    token = (conn.creds() or {}).get("access_token")
+#: One renewal at a time per connection: an analytics call fans out, and
+#: every branch finding the same spent token must not each spend the refresh.
+_RENEW_LOCKS: dict[int, asyncio.Lock] = {}
+
+RECONNECT = "Reconnect it with Continue with LinkedIn in the Honeycomb dashboard."
+
+
+async def _access_token(conn: Connection) -> str:
+    creds = conn.creds() or {}
+    token = creds.get("access_token")
     if not token:
-        raise ConnectorError("Not connected: missing access_token.")
-    return token
+        raise ConnectorError("This LinkedIn connection has no access token. " + RECONNECT)
+    expires_at = _as_float(creds.get("expires_at"))
+    # No expiry recorded: a token pasted before sign-in existed. LinkedIn is
+    # the only one who knows whether it still works, so ask it.
+    if not expires_at or expires_at - time.time() > RENEW_BEFORE_SECONDS:
+        return token
+
+    lock = _RENEW_LOCKS.setdefault(conn.id, asyncio.Lock())
+    async with lock:
+        # Another call may have renewed it while this one waited.
+        creds = conn.creds() or {}
+        if _as_float(creds.get("expires_at")) - time.time() > RENEW_BEFORE_SECONDS:
+            return creds["access_token"]
+        refresh = creds.get("refresh_token")
+        if not refresh:
+            if expires_at > time.time():
+                return token  # still valid for a few hours; nothing to renew with
+            raise ConnectorError("This LinkedIn connection has expired. " + RECONNECT)
+        renewed = await _renew(refresh)
+        creds = linkedin.creds_from_token(renewed, previous=creds)
+        conn.set_creds(creds)
+        await _save_creds(conn)
+        return creds["access_token"]
 
 
-def _headers(conn: Connection) -> dict:
+async def _renew(refresh_token: str) -> dict:
+    client_id = getattr(settings, "LINKEDIN_CLIENT_ID", "")
+    client_secret = getattr(settings, "LINKEDIN_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        raise ConnectorError("LinkedIn sign-in is not configured on this server, so the token cannot be renewed.")
+    token_uri = getattr(settings, "LINKEDIN_OAUTH_TOKEN_URI", "https://www.linkedin.com/oauth/v2/accessToken")
+    try:
+        async with limit_for(token_uri):
+            res = await http_post(
+                token_uri,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                },
+                retries=0,
+            )
+    except UpstreamUnavailable as e:
+        raise ConnectorError(f"Could not reach LinkedIn to renew the token: {e}")
+    if res.status_code != 200:
+        # The body is not echoed: it can quote the request, which carried the
+        # client secret. A refused refresh means revoked or a year old.
+        raise ConnectorError(
+            f"LinkedIn refused to renew this connection ({res.status_code}). " + RECONNECT
+        )
+    try:
+        body = res.json()
+    except ValueError:
+        body = {}
+    if not body.get("access_token"):
+        raise ConnectorError("LinkedIn renewed the connection without a token. " + RECONNECT)
+    return body
+
+
+@sync_to_async
+def _save_creds(conn: Connection) -> None:
+    # Only the credential column: the dashboard may have renamed the connection
+    # or switched a tool off since this request loaded it.
+    Connection.objects.filter(pk=conn.pk).update(creds_enc=conn.creds_enc, updated_at=timezone.now())
+
+
+def _as_float(value) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+async def _headers(conn: Connection) -> dict:
     return {
-        "Authorization": f"Bearer {_token(conn)}",
+        "Authorization": f"Bearer {await _access_token(conn)}",
         "LinkedIn-Version": LINKEDIN_VERSION,
         "X-Restli-Protocol-Version": "2.0.0",
     }
@@ -62,7 +159,7 @@ async def _get(conn: Connection, path: str, params: dict | None = None):
     url = f"{BASE}{path}"
     try:
         async with limit_for(url):
-            res = await http_get(url, headers=_headers(conn), params=params or {})
+            res = await http_get(url, headers=await _headers(conn), params=params or {})
     except UpstreamUnavailable as e:
         raise ConnectorError(str(e))
     if res.status_code >= 400:
@@ -150,7 +247,7 @@ async def me(conn: Connection, db, args: dict) -> dict:
     """Authenticated member profile. Tries OpenID userinfo, then /v2/me.
     These are legacy/v2 endpoints, so no LinkedIn-Version header."""
     async def _loader():
-        legacy = {"Authorization": f"Bearer {_token(conn)}"}
+        legacy = {"Authorization": f"Bearer {await _access_token(conn)}"}
         last_status = None
         for url in (
             "https://api.linkedin.com/v2/userinfo",
@@ -341,7 +438,7 @@ async def _run_analytics(conn, aid, pivot, days, fields=None, start_date=None, e
     url = f"{BASE}/adAnalytics?{query}"
     try:
         async with limit_for(url):
-            res = await http_get(url, headers=_headers(conn))
+            res = await http_get(url, headers=await _headers(conn))
     except UpstreamUnavailable as e:
         raise ConnectorError(f"LinkedIn adAnalytics unavailable: {e}")
     if res.status_code >= 400:
@@ -576,8 +673,7 @@ HANDLERS = {
 registry.register(Connector(
     slug="linkedin_ads",
     label="LinkedIn Ads",
-    auth="api_key",
-    cred_fields=["access_token"],
+    auth=linkedin.LINKEDIN_AUTH,
     catalog=CATALOG,
     handlers=HANDLERS,
     description="Reads LinkedIn ad accounts, campaign groups, campaigns, creatives and analytics from the LinkedIn Marketing REST API.",

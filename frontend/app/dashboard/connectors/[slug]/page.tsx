@@ -111,9 +111,12 @@ function connectionTitle(connection: Connection): string {
   return name.length > 0 ? name : connection.connector_label;
 }
 
-/** The message shown after Google sends the browser back with ?connected=1. */
+/**
+ * The message shown after Google or LinkedIn sends the browser back with
+ * ?connected=1. Provider-neutral: the connector may not have loaded yet.
+ */
 const CONNECTED_NOTE =
-  "Google account connected. Its write tools are switched off until you turn them on.";
+  "Account connected. Its write tools are switched off until you turn them on.";
 
 /**
  * The route itself: nothing but the Suspense boundary the view's

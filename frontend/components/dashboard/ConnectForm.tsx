@@ -8,12 +8,13 @@
  * connector therefore becomes connectable without a frontend change, which is
  * the whole reason the registry publishes the names at all.
  *
- * A connector whose `auth` is "google_oauth" takes the other branch entirely.
- * There is nothing to paste for one of those -- the credential is a refresh
- * token that only Google can issue -- so the form collapses to a single action
- * that hands the browser to Google. The connection is then created by the
- * server's callback, which is also why that branch never calls onSaved: this
- * component is gone by the time the connection exists.
+ * A connector whose `auth` is "google_oauth" or "linkedin_oauth" takes the
+ * other branch entirely. There is nothing to paste for one of those -- the
+ * credential is a token only Google or LinkedIn can issue -- so the form
+ * collapses to a single action that hands the browser to the provider. The
+ * connection is then created by the server's callback, which is also why that
+ * branch never calls onSaved: this component is gone by the time the
+ * connection exists.
  *
  * Two shapes, one component. With no `existing` it creates; with one it edits,
  * and every credential input then becomes optional -- a blank secret means
@@ -28,7 +29,7 @@
 import { useState } from "react";
 import PluginSetup from "@/components/dashboard/PluginSetup";
 import type { FormEvent } from "react";
-import { createConnection, startGoogleOAuth, updateConnection } from "@/lib/api";
+import { createConnection, startConnectorOAuth, updateConnection } from "@/lib/api";
 import type { Connection, ConnectorSpec } from "@/lib/api";
 import {
   FormFeedback,
@@ -38,8 +39,14 @@ import {
   useSubmitState,
 } from "@/components/dashboard/AccountForms";
 
-/** The registry's value for a connector that is connected through Google. */
-const GOOGLE_AUTH = "google_oauth";
+/**
+ * Connectors connected by signing in, keyed by the registry's `auth` value,
+ * with the words that differ between providers.
+ */
+const SIGN_IN: Record<string, { provider: string; account: string }> = {
+  google_oauth: { provider: "Google", account: "pick a Google account" },
+  linkedin_oauth: { provider: "LinkedIn", account: "sign in to LinkedIn" },
+};
 
 /**
  * Words that must not be sentence-cased on their way to a label. Without this
@@ -215,47 +222,53 @@ export default function ConnectForm({
     }, "Connected.");
   }
 
+  const signIn: { provider: string; account: string } | undefined = SIGN_IN[connector.auth];
+
   /**
-   * Hand the browser to Google. Nothing is saved on this side: the server
-   * mints a one-time state nonce, Google sends the user back to the callback,
-   * and the callback is what creates the connection.
+   * Hand the browser to the provider. Nothing is saved on this side: the
+   * server mints a one-time state nonce, the provider sends the user back to
+   * the callback, and the callback is what creates the connection.
    */
-  function handleGoogle(): void {
-    if (state.pending) {
+  function handleSignIn(): void {
+    if (state.pending || signIn === undefined) {
       return;
     }
     void state.run(async function begin(): Promise<void> {
-      const started = await startGoogleOAuth(connector.slug);
+      const started = await startConnectorOAuth(connector.slug);
       const url = started.authorize_url;
       // A start that answered 200 with no URL would otherwise leave the button
       // looking like it worked while the page sat exactly where it was.
       if (typeof url !== "string" || url.length === 0) {
         throw new Error(
-          "The server did not return a Google sign-in link. Try again in a moment."
+          "The server did not return a " + signIn.provider + " sign-in link. Try again in a moment."
         );
       }
       // assign() rather than replace(): the connector page stays in history, so
       // backing out of Google's consent screen lands where the user started.
       window.location.assign(url);
-    }, "Taking you to Google…");
+    }, "Taking you to " + signIn.provider + "…");
   }
 
-  if (connector.auth === GOOGLE_AUTH) {
+  if (signIn !== undefined) {
     return (
       <SectionCard
         titleId="connect-form-title"
         title={editing ? "Reconnect " + connector.label : "Connect " + connector.label}
         description={
           editing
-            ? "Signing in again replaces the Google access stored on this connection. The connection itself, its URL and its keys all stay as they are."
+            ? "Signing in again replaces the " +
+              signIn.provider +
+              " access stored on this connection. The connection itself, its URL and its keys all stay as they are."
             : "There is nothing to paste for " +
               connector.label +
-              ". Google issues the credential and this page never sees it."
+              ". " +
+              signIn.provider +
+              " issues the credential and this page never sees it."
         }
       >
         <div className="acct-stack">
           <p className="conn-note">
-            You will pick a Google account and grant read access to{" "}
+            You will {signIn.account} and grant read access to{" "}
             {connector.label}, then come straight back here. Write tools stay
             switched off until you turn them on yourself.
           </p>
@@ -264,16 +277,16 @@ export default function ConnectForm({
             <button
               type="button"
               className="conn-action conn-action-primary"
-              onClick={handleGoogle}
+              onClick={handleSignIn}
               disabled={state.pending}
             >
-              {state.pending ? "Opening Google" : "Continue with Google"}
+              {state.pending ? "Opening " + signIn.provider : "Continue with " + signIn.provider}
             </button>
           </div>
 
-          {/* The failure worth reading here is the server's own: when Google is
-              not configured it names the exact redirect URI an admin has to
-              register, so it is shown verbatim rather than summarised. */}
+          {/* The failure worth reading here is the server's own: when sign-in
+              is not configured it names the exact redirect URI an admin has
+              to register, so it is shown verbatim rather than summarised. */}
           <FormFeedback error={state.error} success={state.success} />
         </div>
       </SectionCard>

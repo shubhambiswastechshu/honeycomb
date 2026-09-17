@@ -738,6 +738,30 @@ GOOGLE_OAUTH_AUTH_URI = os.environ.get(
     'GOOGLE_OAUTH_AUTH_URI', 'https://accounts.google.com/o/oauth2/v2/auth'
 )
 
+# LinkedIn OAuth
+#
+# The credentials behind the LinkedIn Ads connector's "Continue with LinkedIn".
+# One LinkedIn developer app; its Auth tab must list this exact redirect URL,
+# built from HONEYCOMB_PUBLIC_BASE the same way the Google one is:
+#
+#     <HONEYCOMB_PUBLIC_BASE>/api/connectors/oauth/linkedin/callback/
+#
+# Same rule as Google: unset is not fatal. Only LinkedIn cannot be connected.
+LINKEDIN_CLIENT_ID = os.environ.get('LINKEDIN_CLIENT_ID', '')
+LINKEDIN_CLIENT_SECRET = os.environ.get('LINKEDIN_CLIENT_SECRET', '')
+# Every scope asked for must be one the app's products grant, or LinkedIn
+# refuses the whole sign-in. Changing this set also invalidates the tokens
+# already issued for the old one, so it is a deliberate, rare edit.
+LINKEDIN_OAUTH_SCOPES = os.environ.get(
+    'LINKEDIN_OAUTH_SCOPES', 'r_ads r_ads_reporting r_basicprofile'
+)
+LINKEDIN_OAUTH_AUTH_URI = os.environ.get(
+    'LINKEDIN_OAUTH_AUTH_URI', 'https://www.linkedin.com/oauth/v2/authorization'
+)
+LINKEDIN_OAUTH_TOKEN_URI = os.environ.get(
+    'LINKEDIN_OAUTH_TOKEN_URI', 'https://www.linkedin.com/oauth/v2/accessToken'
+)
+
 # Google Ads is the one Google API that needs a second credential beside OAuth:
 # a developer token, issued per Ads manager account and approved separately from
 # the Cloud project. Without it the API rejects every call, however valid the

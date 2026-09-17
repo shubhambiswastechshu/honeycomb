@@ -53,6 +53,7 @@ from accounts.models import User
 from connectors import registry
 from connectors.shims.errors import redact_text
 
+from . import linkedin
 from .google import fetch_google_email, with_id_scopes
 from .models import Connection, ConnectorOAuthState
 
@@ -149,8 +150,13 @@ class GoogleOAuthStartView(TenantScopedQuerysetMixin, APIView):
         tenant = self.get_tenant()
         if request.user.role not in CONNECT_ADMIN_ROLES:
             raise PermissionDenied(
-                'Only an owner or admin can connect a Google account.'
+                'Only an owner or admin can connect an account.'
             )
+        # One start route for every sign-in provider: the frontend asks the
+        # same URL either way, and the connector's auth decides where it goes.
+        found = registry.get(slug)
+        if found is not None and getattr(found, 'auth', '') == linkedin.LINKEDIN_AUTH:
+            return Response({'authorize_url': linkedin.authorize_url(tenant, request.user, slug)})
         connector = self._google_connector(slug)
         redirect_uri = google_redirect_uri()
         self._require_google_config(redirect_uri)
@@ -239,6 +245,11 @@ class GoogleOAuthCallbackView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'connect'
 
+    #: Named in every message this route can produce. A subclass for another
+    #: provider changes these and inherits the never-render-an-error routing.
+    provider = 'Google'
+    stale_state_message = STALE_STATE_MESSAGE
+
     def handle_exception(self, exc):
         """Even a framework-level refusal leaves this route as a redirect.
 
@@ -254,11 +265,11 @@ class GoogleOAuthCallbackView(APIView):
         if isinstance(exc, Throttled):
             message = (
                 'Too many sign-in attempts from this network. '
-                'Wait a minute and click Connect with Google again.'
+                'Wait a minute and click Continue with {0} again.'.format(self.provider)
             )
         else:
-            logger.exception('Google OAuth callback rejected before dispatch')
-            message = 'Could not complete Google sign-in. Please try again.'
+            logger.exception('%s OAuth callback rejected before dispatch', self.provider)
+            message = 'Could not complete {0} sign-in. Please try again.'.format(self.provider)
         return _redirect_with(frontend_connector_url(slug), error=message)
 
     def get(self, request):
@@ -280,9 +291,10 @@ class GoogleOAuthCallbackView(APIView):
             # rather than a stack trace, and Google gets a 302 rather than a
             # 500. The redacted type/message is enough to correlate with the
             # traceback that goes to the log.
-            logger.exception('Google OAuth callback failed for connector %r', slug)
-            error = 'Could not complete Google sign-in ({0}).'.format(
-                redact_text('{0}: {1}'.format(type(exc).__name__, exc))[:200]
+            logger.exception('%s OAuth callback failed for connector %r', self.provider, slug)
+            error = 'Could not complete {0} sign-in ({1}).'.format(
+                self.provider,
+                redact_text('{0}: {1}'.format(type(exc).__name__, exc))[:200],
             )
         if error:
             return _redirect_with(destination, error=error)
@@ -309,7 +321,7 @@ class GoogleOAuthCallbackView(APIView):
         # what tells us which connector page to send the browser back to.
         state = self._claim_state(state_value) if state_value else None
         if state is None:
-            return STALE_STATE_MESSAGE, ''
+            return self.stale_state_message, ''
         slug = state.connector
 
         if denied:
@@ -457,3 +469,82 @@ class GoogleOAuthCallbackView(APIView):
                 response.status_code, redact_text(response.text[:1000])[:300]
             )
         return response.json(), ''
+
+
+class LinkedInOAuthCallbackView(GoogleOAuthCallbackView):
+    """GET /api/connectors/oauth/linkedin/callback/ -- LinkedIn's landing route.
+
+    Everything that keeps the Google callback safe is inherited: no session,
+    the nonce as the credential, a redirect on every path. Only the exchange
+    and what gets stored differ, and those live in connections/linkedin.py.
+    """
+
+    provider = 'LinkedIn'
+    stale_state_message = linkedin.STALE_STATE_MESSAGE
+
+    def _complete(self, request):
+        denied = request.query_params.get('error')
+        code = request.query_params.get('code') or ''
+        state_value = request.query_params.get('state') or ''
+
+        state = self._claim_state(state_value) if state_value else None
+        if state is None:
+            return self.stale_state_message, ''
+        slug = state.connector
+
+        if denied:
+            # user_cancelled_authorize and friends. LinkedIn's description is
+            # the readable half; both are upstream text bound for a URL.
+            reason = request.query_params.get('error_description') or denied
+            return 'LinkedIn did not grant access ({0}).'.format(
+                redact_text(reason)[:160]
+            ), slug
+
+        connector = registry.get(slug)
+        if connector is None or getattr(connector, 'auth', '') != linkedin.LINKEDIN_AUTH:
+            return 'This connector does not use LinkedIn sign-in.', slug
+        if not code:
+            return 'LinkedIn did not return an authorization code. Please try again.', slug
+
+        token, error = linkedin.exchange_code(code)
+        if error:
+            return error, slug
+        if not token.get('access_token'):
+            return 'LinkedIn did not return an access token. Please try again.', slug
+
+        member_id, member_name = linkedin.fetch_member(str(token['access_token']))
+        label = getattr(connector, 'label', slug)
+        name = '{0} - {1}'.format(label, member_name) if member_name else label
+
+        # Signing in again with the same LinkedIn member repairs that
+        # connection in place, for the reasons the Google callback gives: its
+        # MCP URL is already pasted into AI clients and must keep working.
+        existing = None
+        if member_id:
+            existing = (
+                Connection.objects
+                .filter(tenant=state.tenant, connector=slug, account_key=member_id)
+                .first()
+            )
+        if existing is not None:
+            connection = existing
+            connection.name = name[:80]
+            connection.status = Connection.Status.ACTIVE
+            connection.last_error = ''
+        else:
+            connection = Connection(
+                tenant=state.tenant,
+                created_by=state.user,
+                connector=slug,
+                name=name[:80],
+                account_key=member_id,
+                disabled_tools=list(getattr(connector, 'write_tools', ()) or ()),
+            )
+
+        creds = linkedin.creds_from_token(token)
+        if member_name:
+            creds['member_name'] = member_name
+        connection.set_creds(creds)
+        connection.save()
+        return '', slug
+

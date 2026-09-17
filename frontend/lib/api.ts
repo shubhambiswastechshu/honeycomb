@@ -1051,28 +1051,28 @@ export function listConnectionActivity(
 }
 
 /* ------------------------------------------------------------------ */
-/* Google OAuth                                                        */
+/* Sign-in connectors (Google, LinkedIn)                               */
 /*                                                                     */
 /*   GET /connectors/<slug>/oauth/start/ -> {authorize_url}            */
 /*                                                                     */
-/* Connectors whose auth is "google_oauth" have no credentials to      */
-/* paste: the connection is created by the callback, not by this       */
-/* client. So there is deliberately no matching finish() call here --  */
-/* Google redirects to the server, the server redirects back to the    */
+/* Connectors whose auth is "google_oauth" or "linkedin_oauth" have    */
+/* no credentials to paste: the connection is created by the callback, */
+/* not by this client. So there is deliberately no finish() call --    */
+/* the provider redirects to the server, which redirects back to the   */
 /* connector page with ?connected=1 or ?error=<message>, and the page  */
 /* reads that instead of polling for a result it cannot see.           */
 /* ------------------------------------------------------------------ */
 
 /**
- * Ask the server where to send the browser to start the Google consent
+ * Ask the server where to send the browser to start the provider's consent
  * screen. Each call mints a fresh one-time state nonce, so the URL is good for
  * exactly one attempt and must be navigated to rather than stored or reused.
  *
- * Rejects with the server's own message when Google is not configured on this
+ * Rejects with the server's own message when sign-in is not configured on this
  * deployment; that message names the redirect URI an admin has to register, so
  * it must be shown verbatim rather than replaced with a friendlier sentence.
  */
-export function startGoogleOAuth(
+export function startConnectorOAuth(
   slug: string
 ): Promise<{ authorize_url: string }> {
   return request<{ authorize_url: string }>(

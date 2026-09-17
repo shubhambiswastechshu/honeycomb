@@ -9,7 +9,7 @@ whatever else the project mounts there.
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from .oauth import GoogleOAuthCallbackView, GoogleOAuthStartView
+from .oauth import GoogleOAuthCallbackView, GoogleOAuthStartView, LinkedInOAuthCallbackView
 from .plugin import download as plugin_download
 from .views import ConnectionViewSet, ConnectorCatalogView
 
@@ -45,6 +45,13 @@ urlpatterns = [
         'connectors/oauth/callback/',
         GoogleOAuthCallbackView.as_view(),
         name='connector-oauth-callback',
+    ),
+    # LinkedIn's landing route. Registered in the LinkedIn app's Auth tab, so
+    # as permanent as the Google one; connections.linkedin.redirect_uri builds it.
+    path(
+        'connectors/oauth/linkedin/callback/',
+        LinkedInOAuthCallbackView.as_view(),
+        name='connector-oauth-linkedin-callback',
     ),
     # <str:> and not <slug:>: a registry slug is ours to choose and has always
     # been slug-shaped, but routing must not be the thing that decides that.
