@@ -3,7 +3,7 @@
  * Plugin Name: TechShu SEO Bridge
  * Plugin URI:  https://bringdata.a.techshu.in
  * Description: Connects this WordPress site to the Falcon MCP portal for AI-assisted management — content, SEO (Yoast-compatible), media, image optimization, menus, themes (incl. FSE), users, settings, security hardening, performance, backups & WooCommerce. Changes are applied live and logged here.
- * Version:     2.1.0
+ * Version:     2.2.0
  * Requires at least: 5.6
  * Requires PHP: 7.4
  * Author:      TechShu
@@ -11,14 +11,24 @@
  * License:     GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: techshu-seo-bridge
+ * Update URI:  https://honeycomb-api.a.techshu.in/api/plugins/wordpress/
  */
 
 if (!defined('ABSPATH')) {
     exit; // No direct access.
 }
 
-define('FALCON_SEO_VERSION', '2.1.0');
+define('FALCON_SEO_VERSION', '2.2.0');
 define('FALCON_SEO_TABLE', 'falcon_pending');
+
+// Where this plugin checks for its own updates. It is not on WordPress.org, so
+// this is its update server (Honeycomb's connections.plugin.update_manifest).
+// Overridable in wp-config.php with a define() of the same name, or the
+// 'falcon_seo_update_url' filter, so a self-hosted portal can serve its own.
+if (!defined('FALCON_SEO_UPDATE_URL')) {
+    define('FALCON_SEO_UPDATE_URL', 'https://honeycomb-api.a.techshu.in/api/plugins/wordpress/update.json');
+}
+define('FALCON_SEO_FILE', __FILE__);
 
 /* ============================================================
  * Activation — create the pending-changes table + a token
@@ -3994,6 +4004,165 @@ function falcon_seo_rest_index_status(WP_REST_Request $req) {
 /* ============================================================
  * Admin UI — settings + pending review
  * ============================================================ */
+/* ============================================================
+ * Self-update — check TechShu's update server and let WordPress
+ * upgrade this plugin like any other. Two modes, the site owner's
+ * choice: WordPress shows an update to apply with one click, or
+ * (opt-in) it upgrades silently in the background.
+ *
+ * Needed because this plugin is not on WordPress.org, so without
+ * an update server an installed copy would never learn a newer
+ * version exists. The server is Honeycomb (FALCON_SEO_UPDATE_URL);
+ * the package it points at is the same signed-in download shown in
+ * the portal, so nothing here trusts an arbitrary third party.
+ * ============================================================ */
+function falcon_seo_update_url() {
+    return apply_filters('falcon_seo_update_url', FALCON_SEO_UPDATE_URL);
+}
+
+// The plugin's own row in the plugins list, e.g. 'falcon-seo/falcon-seo.php'.
+function falcon_seo_basename() {
+    return plugin_basename(FALCON_SEO_FILE);
+}
+
+/**
+ * The update manifest from the server, or null. Cached for twelve hours in a
+ * transient so a routine page load never blocks on the network, and cached even
+ * on failure (briefly) so an unreachable server does not mean a request every
+ * time WordPress rebuilds its update list.
+ */
+function falcon_seo_fetch_manifest($force = false) {
+    $cache_key = 'falcon_seo_update_manifest';
+    if (!$force) {
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return is_array($cached) ? $cached : null;
+        }
+    }
+    $res = wp_remote_get(falcon_seo_update_url(), array(
+        'timeout' => 8,
+        'headers' => array('Accept' => 'application/json'),
+    ));
+    if (is_wp_error($res) || wp_remote_retrieve_response_code($res) !== 200) {
+        // Remember the failure briefly, not for the full window: a server that
+        // is down now may be up in an hour, and we do not want to wait twelve.
+        set_transient($cache_key, 'error', HOUR_IN_SECONDS);
+        return null;
+    }
+    $data = json_decode(wp_remote_retrieve_body($res), true);
+    if (!is_array($data) || empty($data['version'])) {
+        set_transient($cache_key, 'error', HOUR_IN_SECONDS);
+        return null;
+    }
+    set_transient($cache_key, $data, 12 * HOUR_IN_SECONDS);
+    return $data;
+}
+
+// Build the object WordPress stores for a known update. Shared by the update
+// check and the details popup so the two can never describe different releases.
+function falcon_seo_update_object($manifest) {
+    $obj = new stdClass();
+    $obj->slug = isset($manifest['slug']) ? $manifest['slug'] : 'falcon-seo';
+    $obj->plugin = falcon_seo_basename();
+    $obj->new_version = $manifest['version'];
+    $obj->url = isset($manifest['homepage']) ? $manifest['homepage'] : '';
+    $obj->package = isset($manifest['package']) ? $manifest['package'] : (isset($manifest['download_url']) ? $manifest['download_url'] : '');
+    $obj->tested = isset($manifest['tested']) ? $manifest['tested'] : '';
+    $obj->requires = isset($manifest['requires']) ? $manifest['requires'] : '';
+    $obj->requires_php = isset($manifest['requires_php']) ? $manifest['requires_php'] : '';
+    $obj->icons = array();
+    return $obj;
+}
+
+// Tell WordPress whether a newer version is waiting. Runs whenever WordPress
+// rebuilds its plugin-update list, so the manifest is read from cache here.
+add_filter('pre_set_site_transient_update_plugins', 'falcon_seo_inject_update');
+function falcon_seo_inject_update($transient) {
+    if (!is_object($transient)) {
+        return $transient;
+    }
+    $manifest = falcon_seo_fetch_manifest();
+    if (!$manifest) {
+        return $transient;
+    }
+    $file = falcon_seo_basename();
+    if (version_compare($manifest['version'], FALCON_SEO_VERSION, '>')) {
+        if (!isset($transient->response) || !is_array($transient->response)) {
+            $transient->response = array();
+        }
+        $transient->response[$file] = falcon_seo_update_object($manifest);
+        unset($transient->no_update[$file]);
+    } else {
+        // Listing it here (not just omitting it) is what makes WordPress show
+        // the "Auto-updates enabled" state and the "up to date" line correctly.
+        if (!isset($transient->no_update) || !is_array($transient->no_update)) {
+            $transient->no_update = array();
+        }
+        $transient->no_update[$file] = falcon_seo_update_object($manifest);
+    }
+    return $transient;
+}
+
+// The "View details" popup on the Plugins screen.
+add_filter('plugins_api', 'falcon_seo_plugin_info', 20, 3);
+function falcon_seo_plugin_info($result, $action, $args) {
+    if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== 'falcon-seo') {
+        return $result;
+    }
+    $manifest = falcon_seo_fetch_manifest();
+    if (!$manifest) {
+        return $result;
+    }
+    $info = new stdClass();
+    $info->name = isset($manifest['name']) ? $manifest['name'] : 'TechShu SEO Bridge';
+    $info->slug = 'falcon-seo';
+    $info->version = $manifest['version'];
+    $info->author = isset($manifest['author']) ? $manifest['author'] : 'TechShu';
+    $info->homepage = isset($manifest['homepage']) ? $manifest['homepage'] : '';
+    $info->requires = isset($manifest['requires']) ? $manifest['requires'] : '';
+    $info->tested = isset($manifest['tested']) ? $manifest['tested'] : '';
+    $info->requires_php = isset($manifest['requires_php']) ? $manifest['requires_php'] : '';
+    $info->download_link = isset($manifest['package']) ? $manifest['package'] : '';
+    $info->sections = isset($manifest['sections']) && is_array($manifest['sections']) ? $manifest['sections'] : array();
+    return $info;
+}
+
+// After a successful upgrade of this plugin, drop the cached manifest so the
+// screen reflects the new version immediately rather than after the cache ages.
+add_action('upgrader_process_complete', 'falcon_seo_after_upgrade', 10, 2);
+function falcon_seo_after_upgrade($upgrader, $data) {
+    if (!is_array($data) || (isset($data['type']) && $data['type'] !== 'plugin')) {
+        return;
+    }
+    $plugins = isset($data['plugins']) ? (array) $data['plugins'] : array();
+    if (in_array(falcon_seo_basename(), $plugins, true)) {
+        delete_transient('falcon_seo_update_manifest');
+    }
+}
+
+// Silent background updates, only when the site owner opted in on the settings
+// screen. Off by default: an unattended release is convenient but a site owner
+// should choose it, not inherit it.
+add_filter('auto_update_plugin', 'falcon_seo_auto_update_optin', 10, 2);
+function falcon_seo_auto_update_optin($update, $item) {
+    if (is_object($item) && !empty($item->plugin) && $item->plugin === falcon_seo_basename()) {
+        return get_option('falcon_seo_auto_update') === '1';
+    }
+    return $update;
+}
+
+// Save the silent/one-click choice from the settings screen.
+add_action('admin_post_falcon_seo_autoupdate', 'falcon_seo_handle_autoupdate');
+function falcon_seo_handle_autoupdate() {
+    if (!current_user_can('manage_options')) wp_die('Nope.');
+    check_admin_referer('falcon_seo_autoupdate');
+    update_option('falcon_seo_auto_update', isset($_POST['falcon_seo_auto_update']) ? '1' : '0');
+    // Look again on the next page load so the state shown is the real one.
+    delete_transient('falcon_seo_update_manifest');
+    wp_redirect(admin_url('admin.php?page=falcon-seo&autoupdate=1'));
+    exit;
+}
+
 add_action('admin_menu', function () {
     add_menu_page('TechShu SEO Bridge', 'TechShu SEO Bridge', 'manage_options', 'falcon-seo', 'falcon_seo_admin_page', 'dashicons-chart-line', 80);
 });
@@ -4082,6 +4251,42 @@ function falcon_seo_admin_page() {
             <?php wp_nonce_field('falcon_seo_regen'); ?>
             <input type="hidden" name="action" value="falcon_seo_regen">
             <button class="button">Regenerate token</button>
+        </form>
+
+        <?php
+        $manifest = falcon_seo_fetch_manifest();
+        $latest   = ($manifest && !empty($manifest['version'])) ? $manifest['version'] : '';
+        $has_update = $latest && version_compare($latest, FALCON_SEO_VERSION, '>');
+        $auto = get_option('falcon_seo_auto_update') === '1';
+        ?>
+        <h2 style="margin-top:2em;">Updates</h2>
+        <?php if (isset($_GET['autoupdate'])): ?>
+            <div class="notice notice-success inline"><p>Update preference saved.</p></div>
+        <?php endif; ?>
+        <table class="form-table">
+            <tr><th>Installed version</th><td><code><?php echo esc_html(FALCON_SEO_VERSION); ?></code></td></tr>
+            <tr><th>Latest version</th><td>
+                <?php if (!$latest): ?>
+                    <em>Could not reach the update server just now.</em>
+                <?php elseif ($has_update): ?>
+                    <strong style="color:#b32d2e;"><?php echo esc_html($latest); ?> available.</strong>
+                    <a href="<?php echo esc_url(admin_url('plugins.php')); ?>">Update on the Plugins screen &rarr;</a>
+                <?php else: ?>
+                    <span style="color:#1a7f37;">Up to date.</span>
+                <?php endif; ?>
+            </td></tr>
+        </table>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <?php wp_nonce_field('falcon_seo_autoupdate'); ?>
+            <input type="hidden" name="action" value="falcon_seo_autoupdate">
+            <label>
+                <input type="checkbox" name="falcon_seo_auto_update" value="1" <?php checked($auto); ?>>
+                Install updates automatically in the background
+            </label>
+            <p class="description" style="margin:4px 0 8px;">
+                Off by default: WordPress shows an update for you to apply with one click. Tick this to let it upgrade silently as soon as a new version is released.
+            </p>
+            <button class="button">Save update preference</button>
         </form>
 
         <h2 style="margin-top:2em;">Recent changes (<?php echo count($rows); ?>)</h2>

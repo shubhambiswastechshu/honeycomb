@@ -4,7 +4,7 @@ Tags: ai, seo, content, automation, woocommerce
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -105,6 +105,15 @@ active theme, site URL, registration defaults, etc.).
 2. Connecting the site in the Falcon portal.
 
 == Changelog ==
+
+= 2.2.0 =
+* The plugin now keeps itself up to date. WordPress checks TechShu's update
+  server and shows a new release on the Plugins screen to apply with one click.
+* New "Updates" section on the TechShu SEO Bridge settings screen: see the
+  installed and latest version, and opt in to fully automatic background
+  updates (off by default, so one-click stays the norm).
+* No new data leaves the site — the update check reads only a public version
+  number and downloads the same package the portal already offers.
 
 = 2.1.0 =
 * Compatibility: the connector now works on sites that block the REST API for

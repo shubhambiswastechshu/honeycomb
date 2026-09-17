@@ -11,6 +11,7 @@ from rest_framework.routers import SimpleRouter
 
 from .oauth import GoogleOAuthCallbackView, GoogleOAuthStartView, LinkedInOAuthCallbackView
 from .plugin import download as plugin_download
+from .plugin import update_manifest as plugin_update_manifest
 from .views import ConnectionViewSet, ConnectorCatalogView
 
 app_name = 'connections'
@@ -24,6 +25,10 @@ urlpatterns = [
     # served from here rather than from a repository the user has no access to.
     # Declared above the <slug> patterns, which would otherwise swallow it.
     path('plugins/wordpress/', plugin_download, name='plugin-wordpress'),
+    # The update server an installed plugin polls (see connections.plugin.
+    # update_manifest). Declared next to the download it points at.
+    path('plugins/wordpress/update.json', plugin_update_manifest,
+         name='plugin-wordpress-update'),
     # Declared above connector-detail. <str:> cannot swallow a '/', so the
     # detail route could not match these anyway -- but the OAuth pair is the
     # more specific pattern and reads better where nothing has to be reasoned
