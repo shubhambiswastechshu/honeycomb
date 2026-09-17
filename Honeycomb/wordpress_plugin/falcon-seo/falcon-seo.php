@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: TechShu SEO Bridge
- * Plugin URI:  https://bringdata.a.techshu.in
+ * Plugin URI:  https://honeycomb.a.techshu.in
  * Description: Connects this WordPress site to the Falcon MCP portal for AI-assisted management — content, SEO (Yoast-compatible), media, image optimization, menus, themes (incl. FSE), users, settings, security hardening, performance, backups & WooCommerce. Changes are applied live and logged here.
  * Version:     2.2.0
  * Requires at least: 5.6
