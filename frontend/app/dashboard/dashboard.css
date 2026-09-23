@@ -3052,6 +3052,19 @@ a.dash-notif-row:focus-visible {
   text-decoration: line-through;
 }
 
+/* See the note in app/dashboard/activity/page.tsx: the trend chart is
+   context for the log below it, not the subject of the page. */
+.dash .act-trend {
+  max-width: 760px;
+  margin-bottom: 16px;
+}
+
+/* The activity page's All / Errors filter. The chips are the marketplace's,
+   so two filter strips one page apart are not two different controls. */
+.dash .act-filter {
+  margin: 0 0 14px;
+}
+
 /* ---- Activity ---- */
 
 .dash .conn-activity {
