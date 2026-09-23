@@ -3062,8 +3062,16 @@ a.dash-notif-row:focus-visible {
    Fractions rather than fixed widths: the left column holds the trend and
    the activity rows and wants the room, the right holds endpoint URLs and
    the three setup steps and does not. */
+/* A row of numbers, not a grid of tiles: .data-stats lays out fixed 172px
+   cells, which is right for a card and wrong for a strip. */
 .dash .ov-kpis {
-  margin-bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  grid-template-columns: none;
+  gap: 18px 4px;
+  margin: 0 0 22px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--md-outline-variant);
 }
 
 .dash .ov-grid {
@@ -3086,12 +3094,18 @@ a.dash-notif-row:focus-visible {
   margin: 0;
 }
 
-/* Small on purpose. The component sizes its cells from the width it is
-   given, so this is the real control over the chart's height -- and on the
-   Overview the trend is a glance, not the subject. /dashboard/activity shows
-   it larger, next to the log it describes. */
+/* Full width, and flat. The chart is the one thing on this page that earns
+   the whole pane, so it gets it -- and the box it used to sit in was chrome
+   drawn around something that already reads as a distinct object. */
 .dash .ov-trend {
-  max-width: 460px;
+  margin-bottom: 22px;
+}
+
+.dash .ov-trend .ov-matrix {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
 }
 
 /* One column below this: side by side, the right-hand column's URLs and
@@ -3106,11 +3120,10 @@ a.dash-notif-row:focus-visible {
   }
 }
 
-/* See the note in app/dashboard/activity/page.tsx: the trend chart is
-   context for the log below it, not the subject of the page. */
+/* No width cap any more: ActivityMatrix clamps its own cell HEIGHT, so a
+   full-bleed chart is short by construction rather than by being squeezed. */
 .dash .act-trend {
-  max-width: 760px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 /* The activity page's All / Errors filter. The chips are the marketplace's,
@@ -3860,8 +3873,22 @@ a.dash-notif-row:focus-visible {
   gap: 2px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #ffffff;
+  border-radius: var(--md-shape-md);
+  background: var(--md-surface-container-lowest);
+}
+
+/* On the Overview the same tiles lose their card: six bordered boxes in a
+   row is six frames around six numbers, and the numbers are doing the work.
+   A single rule under the strip separates it from the chart instead. */
+.dash .ov-kpis .data-stat {
+  padding: 0 30px 0 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+.dash .ov-kpis .data-stat-bad .data-stat-value {
+  color: var(--md-error);
 }
 
 .dash .data-stat-value {

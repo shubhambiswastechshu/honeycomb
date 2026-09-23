@@ -24,11 +24,19 @@ import type { ActivitySummary } from "@/lib/api";
 /** Cells in a full-height column. The scale is quantised to this. */
 const ROWS = 12;
 
-/* Cell geometry is MEASURED, not fixed. One SVG unit is one CSS pixel here, so
-   the columns divide whatever width the panel gives them and the cells stay
-   square at whatever size that implies. A fixed cell size would either strand
-   a narrow chart in a wide panel -- the blank space this dashboard has been
-   fighting -- or overflow a phone. The clamp keeps cells readable at both ends. */
+/* Cell geometry is MEASURED, not fixed, so the columns divide whatever width
+   the panel gives them. One SVG unit is one CSS pixel -- but that only holds
+   while the computed width MATCHES the panel, and it stopped holding once the
+   cell hit MAX_CELL: the viewBox then came out narrower than the box, CSS
+   `width: 100%` stretched it, and on a full-width pane the whole chart --
+   axis labels included -- was scaled about 2.5x.
+   
+   So width and height are clamped separately now. The cell's WIDTH is free to
+   grow, which keeps the viewBox the width of the panel and the scale at 1:1;
+   its HEIGHT keeps the old clamp, which is what stops twelve rows of
+   fill-the-pane squares from making a 900px-tall chart. Cells end up wider
+   than they are tall on a broad screen, which is the normal shape for a
+   heatmap and is what lets this be full-bleed AND short. */
 const GAP = 2;
 const MIN_CELL = 4;
 const MAX_CELL = 14;
@@ -159,12 +167,15 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
   );
 
   const columns = model.columns;
-  // Divide the measured width among the columns, then square the cell.
+  // Divide the measured width among the columns. The width is taken as-is so
+  // the viewBox matches the panel; only the height is clamped.
   const raw = columns.length === 0 ? 0 : (boxW - AXIS_W) / columns.length - GAP;
-  const CELL = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.round(raw)));
-  const STEP = CELL + GAP;
-  const width = AXIS_W + columns.length * STEP;
-  const plotH = ROWS * STEP;
+  const CELL_W = Math.max(MIN_CELL, Math.round(raw));
+  const CELL_H = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.round(raw)));
+  const STEP_X = CELL_W + GAP;
+  const STEP_Y = CELL_H + GAP;
+  const width = AXIS_W + columns.length * STEP_X;
+  const plotH = ROWS * STEP_Y;
   const height = plotH + AXIS_H;
 
   const onMove = useCallback(
@@ -176,10 +187,10 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
       // Map the pointer through the viewBox rather than trusting pixel maths:
       // the SVG scales with the panel, so client pixels are not SVG units.
       const x = ((event.clientX - box.left) / box.width) * width - AXIS_W;
-      const index = Math.floor(x / STEP);
+      const index = Math.floor(x / STEP_X);
       setCursor(index >= 0 && index < columns.length ? index : null);
     },
-    [columns.length, width, STEP],
+    [columns.length, width, STEP_X],
   );
 
   const onKey = useCallback(
@@ -277,12 +288,12 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
           })}
 
           {columns.map(function column(day, index) {
-            const x = AXIS_W + index * STEP;
+            const x = AXIS_W + index * STEP_X;
             const cells = [];
             for (let row = 0; row < ROWS; row += 1) {
               // Row 0 is the BOTTOM of the column: volume grows upward from a
               // single baseline, like every other magnitude mark.
-              const y = plotH - (row + 1) * STEP + GAP;
+              const y = plotH - (row + 1) * STEP_Y + GAP;
               let tone = "ov-matrix-cell-empty";
               if (row < day.okCells) {
                 tone = "ov-matrix-cell-ok";
@@ -295,8 +306,8 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
                   className={"ov-matrix-cell " + tone}
                   x={x}
                   y={y}
-                  width={CELL}
-                  height={CELL}
+                  width={CELL_W}
+                  height={CELL_H}
                   rx={1.5}
                 />,
               );
@@ -311,8 +322,8 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
           {cursor !== null ? (
             <line
               className="ov-matrix-cursor"
-              x1={AXIS_W + cursor * STEP + CELL / 2}
-              x2={AXIS_W + cursor * STEP + CELL / 2}
+              x1={AXIS_W + cursor * STEP_X + CELL_W / 2}
+              x2={AXIS_W + cursor * STEP_X + CELL_W / 2}
               y1={-2}
               y2={plotH + 2}
             />
@@ -321,7 +332,7 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
           {columns.map(function label(day, index) {
             // Space labels by what fits: a date needs ~44px, so derive the
             // stride from the column width instead of guessing a constant.
-            const every = Math.max(1, Math.ceil(44 / STEP));
+            const every = Math.max(1, Math.ceil(44 / STEP_X));
             if (index % every !== 0) {
               return null;
             }
@@ -329,7 +340,7 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
               <text
                 key={"x" + day.iso}
                 className="ov-matrix-xlabel"
-                x={AXIS_W + index * STEP + CELL / 2}
+                x={AXIS_W + index * STEP_X + CELL_W / 2}
                 y={plotH + 15}
                 textAnchor="middle"
               >
@@ -346,7 +357,7 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
             style={{
               left:
                 "calc(" +
-                (((AXIS_W + cursor! * STEP + CELL / 2) / width) * 100).toFixed(3) +
+                (((AXIS_W + cursor! * STEP_X + CELL_W / 2) / width) * 100).toFixed(3) +
                 "% )",
             }}
           >

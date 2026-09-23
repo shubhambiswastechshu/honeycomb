@@ -423,9 +423,20 @@ export default function OverviewPage() {
           </ul>
         ) : null}
 
-        {/* Two columns below the numbers: what needs doing on the left, what
-            the workspace IS on the right. Stacked, this was 1766px of
-            single-file scrolling for five things that fit on one screen. */}
+        {/* ---- The trend, across the full width ----
+            Its own band rather than a block inside "Recent activity": at full
+            width it is the widest thing on the page, and nesting it in a
+            column meant either a narrow chart or a column the rest of the
+            content did not need. */}
+        {summary !== null ? (
+          <div className="ov-trend">
+            <ActivityMatrix summary={summary} />
+          </div>
+        ) : null}
+
+        {/* Two columns below: what needs doing on the left, what the
+            workspace IS on the right. Stacked, this was 1766px of single-file
+            scrolling for five things that fit on one screen. */}
         <div className="ov-grid">
           <div className="ov-col">
 
@@ -494,15 +505,6 @@ export default function OverviewPage() {
               </Link>
             </div>
 
-            {/* Capped: the chart's SVG is aspect-locked to its viewBox and
-                width:100% scales the whole thing, so across the full pane it
-                reached 946px -- over half this page -- for a grid that was
-                mostly empty. */}
-            {summary !== null ? (
-              <div className="ov-trend">
-                <ActivityMatrix summary={summary} />
-              </div>
-            ) : null}
 
             {eventsError !== null ? (
               <p className="error" role="alert">
