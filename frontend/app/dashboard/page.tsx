@@ -581,7 +581,7 @@ export default function OverviewPage() {
 
           </div>
 
-          <div className="ov-col ov-col-side">
+          <div className="ov-col">
 
         {/* ---- Endpoints ---- */}
         {connections !== null && connections.length > 0 ? (

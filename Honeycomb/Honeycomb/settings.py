@@ -401,6 +401,11 @@ REST_FRAMEWORK = {
         # off this process, and nobody legitimately configures twenty
         # integrations a minute.
         'connect': '20/min',
+        # Listing or reading a connection, which is one tenant-scoped SELECT
+        # and happens on nearly every dashboard page. Split out of 'connect'
+        # because sharing that write ceiling put ordinary navigation over the
+        # limit; matched to 'connectors' above, which is the same kind of read.
+        'connections_read': '120/min',
         # The public crawler. Starting a crawl puts load on a real machine and on
         # somebody's website, with no account behind the request -- so the
         # ceiling is per client address and low. Reads are the live view

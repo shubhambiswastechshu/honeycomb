@@ -18,7 +18,7 @@ from django.db.models import Count, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -126,6 +126,24 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
     # live MCP endpoint. Cheap to read, but not something a browser has any
     # reason to do in bulk.
     throttle_scope = 'connect'
+
+    def get_throttles(self):
+        """Reads do not share the write ceiling.
+
+        'connect' is 20/min because creating a connection encrypts a
+        credential and, for some connectors, calls the third party to verify
+        it -- twenty of those a minute is not a person. A GET is none of that:
+        it is one tenant-scoped SELECT, and the dashboard makes it on nearly
+        every page, because the overview, the data page, global search and the
+        notification bell all want the list.
+
+        Sharing one ceiling meant about eight page views inside a minute
+        returned 429 to a user who had written nothing -- measured at sixteen
+        GETs across six navigations. The limit on writes is unchanged.
+        """
+        if self.request.method in SAFE_METHODS:
+            self.throttle_scope = 'connections_read'
+        return super().get_throttles()
 
     def get_queryset(self):
         queryset = with_key_counts(super().get_queryset())
