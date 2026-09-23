@@ -80,8 +80,10 @@ function RailLink({ item, active }: { item: RailItem; active: boolean }) {
      caption, not as a filled block of text. */
   const inner = (
     <>
+      {/* Material's icon is 24px; the rail runs two density steps down, so
+          the glyph comes down with the box it sits in. */}
       <span className="rail-box">
-        <Icon size={19} strokeWidth={1.75} aria-hidden="true" />
+        <Icon size={21} strokeWidth={1.9} aria-hidden="true" />
       </span>
       <span className="rail-name">{item.label}</span>
       <span className="rail-tip" role="presentation">

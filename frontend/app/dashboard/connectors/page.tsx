@@ -257,7 +257,7 @@ export default function ConnectorsPage() {
                 <Search
                   className="mkt-search-icon"
                   size={16}
-                  strokeWidth={1.8}
+                  strokeWidth={1.9}
                   aria-hidden="true"
                 />
                 <input
@@ -279,6 +279,9 @@ export default function ConnectorsPage() {
                   role="group"
                   aria-label="Filter by category"
                 >
+                  {/* A Material filter chip carries a leading checkmark once
+                      it is on. aria-pressed is still the state; the tick is
+                      what makes it legible at a glance. */}
                   <button
                     type="button"
                     className="mkt-chip"
@@ -287,6 +290,14 @@ export default function ConnectorsPage() {
                       setCategory(ALL);
                     }}
                   >
+                    {category === ALL ? (
+                      <Check
+                        className="mkt-chip-check"
+                        size={15}
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      />
+                    ) : null}
                     All
                   </button>
                   {categories.map(function renderChip(name: string) {
@@ -300,6 +311,14 @@ export default function ConnectorsPage() {
                           setCategory(name);
                         }}
                       >
+                        {category === name ? (
+                          <Check
+                            className="mkt-chip-check"
+                            size={15}
+                            strokeWidth={2.2}
+                            aria-hidden="true"
+                          />
+                        ) : null}
                         {name}
                       </button>
                     );
@@ -398,8 +417,8 @@ export default function ConnectorsPage() {
                               <span className="mkt-meta">
                                 <span className="mkt-cta">
                                   <Plus
-                                    size={13}
-                                    strokeWidth={2.4}
+                                    size={15}
+                                    strokeWidth={2.1}
                                     aria-hidden="true"
                                   />
                                   {connected ? "Add another" : "Connect"}

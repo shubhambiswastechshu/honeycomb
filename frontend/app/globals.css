@@ -16,6 +16,99 @@
   --accent-hover: #d98c2d;
   --accent-contrast: var(--ink);
   --error-text: #9b3d22;
+
+  /* ------------------------------------------------------------------
+     Material Design 3 token layer
+
+     Material's roles, seeded from the honeycomb amber (hue ~36deg) instead
+     of Material's default purple, so the product reads as Material without
+     becoming somebody else's. Tones were picked by hand rather than
+     generated: --amber-500 sits around tone 70, which cannot carry small
+     text on a light ground, so it stays a FILL colour and --md-primary is
+     the one text and icons use. Every pairing below clears 4.5:1.
+
+     Nothing consumes these at :root. The auth screens keep the brand
+     variables above; the dashboard is what draws from this block.
+     ------------------------------------------------------------------ */
+
+  /* Accent roles */
+  --md-primary: #7d5300;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #ffddab;
+  --md-on-primary-container: #281800;
+  --md-secondary: #6d5c3f;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #f6e2c2;
+  --md-on-secondary-container: #251a06;
+  --md-tertiary-container: #d3ecc6;
+  --md-on-tertiary-container: #0c2007;
+  --md-error: #8f4426;
+  --md-error-container: #ffdbcd;
+  --md-on-error-container: #360f00;
+
+  /* Surfaces. One warm ground with five container tones above it: in
+     Material a region is separated from its neighbour by TONE, not by a
+     border, which is why the bar, the rail and the pane share --md-surface
+     and carry no rules between them. */
+  --md-surface: #fffbf3;
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #fdf6ea;
+  --md-surface-container: #f8f0e2;
+  --md-surface-container-high: #f2ebdc;
+  --md-surface-container-highest: #ece5d6;
+  --md-on-surface: #1f1b13;
+  --md-on-surface-variant: #554d3c;
+  --md-outline: #877c68;
+  --md-outline-variant: #dbd0ba;
+  --md-inverse-surface: #34302a;
+  --md-inverse-on-surface: #f8efe2;
+
+  /* State layers: the on-colour painted over a control at these opacities. */
+  --md-state-hover: 0.08;
+  --md-state-pressed: 0.1;
+
+  /* Elevation. Material's two-shadow recipe, tinted with the brand ink
+     rather than neutral black so a raised surface stays warm. */
+  --md-elevation-0: none;
+  --md-elevation-1: 0 1px 2px rgba(31, 27, 19, 0.26),
+    0 1px 3px 1px rgba(31, 27, 19, 0.1);
+  --md-elevation-2: 0 1px 2px rgba(31, 27, 19, 0.26),
+    0 2px 6px 2px rgba(31, 27, 19, 0.11);
+  --md-elevation-3: 0 1px 3px rgba(31, 27, 19, 0.26),
+    0 4px 8px 3px rgba(31, 27, 19, 0.12);
+
+  /* Shape scale */
+  --md-shape-xs: 4px;
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-xl: 28px;
+  --md-shape-full: 999px;
+
+  /* Motion */
+  --md-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-dur-short: 150ms;
+  --md-dur-medium: 250ms;
+  --md-dur-long: 400ms;
+
+  /* Type scale. Roboto is already the app's typeface, so these are the M3
+     roles expressed in it. Given as `font` shorthands because every role
+     fixes weight, size and line-height together -- tracking is a separate
+     property and is set alongside each use, since the shorthand cannot
+     carry it. */
+  --md-font: var(--font-sans), Roboto, "Segoe UI", sans-serif;
+  --md-type-headline-md: 400 28px/36px var(--md-font);
+  --md-type-headline-sm: 400 24px/32px var(--md-font);
+  --md-type-title-lg: 400 22px/28px var(--md-font);
+  --md-type-title-md: 500 16px/24px var(--md-font);
+  --md-type-title-sm: 500 14px/20px var(--md-font);
+  --md-type-body-lg: 400 16px/24px var(--md-font);
+  --md-type-body-md: 400 14px/20px var(--md-font);
+  --md-type-body-sm: 400 12px/16px var(--md-font);
+  --md-type-label-lg: 500 14px/20px var(--md-font);
+  --md-type-label-md: 500 12px/16px var(--md-font);
+  --md-type-label-sm: 500 11px/16px var(--md-font);
 }
 
 *,

@@ -294,7 +294,7 @@ export default function GlobalSearch() {
       <label className="dash-visually-hidden" htmlFor="dash-search-input">
         Search pages, connections and connectors
       </label>
-      <Search className="dash-search-icon" size={15} strokeWidth={1.9} aria-hidden="true" />
+      <Search className="dash-search-icon" size={19} strokeWidth={1.9} aria-hidden="true" />
       <input
         id="dash-search-input"
         ref={inputRef}

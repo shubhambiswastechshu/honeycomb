@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/ui/Logo";
 import GlobalSearch from "@/components/dashboard/GlobalSearch";
+import NotificationBell from "@/components/dashboard/NotificationBell";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import { useSession } from "@/components/dashboard/SessionProvider";
 
@@ -47,6 +48,9 @@ export default function TopBar() {
           two things a person reaches for least in the column reserved for
           the things they reach for most. */}
       <div className="dash-account">
+        {/* Left of the account, because it is about the workspace rather than
+            about this person. */}
+        <NotificationBell />
         <Link
           href="/dashboard/profile"
           className="dash-account-link"

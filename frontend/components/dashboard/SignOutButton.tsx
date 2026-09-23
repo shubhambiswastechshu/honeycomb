@@ -36,7 +36,7 @@ export default function SignOutButton() {
           setAsking(true);
         }}
       >
-        <LogOut size={17} strokeWidth={1.8} aria-hidden="true" />
+        <LogOut size={18} strokeWidth={1.9} aria-hidden="true" />
       </button>
 
       <ConfirmDialog
