@@ -29,11 +29,19 @@ import { useSession } from "@/components/dashboard/SessionProvider";
 import { activitySummary, listActivity, listConnections } from "@/lib/api";
 import type { ActivityEvent, ActivitySummary, Connection } from "@/lib/api";
 
-/** How many calls the activity list shows. Also what is asked of the server. */
-const EVENT_LIMIT = 12;
+/**
+ * How many calls the Overview lists. Six, not twelve: /dashboard/activity is
+ * the full log now, so this is a glance with a way through rather than a
+ * second copy of that page competing with everything else on this one.
+ */
+const EVENT_LIMIT = 6;
 
-/** The activity field's window, in days. 30 is the summary endpoint's cap. */
-const SPARK_DAYS = 90;
+/**
+ * The trend window, in days. Thirty, not ninety: at ninety the chart was
+ * three months of empty cells for a workspace a fortnight old, and it was
+ * the single largest thing on the page.
+ */
+const SPARK_DAYS = 30;
 
 /**
  * How many MCP URLs the Overview lists before handing off to /dashboard/data.
@@ -266,6 +274,29 @@ export default function OverviewPage() {
           errors: failing === null ? 0 : failing.length,
         };
 
+  /**
+   * Two more counts, from the summary rather than the connections list, so
+   * the strip says what the workspace has been DOING and not only what it is
+   * wired to. Read off the server's own sums rather than re-added from the
+   * day buckets -- the number under a chart must not disagree with the chart.
+   *
+   * Null until the summary lands, which renders as nothing rather than as a
+   * zero: "0 calls" and "not loaded yet" are different claims.
+   */
+  const callTotals =
+    summary === null
+      ? null
+      : {
+          calls: summary.total,
+          failed: summary.errors,
+          // Whole percent: a failure rate quoted to two decimals over a
+          // handful of calls is precision the number does not have.
+          failRate:
+            summary.total > 0
+              ? Math.round((summary.errors / summary.total) * 100)
+              : 0,
+        };
+
   const hasConnections = connections !== null && connections.length > 0;
 
   /**
@@ -333,6 +364,71 @@ export default function OverviewPage() {
           </p>
         ) : null}
 
+        {/* ---- The numbers, first ----
+            These were third, under a 946px chart, which put the densest and
+            cheapest-to-read thing on the page below the least informative.
+            A dashboard's first row should be the counts. */}
+        {totals !== null && totals.connections > 0 ? (
+          <ul className="data-stats ov-kpis">
+            <li className="data-stat">
+              <span className="data-stat-value">{totals.connections}</span>
+              <span className="data-stat-label">
+                {totals.connections === 1 ? "Connection" : "Connections"}
+              </span>
+            </li>
+            <li className="data-stat">
+              <span className="data-stat-value">{totals.tools}</span>
+              <span className="data-stat-label">Tools exposed</span>
+            </li>
+            <li className="data-stat">
+              <span className="data-stat-value">{totals.keys}</span>
+              <span className="data-stat-label">
+                {totals.keys === 1 ? "Key" : "Keys"}
+              </span>
+            </li>
+            {/* Absent until the summary answers: "0 calls" and "not loaded"
+                are different claims and must not render the same. */}
+            {callTotals !== null ? (
+              <li className="data-stat">
+                <span className="data-stat-value">{callTotals.calls}</span>
+                <span className="data-stat-label">
+                  {"Calls · " + String(SPARK_DAYS) + "d"}
+                </span>
+              </li>
+            ) : null}
+            {callTotals !== null ? (
+              <li
+                className={
+                  callTotals.failed > 0 ? "data-stat data-stat-bad" : "data-stat"
+                }
+              >
+                <span className="data-stat-value">
+                  {String(callTotals.failRate) + "%"}
+                </span>
+                <span className="data-stat-label">Call failure rate</span>
+              </li>
+            ) : null}
+            <li
+              className={
+                totals.errors > 0 ? "data-stat data-stat-bad" : "data-stat"
+              }
+            >
+              <span className="data-stat-value">{totals.errors}</span>
+              <span className="data-stat-label">
+                {totals.errors === 1
+                  ? "Connection down"
+                  : "Connections down"}
+              </span>
+            </li>
+          </ul>
+        ) : null}
+
+        {/* Two columns below the numbers: what needs doing on the left, what
+            the workspace IS on the right. Stacked, this was 1766px of
+            single-file scrolling for five things that fit on one screen. */}
+        <div className="ov-grid">
+          <div className="ov-col">
+
         {/* ---- Needs attention ---- */}
         {failing !== null && failing.length > 0 ? (
           <section className="ov-section">
@@ -390,9 +486,23 @@ export default function OverviewPage() {
                 <Activity size={15} strokeWidth={2} aria-hidden="true" />
                 <span>Recent activity</span>
               </h2>
+              {/* The Overview shows the newest few; the log itself lives on
+                  /dashboard/activity, so this hands off rather than
+                  reproducing it. */}
+              <Link className="ov-section-link" href="/dashboard/activity">
+                View all
+              </Link>
             </div>
 
-            {summary !== null ? <ActivityMatrix summary={summary} /> : null}
+            {/* Capped: the chart's SVG is aspect-locked to its viewBox and
+                width:100% scales the whole thing, so across the full pane it
+                reached 946px -- over half this page -- for a grid that was
+                mostly empty. */}
+            {summary !== null ? (
+              <div className="ov-trend">
+                <ActivityMatrix summary={summary} />
+              </div>
+            ) : null}
 
             {eventsError !== null ? (
               <p className="error" role="alert">
@@ -467,40 +577,9 @@ export default function OverviewPage() {
           </section>
         ) : null}
 
-        {/* ---- Status strip ---- */}
-        {totals !== null && totals.connections > 0 ? (
-          <section className="ov-section">
-            <h2 className="ov-section-title">At a glance</h2>
-            <ul className="data-stats">
-              <li className="data-stat">
-                <span className="data-stat-value">{totals.connections}</span>
-                <span className="data-stat-label">
-                  {totals.connections === 1 ? "Connection" : "Connections"}
-                </span>
-              </li>
-              <li className="data-stat">
-                <span className="data-stat-value">{totals.tools}</span>
-                <span className="data-stat-label">Tools exposed</span>
-              </li>
-              <li className="data-stat">
-                <span className="data-stat-value">{totals.keys}</span>
-                <span className="data-stat-label">
-                  {totals.keys === 1 ? "Key" : "Keys"}
-                </span>
-              </li>
-              <li
-                className={
-                  totals.errors > 0 ? "data-stat data-stat-bad" : "data-stat"
-                }
-              >
-                <span className="data-stat-value">{totals.errors}</span>
-                <span className="data-stat-label">
-                  {totals.errors === 1 ? "Error" : "Errors"}
-                </span>
-              </li>
-            </ul>
-          </section>
-        ) : null}
+          </div>
+
+          <div className="ov-col ov-col-side">
 
         {/* ---- Endpoints ---- */}
         {connections !== null && connections.length > 0 ? (
@@ -591,6 +670,9 @@ export default function OverviewPage() {
             </ol>
           </section>
         ) : null}
+
+          </div>
+        </div>
 
         {/* Nothing connected, nothing called and nothing loaded yet: the page
             has no honest content, so it shows the wait rather than a frame of

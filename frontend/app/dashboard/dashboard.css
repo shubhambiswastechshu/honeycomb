@@ -3052,6 +3052,60 @@ a.dash-notif-row:focus-visible {
   text-decoration: line-through;
 }
 
+/* ---- Overview layout ----
+
+   The page was a single 1766px column of full-width sections, so five things
+   that fit on one screen took three screens of scrolling -- and the section
+   carrying the least information (a 90-day grid, nearly all of it empty) was
+   the tallest thing on it. Now: the counts across the top, then two columns.
+
+   Fractions rather than fixed widths: the left column holds the trend and
+   the activity rows and wants the room, the right holds endpoint URLs and
+   the three setup steps and does not. */
+.dash .ov-kpis {
+  margin-bottom: 18px;
+}
+
+.dash .ov-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px 20px;
+}
+
+.dash .ov-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* .ov-stack put a margin on every section; inside the columns the flex gap
+   is doing that job, so the margins would double it. */
+.dash .ov-col > .ov-section {
+  margin: 0;
+}
+
+/* Small on purpose. The component sizes its cells from the width it is
+   given, so this is the real control over the chart's height -- and on the
+   Overview the trend is a glance, not the subject. /dashboard/activity shows
+   it larger, next to the log it describes. */
+.dash .ov-trend {
+  max-width: 460px;
+}
+
+/* One column below this: side by side, the right-hand column's URLs and
+   steps are narrower than their own content wants. */
+@media (max-width: 1100px) {
+  .dash .ov-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash .ov-trend {
+    max-width: none;
+  }
+}
+
 /* See the note in app/dashboard/activity/page.tsx: the trend chart is
    context for the log below it, not the subject of the page. */
 .dash .act-trend {
