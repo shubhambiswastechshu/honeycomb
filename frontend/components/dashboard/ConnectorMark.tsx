@@ -35,9 +35,11 @@
 import {
   Bot,
   ChartColumn,
+  CreditCard,
   Database,
   Folder,
   Globe,
+  Handshake,
   HardDrive,
   Library,
   Mail,
@@ -82,6 +84,9 @@ const MARKS: Record<string, LucideIcon> = {
   // thing this connector reads is rows and columns, not prose.
   google_sheets: Table2,
   gsc: Globe,
+  // A deal being struck, not a person: HubSpot is the pipeline, and three
+  // other connectors already wear the people glyph.
+  hubspot: Handshake,
   linkedin_ads: Users,
   medicines: Pill,
   meta_ad_library: Library,
@@ -89,6 +94,11 @@ const MARKS: Record<string, LucideIcon> = {
   meta_business_suite: Users,
   ms_clarity: MousePointerClick,
   open_data: Database,
+  // Both were listed below as anticipated; they are registered now, so they
+  // move up into the block of connectors the backend actually serves.
+  salesforce_commerce: ShoppingCart,
+  shopify: Store,
+  stripe: CreditCard,
   universal_search: Search,
   wordpress: NotebookPen,
   youtube: Video,
@@ -102,8 +112,6 @@ const MARKS: Record<string, LucideIcon> = {
   drive: Folder,
   gmail: Mail,
   image_gen: Sparkles,
-  salesforce_commerce: ShoppingCart,
-  shopify: ShoppingCart,
   storage: HardDrive,
 };
 
