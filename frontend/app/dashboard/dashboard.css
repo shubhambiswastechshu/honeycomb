@@ -5344,3 +5344,200 @@ a.dash-notif-row:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+
+/* ==========================================================================
+   Touch targets
+
+   The dashboard runs two density steps below Material's default, which is
+   right for a pointer and wrong for a finger: it left the search field at
+   36px, the bell and sign-out at 34, chips at 26 and inline links at 18.
+   Apple asks for 44px, Material for 48; everything below was under both.
+
+   Keyed on `pointer: coarse` rather than on width, because the question is
+   "is this being touched", not "is the window small". An iPad Pro in
+   landscape is 1366px wide and still a finger; a 900px desktop window is not.
+   A laptop with a touchscreen reports `fine` for its PRIMARY pointer, so it
+   correctly keeps the dense layout.
+
+   Sizes here are minimums applied to the hit box, not redesigns. Where
+   growing the box would move the layout -- inline links inside a sentence --
+   the padding is cancelled with a negative margin so the target grows but
+   nothing shifts.
+   ========================================================================== */
+
+@media (pointer: coarse) {
+  /* ---- Top bar ---- */
+  .dash-topbar {
+    height: 60px;
+  }
+
+  .dash-search-input {
+    height: 44px;
+  }
+
+  .dash-notif-button,
+  .dash-signout {
+    width: 44px;
+    height: 44px;
+  }
+
+  .dash-account-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dash-account-link {
+    padding: 6px 12px 6px 6px;
+  }
+
+  /* ---- Navigation rail and bottom bar ----
+     The width applies only where the rail IS a rail. Below 720px it is a
+     horizontal bottom bar at width:100%, and because this block is appended
+     after that media query, an unqualified width here overrode it and left a
+     72px stub in the corner holding one icon. */
+  @media (min-width: 720px) {
+    .dash-rail {
+      width: 72px;
+    }
+  }
+
+  .rail-item {
+    padding: 7px 0 8px;
+  }
+
+  .rail-box {
+    width: 48px;
+    height: 38px;
+  }
+
+  /* ---- Filter chips and small buttons ---- */
+  .dash .mkt-chip,
+  .dash .mkt-cta,
+  .dash-notif-tab {
+    height: 40px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .dash .mkt-chip[aria-pressed="true"],
+  .dash .mkt-chip.is-on {
+    padding-left: 11px;
+  }
+
+  .dash .mkt-cta {
+    padding-left: 13px;
+  }
+
+  /* ---- Fields ---- */
+  .dash input.mkt-search,
+  .dash .mkt-search input {
+    height: 44px;
+  }
+
+  .dash .mkt-search .mkt-search-icon + input {
+    padding-left: 38px;
+  }
+
+  /* ---- Connector detail: the tab strip already scrolls, the tabs were
+          just short. ---- */
+  .dash .acct-tab {
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
+
+  /* ---- Notification rows ---- */
+  .dash-notif-row {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  .dash-notif-foot {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  /* ---- Row actions: copy buttons, per-row controls ---- */
+  .dash .conn-copy,
+  .dash .conn-action,
+  .dash .data-row-action,
+  .dash .acct-action {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* ---- Inline links ----
+     "View all", the breadcrumb, a row title that is also a link: these sit
+     inside a line of text at 18px tall. The padding grows the tap area and
+     the matching negative margin keeps the line where it was, so nothing
+     reflows. */
+  .dash .ov-section-link,
+  .dash .ov-step-link,
+  .dash .inv-name,
+  .dash .conn-back,
+  .dash .data-row-link,
+  .dash .conn-row-title a,
+  .dash .conn-row-title .data-row-link,
+  .dash .footnote a {
+    display: inline-block;
+    padding: 12px 0;
+    margin: -12px 0;
+  }
+}
+
+
+/* ==========================================================================
+   Tablet band, 720-1023px
+
+   Above this the top bar has room for the brand, a 720px search field, the
+   Ctrl-K hint and the account name. At 768px it does not: the search column
+   claims its maximum and the outer columns collapse, so the account name
+   printed straight through the keyboard hint -- "Test UserCtrl K".
+
+   Below 720px the existing bottom-bar query already drops all three. This
+   fills the gap between the two.
+   ========================================================================== */
+
+/* Six numbers stacked one per row is most of a phone screen spent on six
+   short lines. Two up halves that and each still has room for its label. */
+@media (max-width: 719px) {
+  .dash .ov-kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+
+  .dash .ov-kpis .data-stat {
+    padding-right: 8px;
+  }
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+  .dash-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  /* The mark alone carries the brand once the bar is this tight. */
+  .dash-brand-text {
+    display: none;
+  }
+
+  /* A keyboard hint on a tablet is advice for hardware that is usually not
+     attached, and it is the first thing worth dropping for room. */
+  .dash-search-hint {
+    display: none;
+  }
+
+  .dash-search-input {
+    padding-right: 20px;
+  }
+
+  .dash-account-name {
+    display: none;
+  }
+
+  .dash-account-link {
+    padding: 4px;
+  }
+}

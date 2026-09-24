@@ -666,3 +666,50 @@ body {
     transform: none;
   }
 }
+
+
+/* ==========================================================================
+   Touch targets, for the controls shared with the auth screens
+
+   Same reasoning as the block at the end of dashboard.css: keyed on
+   `pointer: coarse`, so it is about being touched rather than about the
+   window being narrow, and it raises hit boxes rather than redesigning
+   anything. The reveal button inside the password field was 34px, which is
+   the smallest thing anyone is asked to hit on the way into the product.
+   ========================================================================== */
+
+@media (pointer: coarse) {
+  .input {
+    min-height: 46px;
+  }
+
+  .input-revealable {
+    padding-right: 52px;
+  }
+
+  .reveal {
+    width: 44px;
+    height: 44px;
+  }
+
+  .button {
+    min-height: 50px;
+  }
+
+  .link-button {
+    min-height: 44px;
+  }
+
+  /* The footer links sit in a row at 13px; the padding gives them a finger's
+     worth of height and the negative margin keeps the row its own height. */
+  .site-footer-nav a,
+  .footnote a {
+    display: inline-block;
+    padding: 12px 0;
+    margin: -12px 0;
+  }
+
+  .site-footer-inner {
+    gap: 4px 32px;
+  }
+}
