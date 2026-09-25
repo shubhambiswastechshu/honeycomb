@@ -17,17 +17,20 @@
  * section that needed it and nothing else.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Activity, Check, Database, TriangleAlert } from "lucide-react";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
-import ActivityMatrix from "@/components/dashboard/ActivityMatrix";
+import ActivityCalendar from "@/components/dashboard/ActivityCalendar";
+import ActivityTrend from "@/components/dashboard/ActivityTrend";
 import McpUrl from "@/components/dashboard/McpUrl";
 import PanelCover from "@/components/dashboard/PanelCover";
+import { useLive } from "@/components/dashboard/LiveProvider";
+import { tailSummary } from "@/components/dashboard/live-model";
 import { useSession } from "@/components/dashboard/SessionProvider";
-import { activitySummary, listActivity, listConnections } from "@/lib/api";
-import type { ActivityEvent, ActivitySummary, Connection } from "@/lib/api";
+import { listActivity, listConnections } from "@/lib/api";
+import type { ActivityEvent, Connection } from "@/lib/api";
 
 /**
  * How many calls the Overview lists. Six, not twelve: /dashboard/activity is
@@ -37,9 +40,10 @@ import type { ActivityEvent, ActivitySummary, Connection } from "@/lib/api";
 const EVENT_LIMIT = 6;
 
 /**
- * The trend window, in days. Thirty, not ninety: at ninety the chart was
- * three months of empty cells for a workspace a fortnight old, and it was
- * the single largest thing on the page.
+ * The window the strip of counts covers, in days. The charts below it show
+ * the whole year and let the trend pick its own range; the numbers in the
+ * strip stay on the last thirty so "Calls" and "Call failure rate" mean the
+ * same thing they always did.
  */
 const SPARK_DAYS = 30;
 
@@ -171,7 +175,16 @@ export default function OverviewPage() {
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const [events, setEvents] = useState<ActivityEvent[] | null>(null);
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [summary, setSummary] = useState<ActivitySummary | null>(null);
+
+  // A year of per-day counts and the last-24-hours snapshot come from the live
+  // provider, which the panel beside this page shares: one fetch, one answer.
+  const { summary: history, live } = useLive();
+  const summary = useMemo(
+    function thirtyDays() {
+      return history === null ? null : tailSummary(history, SPARK_DAYS);
+    },
+    [history]
+  );
 
   // A dashboard is a tab people leave open. Fetched once and never again, the
   // sparkline silently mislabels which day is "today" after midnight and the
@@ -180,7 +193,7 @@ export default function OverviewPage() {
   // nobody sees and keeps the page honest. Not a poll: a tab nobody is looking
   // at has nothing to be stale for.
   const load = useCallback(function load(alive: () => boolean): Promise<void> {
-    // Three requests, in parallel, each with its own catch. Promise.all over
+    // Two requests, in parallel, each with its own catch. Promise.all over
     // bare promises would reject as a whole the moment one endpoint answered
     // 500 and blank a page whose other two thirds loaded fine, so every
     // promise settles into its own slice of state and the page renders
@@ -209,17 +222,6 @@ export default function OverviewPage() {
           if (alive()) {
             setEventsError(ACTIVITY_ERROR);
           }
-        }),
-      activitySummary(SPARK_DAYS)
-        .then(function apply(result: ActivitySummary) {
-          if (alive()) {
-            setSummary(result);
-          }
-        })
-        .catch(function fail() {
-          // No message for this one. The sparkline is a decoration on a list
-          // that stands perfectly well without it, and a second red line
-          // above the same section would just say the same outage twice.
         }),
     ]).then(function done() {
       return undefined;
@@ -304,7 +306,7 @@ export default function OverviewPage() {
    * and so does a non-zero total from the summary. Either is enough to say the
    * last step of Getting started is done.
    */
-  const activityKnown = events !== null || summary !== null;
+  const activityKnown = events !== null || history !== null;
   // Both activity calls failing is the only way activityKnown stays false with
   // the requests finished: either one succeeding sets its own state.
   const activityFailed = eventsError !== null;
@@ -316,7 +318,7 @@ export default function OverviewPage() {
   const activitySettled = activityKnown || activityFailed;
   const hasActivity =
     (events !== null && events.length > 0) ||
-    (summary !== null && summary.total > 0);
+    (history !== null && history.total > 0);
 
   const stepConnected = hasConnections;
   const stepKeyed =
@@ -428,9 +430,10 @@ export default function OverviewPage() {
             width it is the widest thing on the page, and nesting it in a
             column meant either a narrow chart or a column the rest of the
             content did not need. */}
-        {summary !== null ? (
+        {history !== null ? (
           <div className="ov-trend">
-            <ActivityMatrix summary={summary} />
+            <ActivityCalendar summary={history} />
+            <ActivityTrend summary={history} live={live} />
           </div>
         ) : null}
 

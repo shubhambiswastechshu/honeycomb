@@ -1189,3 +1189,52 @@ export function activitySummary(days?: number): Promise<ActivitySummary> {
   }
   return request<ActivitySummary>(path, { method: "GET", authenticated: true });
 }
+
+/** One clock hour of the last 24. start is an ISO UTC instant. */
+export interface LiveHour {
+  start: string;
+  ok: number;
+  error: number;
+}
+
+/**
+ * How much one connector, or one tool of a connector, was called in the
+ * window. calls is ok + error; avg_ms is null when nothing in the group was
+ * timed. tool_name is present only on the per-tool rows.
+ */
+export interface LiveShare {
+  connector: string;
+  connector_label: string;
+  calls: number;
+  ok: number;
+  error: number;
+  avg_ms: number | null;
+  tool_name?: string;
+}
+
+/**
+ * Everything the live panel shows, in one response: the last 24 hours by
+ * clock hour, the totals summed from those same hours, who is being called,
+ * and the newest calls. `since` is where the window starts; `recent` is not
+ * limited to it, so the feed can still say what happened last on a quiet day.
+ */
+export interface ActivityLive {
+  generated_at: string;
+  since: string;
+  calls: number;
+  errors: number;
+  avg_ms: number | null;
+  last_call_at: string | null;
+  hours: LiveHour[];
+  connectors: LiveShare[];
+  tools: LiveShare[];
+  recent: ActivityEvent[];
+}
+
+/** The 24-hour snapshot the live panel polls. Tenant-scoped by the server. */
+export function activityLive(): Promise<ActivityLive> {
+  return request<ActivityLive>("/activity/live/", {
+    method: "GET",
+    authenticated: true,
+  });
+}

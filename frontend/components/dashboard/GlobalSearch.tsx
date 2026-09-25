@@ -27,11 +27,10 @@ import {
   Settings,
   User,
   Users,
-  Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
-import { FORAGER_CONSOLE_URL, listConnections, listConnectors } from "@/lib/api";
+import { listConnections, listConnectors } from "@/lib/api";
 import type { Connection, ConnectorSpec } from "@/lib/api";
 
 /** Results shown per group. Past this, typing more is faster than scrolling. */
@@ -50,7 +49,6 @@ const PAGES: PageEntry[] = [
   { title: "Overview", href: "/dashboard", icon: LayoutGrid, keywords: "home dashboard chart" },
   { title: "MCPs", href: "/dashboard/connectors", icon: Blocks, keywords: "connectors marketplace catalogue add connect" },
   { title: "Data", href: "/dashboard/data", icon: Database, keywords: "connections inventory mcp url endpoints" },
-  { title: "Crawler", href: FORAGER_CONSOLE_URL, icon: Waypoints, keywords: "forager crawl worker console seo", external: true },
   { title: "Activity", href: "/dashboard/activity", icon: Activity, keywords: "log calls history usage" },
   { title: "Team", href: "/dashboard/team", icon: Users, keywords: "members invite people" },
   { title: "Settings", href: "/dashboard/settings", icon: Settings, keywords: "organisation organization workspace" },
@@ -187,7 +185,7 @@ export default function GlobalSearch() {
           id: "page:" + p.href,
           kind: "page",
           title: p.title,
-          detail: p.external ? "Opens the crawler console" : "Page",
+          detail: p.external ? "Opens outside the dashboard" : "Page",
           href: p.href,
           external: p.external === true,
           icon: p.icon,

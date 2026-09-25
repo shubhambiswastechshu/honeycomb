@@ -20,16 +20,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle } from "lucide-react";
-import ActivityMatrix from "@/components/dashboard/ActivityMatrix";
+import ActivityCalendar from "@/components/dashboard/ActivityCalendar";
+import ActivityTrend from "@/components/dashboard/ActivityTrend";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
+import { useLive } from "@/components/dashboard/LiveProvider";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-import { activitySummary, listActivity } from "@/lib/api";
-import type { ActivityEvent, ActivitySummary } from "@/lib/api";
+import { listActivity } from "@/lib/api";
+import type { ActivityEvent } from "@/lib/api";
 
 /** The server clamps this to 100; asking for its maximum is the point here. */
 const EVENT_LIMIT = 100;
-const SPARK_DAYS = 30;
 
 const EVENTS_FAILED = "The activity log could not be loaded.";
 const SUMMARY_FAILED = "The activity counts could not be loaded.";
@@ -73,9 +74,11 @@ export default function ActivityPage() {
   // that render two different things, so they get two different values rather
   // than one array that starts empty and lies for a frame.
   const [events, setEvents] = useState<ActivityEvent[] | null>(null);
-  const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  // The year of counts and the last 24 hours come from the live provider, which
+  // the panel beside this page shares. They fail on their own, separately from
+  // the rows below.
+  const { summary, summaryError, live } = useLive();
   const [filter, setFilter] = useState<Filter>("all");
 
   const aliveRef = useRef<boolean>(true);
@@ -91,19 +94,6 @@ export default function ActivityPage() {
       .catch(function failed(caught: unknown) {
         if (aliveRef.current) {
           setEventsError(caught instanceof Error ? caught.message : EVENTS_FAILED);
-        }
-      });
-
-    activitySummary(SPARK_DAYS)
-      .then(function received(data: ActivitySummary) {
-        if (aliveRef.current) {
-          setSummary(data);
-          setSummaryError(null);
-        }
-      })
-      .catch(function failed() {
-        if (aliveRef.current) {
-          setSummaryError(SUMMARY_FAILED);
         }
       });
   }, []);
@@ -169,17 +159,17 @@ export default function ActivityPage() {
       </p>
 
       <div className="panel-body">
-        {summaryError !== null ? (
+        {summary === null && summaryError ? (
           <p className="error" role="alert">
-            {summaryError}
+            {SUMMARY_FAILED}
           </p>
         ) : summary !== null ? (
-          /* Capped, because the chart's SVG is aspect-locked to its viewBox
-             and `width: 100%` scales the whole thing up: across the full pane
-             it grew to roughly 500px tall and pushed every row of the actual
-             log below the fold. The trend is context here, not the subject. */
+          /* The calendar and the spike trend, above the log they summarise.
+             Both size themselves to the pane, so neither can grow tall enough
+             to push the rows below the fold. */
           <div className="act-trend">
-            <ActivityMatrix summary={summary} />
+            <ActivityCalendar summary={summary} />
+            <ActivityTrend summary={summary} live={live} />
           </div>
         ) : null}
 

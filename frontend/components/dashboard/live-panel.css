@@ -1,0 +1,626 @@
+/* ==========================================================================
+   Live panel (components/dashboard/LivePanel)
+
+   A third column of .dash-body: docked beside the page on wide screens, a
+   slide-over with a scrim on narrow ones. It sits on the shell's own
+   `surface`, separated from the page by a hairline rather than a shadow while
+   docked -- a docked column is part of the layout, and only the overlay is
+   floating enough to earn an elevation.
+
+   Prefix: lp-. The bell that toggles it keeps its .dash-notif-* rules in
+   dashboard.css.
+   ========================================================================== */
+
+.lp-panel {
+  --lp-green: #30a14e;
+  --lp-idle: #ebedf0;
+  --lp-bad: #d03b3b;
+
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  min-height: 0;
+  background: var(--md-surface);
+  border-left: 1px solid var(--md-outline-variant);
+  outline: none;
+  animation: lp-in var(--md-dur-medium) var(--md-ease-emphasized) both;
+}
+
+@keyframes lp-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Only shown as an overlay's backdrop; see the narrow-screen block. */
+.lp-scrim {
+  display: none;
+}
+
+/* ---- Header ---- */
+
+.lp-head {
+  flex: none;
+  padding: 14px 16px 10px;
+}
+
+.lp-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lp-title {
+  margin: 0;
+  font: var(--md-type-title-md);
+  letter-spacing: 0;
+  color: var(--md-on-surface);
+}
+
+.lp-close {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lp-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--md-on-surface);
+}
+
+.lp-close:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 1px;
+}
+
+.lp-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font: var(--md-type-body-sm);
+  letter-spacing: 0;
+}
+
+.lp-status b {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.lp-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lp-green);
+  animation: lp-pulse 1.8s ease-out infinite;
+}
+
+.lp-status.is-paused .lp-dot {
+  background: var(--md-outline);
+  animation: none;
+}
+
+.lp-status.is-bad .lp-dot {
+  background: var(--lp-bad);
+  animation: none;
+}
+
+.lp-status.is-bad b {
+  color: var(--md-error);
+}
+
+@keyframes lp-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(48, 161, 78, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(48, 161, 78, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(48, 161, 78, 0);
+  }
+}
+
+/* ---- Body ---- */
+
+.lp-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 16px 14px;
+  overflow-y: auto;
+}
+
+.lp-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+}
+
+.lp-tile-value {
+  font: 500 22px/28px var(--md-font);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-tile-label {
+  color: var(--muted);
+  font: var(--md-type-label-md);
+  letter-spacing: 0.2px;
+}
+
+.lp-tile.is-bad .lp-tile-value {
+  color: var(--md-error);
+}
+
+/* Last 24 hours, as bars. */
+.lp-bars {
+  margin: 0 0 16px;
+}
+
+.lp-bars svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.lp-bar-idle {
+  fill: var(--lp-idle);
+}
+
+.lp-bar-ok {
+  fill: var(--lp-green);
+}
+
+.lp-bar-bad {
+  fill: var(--lp-bad);
+}
+
+.lp-bars-cap {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--muted);
+  font: 11px/16px var(--md-font);
+  letter-spacing: 0;
+}
+
+/* ---- Tabs ---- */
+
+.lp-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--md-surface-container);
+}
+
+.lp-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: var(--md-type-label-md);
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lp-tab:hover {
+  color: var(--md-on-surface);
+}
+
+.lp-tab[aria-pressed="true"] {
+  background: #ffffff;
+  color: var(--md-on-surface);
+  box-shadow: var(--md-elevation-1);
+}
+
+.lp-tab:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 1px;
+}
+
+.lp-tab-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--md-error);
+  color: #ffffff;
+  font: 600 10px/16px var(--md-font);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Rows ---- */
+
+.lp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.lp-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+a.lp-row:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: -2px;
+}
+
+/* A call that just arrived: a green wash that fades, so the eye is pulled to
+   what changed and nothing keeps flashing. */
+.lp-row.is-new {
+  animation: lp-flash 2.4s ease-out both;
+}
+
+@keyframes lp-flash {
+  from {
+    background: rgba(48, 161, 78, 0.2);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.lp-mark {
+  position: relative;
+  display: flex;
+}
+
+.lp-flag {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: var(--md-error);
+  color: #ffffff;
+}
+
+.lp-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lp-tool {
+  overflow: hidden;
+  font: var(--md-type-title-sm);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-sub {
+  overflow: hidden;
+  color: var(--muted);
+  font: var(--md-type-body-sm);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-row.is-error .lp-sub {
+  color: var(--md-error);
+}
+
+.lp-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--muted);
+  font: 11.5px/16px var(--md-font);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lp-ms {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.lp-row.is-error .lp-ms {
+  color: var(--md-error);
+}
+
+.lp-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 4px;
+  color: var(--muted);
+  font: var(--md-type-body-md);
+}
+
+.lp-empty svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.lp-note {
+  margin: 8px 4px 0;
+  color: var(--muted);
+  font: 11.5px/16px var(--md-font);
+  letter-spacing: 0;
+}
+
+.lp-error {
+  margin: 4px 0 8px;
+  color: var(--md-error);
+  font: var(--md-type-body-sm);
+}
+
+/* ---- Breakdown ---- */
+
+.lp-section {
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font: var(--md-type-label-md);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.lp-section:first-child {
+  margin-top: 4px;
+}
+
+.lp-shares {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-share {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lp-share-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lp-share-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--md-type-title-sm);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-share-of {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.lp-share-n {
+  flex: none;
+  font: 500 13px/18px var(--md-font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fill is the whole share; its red background shows only where the green
+   succeeded-part stops short, so the red IS the failed share. */
+.lp-share-track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--lp-idle);
+}
+
+.lp-share-fill {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--lp-bad);
+}
+
+.lp-share-ok {
+  display: block;
+  height: 100%;
+  background: var(--lp-green);
+}
+
+.lp-share-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font: 11.5px/16px var(--md-font);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-share-foot .is-bad {
+  color: var(--md-error);
+}
+
+/* ---- Footer ---- */
+
+.lp-foot {
+  flex: none;
+  display: block;
+  padding: 12px 16px;
+  border-top: 1px solid var(--md-outline-variant);
+  color: var(--md-primary);
+  font: var(--md-type-label-lg);
+  letter-spacing: 0.1px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.lp-foot:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.lp-foot:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: -2px;
+}
+
+/* ==========================================================================
+   Making room for it
+   ========================================================================== */
+
+/* Docked, the page loses 340px. Between 1100 and 1500px that leaves the
+   Overview's two columns narrower than their URLs and steps want, so they
+   stack a breakpoint earlier than they otherwise would. */
+@media (min-width: 1100px) and (max-width: 1499px) {
+  .dash:has(.lp-panel) .ov-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Too narrow to dock: the panel slides over the page, under the top bar so the
+   bell that toggles it stays reachable, with a scrim that closes it. */
+@media (max-width: 1099px) {
+  .lp-scrim {
+    position: fixed;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 29;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: default;
+    animation: lp-fade var(--md-dur-medium) linear both;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .lp-panel {
+    position: fixed;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(360px, 100vw);
+    border-left: 0;
+    box-shadow: var(--md-elevation-3);
+  }
+}
+
+@keyframes lp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 719px) {
+  .lp-panel {
+    width: 100vw;
+  }
+}
+
+/* Fingers, not pointers: the same 40px floor the rest of the dashboard uses. */
+@media (pointer: coarse) {
+  .lp-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .lp-tab {
+    min-height: 40px;
+  }
+
+  .lp-row {
+    padding: 11px 6px;
+  }
+
+  .lp-foot {
+    padding: 15px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-panel,
+  .lp-scrim,
+  .lp-row.is-new {
+    animation: none;
+  }
+
+  .lp-dot {
+    animation: none;
+  }
+}

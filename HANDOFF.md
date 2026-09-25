@@ -109,7 +109,18 @@ deliberate, throttled email-existence oracle — that tradeoff was made knowingl
 - **No email delivery.** No verification, no password reset, no invites.
 - **No test suite.** Verification so far has been live HTTP probes and a
   throwaway APIClient script. `accounts/tests.py` is empty. Adding real tests is
-  the highest-value next task.
+  the highest-value next task. The one exception is `mcp/tests.py`, which pins
+  down the live-activity endpoint and the summary window.
+- **The live panel shows completed calls, not calls in flight.** A tool call's
+  `McpActivity` row is written when the call finishes, so the panel is a feed of
+  finished calls arriving within seconds (`GET /api/activity/live/`, polled every
+  5 s only while the panel is open and the tab is visible). Showing calls that
+  are still running would need a row written at the start of the call.
+- **Spike detection is a rule, not a model.** A bucket is a volume spike when it
+  has 3+ calls and sits more than two standard deviations above the window's
+  mean; a failure spike is 3+ failures making up 30%+ of the bucket. The rule
+  lives in `frontend/components/dashboard/spikes.ts` and is shared by the
+  calendar and the trend chart. Days are UTC days, as the server counts them.
 
 ---
 

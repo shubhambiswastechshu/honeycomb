@@ -23,11 +23,8 @@ import {
   Blocks,
   Settings,
   Users,
-  Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-import { FORAGER_CONSOLE_URL } from "@/lib/api";
 
 interface RailItem {
   href: string;
@@ -53,11 +50,6 @@ const MAIN_ITEMS: RailItem[] = [
      so this entry stays lit while a single connector is open. */
   { href: "/dashboard/connectors", label: "MCPs", icon: Blocks },
   { href: "/dashboard/data", label: "Data", icon: Database },
-  /* Next to Data, because that is what it produces: Forager is where a crawl
-     is started and watched, and its pages land in the same inventory. Same
-     glyph the Forager connector carries in ConnectorMark, so the rail and the
-     connector list are recognisably the same thing. */
-  { href: FORAGER_CONSOLE_URL, label: "Crawler", icon: Waypoints, external: true },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

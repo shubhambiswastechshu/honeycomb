@@ -16,12 +16,13 @@ from .models import McpActivity, McpKey
 DEFAULT_ACTIVITY_LIMIT = 20
 MAX_ACTIVITY_LIMIT = 100
 DEFAULT_SUMMARY_DAYS = 7
-#: The Overview's activity field asks for a quarter. The response is one small
-#: row per day whatever the window -- 90 days is ~4KB of JSON, and the query
-#: behind it is a single grouped aggregate over an indexed timestamp, so the
-#: cost of the larger window is bounded by the number of DAYS, not by how much
-#: traffic those days hold.
-MAX_SUMMARY_DAYS = 90
+#: The Overview's calendar asks for a year: 53 weeks, so the oldest column is a
+#: whole week and the newest holds today, which is 371 days. The response is
+#: one small row per day whatever the window -- 371 days is ~15KB of JSON, and
+#: the query behind it is a single grouped aggregate over an indexed timestamp,
+#: so the cost of the larger window is bounded by the number of DAYS, not by
+#: how much traffic those days hold.
+MAX_SUMMARY_DAYS = 371
 
 
 class McpKeySerializer(serializers.ModelSerializer):

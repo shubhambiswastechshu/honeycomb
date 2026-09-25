@@ -4,6 +4,7 @@ from django.urls import path
 
 from .views import (
     ActivityListView,
+    ActivityLiveView,
     ActivitySummaryView,
     McpKeyDetailView,
     McpKeyListCreateView,
@@ -16,6 +17,9 @@ urlpatterns = [
     # slice. Declared before the bare list so the literal wins over nothing --
     # they cannot collide, but the specific route reads first.
     path('activity/summary/', ActivitySummaryView.as_view(), name='activity-summary'),
+    # Polled every few seconds by the live panel, so it answers everything the
+    # panel shows in one request.
+    path('activity/live/', ActivityLiveView.as_view(), name='activity-live'),
     path('activity/', ActivityListView.as_view(), name='activity'),
     path('connections/<int:connection_id>/keys/',
          McpKeyListCreateView.as_view(), name='keys'),
