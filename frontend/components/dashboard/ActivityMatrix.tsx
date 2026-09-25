@@ -375,7 +375,7 @@ export default function ActivityMatrix({ summary }: ActivityMatrixProps) {
       </div>
 
       {/* The relief the palette check requires: brand amber sits under 3:1 on
-          this cream surface, so every value the field encodes is also readable
+          this white surface, so every value the field encodes is also readable
           as text. It doubles as the screen-reader route through the data. */}
       <details className="ov-matrix-table">
         <summary>Show the numbers</summary>

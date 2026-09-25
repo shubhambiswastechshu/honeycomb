@@ -4,9 +4,11 @@ Paste this whole file to another AI to get the same look. It describes the
 theme only: colour, type, shape, motion, components and the loading animation.
 No features, no product behaviour.
 
-**The idea in one line:** warm honey on off-white paper. Flat — no shadows, no
-gradients, no glass. Structure comes from 1px hairline borders and one amber
-accent used sparingly. Light theme only, committed to on purpose.
+**The idea in one line:** white paper with a honey-amber accent. Flat — no
+gradients, no glass. Structure comes from 1px hairline borders and true-grey
+tone steps, and the amber is an accent only: buttons, focus rings, active
+markers and icon glyphs — never a wash across a surface. Light theme only,
+committed to on purpose.
 
 ---
 
@@ -24,48 +26,48 @@ Put these on `:root` and never write a raw hex anywhere else.
   --amber-300: #e5bd3f;
   --amber-200: #eec33d;
 
-  /* Neutrals. The "black" is a warm brown-olive, never #000 or a cool grey —
-     this is what stops the palette reading as generic. */
-  --ink:    #312f17;   /* text, headings */
-  --muted:  #7a7357;   /* secondary text, icons at rest */
-  --bg:     #fffdf8;   /* page — off-white with a yellow bias, never #fff */
-  --border: #e3d9bf;   /* every hairline */
+  /* Neutrals. True grey with no colour bias, so the page reads as clean
+     white. The amber above is the only colour in the chrome. */
+  --ink:    #1f1f1f;   /* text, headings */
+  --muted:  #6b6b6b;   /* secondary text, icons at rest */
+  --bg:     #ffffff;   /* page */
+  --border: #e0e0e0;   /* every hairline */
 
   --text:            var(--ink);
   --accent:          var(--amber-500);
   --accent-hover:    #d98c2d;
   --accent-contrast: var(--ink);   /* text ON amber is ink, not white */
-  --error-text:      #9b3d22;      /* burnt red, still warm */
+  --error-text:      #9b3d22;      /* burnt red */
 }
 ```
 
-**Surfaces**, lightest to warmest:
+**Surfaces**, lightest to darkest — all neutral grey, no yellow bias:
 
 | Use | Value |
 | --- | --- |
-| Page ground | `#fffdf8` (`--bg`) |
-| Raised card, input field | `#ffffff` |
-| Toolbars, sidebars, table headers | `#fffcf4` |
-| Warm block: hover fill, notices, chips | `#fdf6e7` |
+| Page ground, raised card, input field | `#ffffff` (`--bg`) |
+| Toolbars, sidebars, table headers | `#fafafa` |
+| Fill: hover, notices, chips, search fields | `#f5f5f5` / `#f0f0f0` |
+| Selected item, pressed fill | `#ececec` |
 
-**Accent tints.** Amber is never used at full strength for a fill behind text.
-Use `rgba(234, 157, 62, α)`:
+**Washes.** Hover and selected fills are a neutral black wash, never amber:
+`rgba(0, 0, 0, α)`.
 
 | α | Use |
 | --- | --- |
-| `0.05` | card hover |
-| `0.07` | table row hover, active editor line |
-| `0.10` | list row hover |
-| `0.12` | icon chip background |
-| `0.14` | active nav item |
-| `0.16` | selected tab, icon-button hover |
-| `0.24` | text selection |
+| `0.04` | card, row and table-row hover |
+| `0.06` | icon chip, count badge, active list row |
+| `0.08` | selected tab or row, icon-button hover |
+
+Amber keeps a role where it *is* the signal: the primary button fill, the focus
+ring (`rgba(234, 157, 62, 0.2)`), the active-nav marker, a toggle in its on
+state, chart series, and the warning / redirect status colour.
 
 **Semantic dots** (status). Colour is never the only signal — always pair with
 a `title` or a word:
 
 ```
-connected  #3f7d3a      failed  #9b3d22      pending  #cbbf9c
+connected  #3f7d3a      failed  #9b3d22      pending  #c7c7c7
 ```
 
 ---

@@ -24,7 +24,7 @@ export interface PanelCoverProps {
   /** Status that belongs with the heading, e.g. a count. Optional. */
   children?: ReactNode;
   /**
-   * Ink scrim and inverted type instead of the cream one. The page around it
+   * Ink scrim and inverted type instead of the white one. The page around it
    * is unchanged -- this is a dark photograph, not a dark theme.
    */
   dark?: boolean;

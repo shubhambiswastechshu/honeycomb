@@ -13,7 +13,7 @@
 /* ---- Frame ---- */
 
 /* Full viewport, and the shell itself never scrolls: only .dash-main does. */
-/* One warm Material `surface` for the whole shell. The bar, the rail and the
+/* One white Material `surface` for the whole shell. The bar, the rail and the
    pane are the same colour and carry no rules between them -- in Material a
    region is told apart from its neighbour by the tone of what sits ON it (a
    white card, a container-tone search field), not by a border. */
@@ -878,10 +878,10 @@ a.dash-notif-row:focus-visible {
 /* The current section: a bar on the rail's edge, and no filled shape at all.
 
    Two filled indicators were tried here and neither held up. Material's own
-   `secondary-container` lands on #f6e2c2 from this brand -- a four-percent
-   step off the ground, which read as a stain. A solid amber pill fixed the
-   contrast but put a saturated blob in the one column that sits beside every
-   card on every page, so the chrome competed with the content.
+   `secondary-container` is a four-percent step off the ground, which read
+   as a stain (a tan one, back when the ground was cream). A solid amber pill
+   fixed the contrast but put a saturated blob in the one column that sits
+   beside every card on every page, so the chrome competed with the content.
 
    The bar spends no area. The glyph and the caption carry the state through
    colour and weight, and the edge mark is what you catch peripherally when
@@ -904,7 +904,7 @@ a.dash-notif-row:focus-visible {
 }
 
 /* Weight as well as colour, so the row still reads as selected to anyone who
-   cannot separate the amber from the cream. */
+   cannot separate the amber from the ground. */
 .rail-item[aria-current="page"] .rail-name {
   font-weight: 700;
 }
@@ -1038,7 +1038,7 @@ a.dash-notif-row:focus-visible {
   width: 50px;
   height: 56px;
   color: var(--amber-500);
-  background: rgba(234, 157, 62, 0.13);
+  background: rgba(0, 0, 0, 0.06);
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
@@ -1309,7 +1309,7 @@ a.dash-notif-row:focus-visible {
   justify-content: center;
   width: 46px;
   height: 53px;
-  background: rgba(234, 157, 62, 0.16);
+  background: rgba(0, 0, 0, 0.08);
   color: var(--amber-500);
   font-size: 22px;
   font-weight: 500;
@@ -1343,7 +1343,7 @@ a.dash-notif-row:focus-visible {
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(234, 157, 62, 0.12);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--ink);
   font-size: 12px;
   font-weight: 500;
@@ -1384,7 +1384,7 @@ a.dash-notif-row:focus-visible {
   border: 1px solid var(--border);
   border-left: 3px solid var(--amber-400);
   border-radius: 6px;
-  background: rgba(234, 157, 62, 0.08);
+  background: rgba(0, 0, 0, 0.04);
   font-size: 14px;
   color: var(--ink);
 }
@@ -1701,7 +1701,7 @@ a.dash-notif-row:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(49, 47, 23, 0.34);
+  background: rgba(31, 31, 31, 0.34);
   -webkit-backdrop-filter: blur(7px) saturate(0.92);
   backdrop-filter: blur(7px) saturate(0.92);
   animation: hc-backdrop-in 0.22s cubic-bezier(0.22, 0.68, 0.35, 1) both;
@@ -1718,13 +1718,13 @@ a.dash-notif-row:focus-visible {
 @keyframes hc-backdrop-in {
   from {
     opacity: 0;
-    background: rgba(49, 47, 23, 0);
+    background: rgba(31, 31, 31, 0);
     -webkit-backdrop-filter: blur(0) saturate(1);
     backdrop-filter: blur(0) saturate(1);
   }
   to {
     opacity: 1;
-    background: rgba(49, 47, 23, 0.34);
+    background: rgba(31, 31, 31, 0.34);
     -webkit-backdrop-filter: blur(7px) saturate(0.92);
     backdrop-filter: blur(7px) saturate(0.92);
   }
@@ -1733,13 +1733,13 @@ a.dash-notif-row:focus-visible {
 @keyframes hc-backdrop-out {
   from {
     opacity: 1;
-    background: rgba(49, 47, 23, 0.34);
+    background: rgba(31, 31, 31, 0.34);
     -webkit-backdrop-filter: blur(7px) saturate(0.92);
     backdrop-filter: blur(7px) saturate(0.92);
   }
   to {
     opacity: 0;
-    background: rgba(49, 47, 23, 0);
+    background: rgba(31, 31, 31, 0);
     -webkit-backdrop-filter: blur(0) saturate(1);
     backdrop-filter: blur(0) saturate(1);
   }
@@ -1763,7 +1763,7 @@ a.dash-notif-row:focus-visible {
   background: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--md-shape-md);
-  box-shadow: 0 18px 44px rgba(49, 47, 23, 0.18);
+  box-shadow: 0 18px 44px rgba(31, 31, 31, 0.18);
   animation: rise 0.2s ease both;
 }
 
@@ -1811,7 +1811,7 @@ a.dash-notif-row:focus-visible {
 
 .hc-modal-close:hover:not(:disabled) {
   color: var(--ink);
-  background: rgba(49, 47, 23, 0.07);
+  background: rgba(31, 31, 31, 0.07);
 }
 
 .hc-modal-close:focus-visible {
@@ -1874,7 +1874,7 @@ a.dash-notif-row:focus-visible {
 }
 
 .hc-modal-cancel:hover:not(:disabled) {
-  background: rgba(49, 47, 23, 0.05);
+  background: rgba(31, 31, 31, 0.05);
 }
 
 .hc-modal-confirm {
@@ -2146,7 +2146,7 @@ a.dash-notif-row:focus-visible {
 /* The whole card is the link -- same reasoning, geometry, easing and hover
    tint as the .tile it descends from, with a shadow added under the lift so a
    catalog of many cards still shows which one is under the pointer. */
-/* An M3 outlined card: white on the warm ground, a 1px outline-variant hair,
+/* An M3 outlined card: white on the page ground, a 1px outline-variant hair,
    12px corners. Hover raises it to elevation 1 and drops the outline, which
    is how Material says a surface has come forward -- the card no longer
    translates, because in Material depth is carried by shadow alone and a
@@ -2442,14 +2442,14 @@ a.dash-notif-row:focus-visible {
 .dash .conn-tab-count {
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(49, 47, 23, 0.07);
+  background: rgba(31, 31, 31, 0.07);
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
 }
 
 .dash .conn-tab[aria-selected="true"] .conn-tab-count {
-  background: rgba(234, 157, 62, 0.18);
+  background: rgba(0, 0, 0, 0.08);
   color: var(--ink);
 }
 
@@ -2541,7 +2541,7 @@ a.dash-notif-row:focus-visible {
 
 .dash .conn-status.is-active {
   border-color: var(--amber-400);
-  background: rgba(234, 157, 62, 0.14);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--ink);
 }
 
@@ -2592,7 +2592,7 @@ a.dash-notif-row:focus-visible {
 
 .dash .conn-button:hover:not(:disabled) {
   border-color: var(--amber-400);
-  background: rgba(234, 157, 62, 0.07);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .conn-button:focus-visible {
@@ -2740,7 +2740,7 @@ a.dash-notif-row:focus-visible {
   padding: 1px 7px;
   border: 1px solid var(--amber-400);
   border-radius: 999px;
-  background: rgba(234, 157, 62, 0.16);
+  background: rgba(0, 0, 0, 0.08);
   color: var(--ink);
   font-family: inherit;
   font-size: 11px;
@@ -2774,7 +2774,7 @@ a.dash-notif-row:focus-visible {
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: #f3ede0;
+  background: #f1f1f1;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
@@ -2802,7 +2802,7 @@ a.dash-notif-row:focus-visible {
 
 .dash button.conn-switch > .conn-switch-knob {
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(49, 47, 23, 0.3);
+  box-shadow: 0 1px 2px rgba(31, 31, 31, 0.3);
 }
 
 .dash button.conn-switch[aria-checked="false"] > .conn-switch-knob {
@@ -2934,7 +2934,7 @@ a.dash-notif-row:focus-visible {
    evidence that it happened. */
 .dash .conn-copy.is-done {
   border-color: var(--amber-500);
-  background: rgba(234, 157, 62, 0.14);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--ink);
 }
 
@@ -2949,7 +2949,7 @@ a.dash-notif-row:focus-visible {
   border: 1px solid var(--border);
   border-left: 3px solid var(--amber-500);
   border-radius: 11px;
-  background: rgba(234, 157, 62, 0.08);
+  background: rgba(0, 0, 0, 0.04);
   animation: dash-rise 0.24s cubic-bezier(0.22, 0.68, 0.35, 1) both;
 }
 
@@ -3310,7 +3310,7 @@ a.dash-notif-row:focus-visible {
 /* ==========================================================================
    Connector surfaces -- the rules the page markup reaches for that the block
    above does not cover. Same language as the rest of this file: white cards on
-   the warm ground, amber for the current thing, --error-text for the
+   the page ground, amber for the current thing, --error-text for the
    destructive one, and no colour that is not already a variable.
    ========================================================================== */
 
@@ -3360,7 +3360,7 @@ a.dash-notif-row:focus-visible {
 }
 
 .dash .conn-list-framed > .conn-tool:hover {
-  background: rgba(234, 157, 62, 0.05);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .conn-tool-name {
@@ -3379,7 +3379,7 @@ a.dash-notif-row:focus-visible {
   height: 32px;
   border-radius: var(--md-shape-sm);
   color: var(--amber-500);
-  background: rgba(234, 157, 62, 0.12);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 /* min-width:0 so a long URL or a long error truncates instead of pushing the
@@ -3441,7 +3441,7 @@ a.dash-notif-row:focus-visible {
 
 .dash .conn-action:hover:not(:disabled) {
   border-color: var(--amber-400);
-  background: rgba(234, 157, 62, 0.08);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .conn-action:focus-visible {
@@ -3512,7 +3512,7 @@ a.dash-notif-row:focus-visible {
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--muted);
-  background: rgba(234, 157, 62, 0.08);
+  background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--border);
   border-radius: 999px;
   white-space: nowrap;
@@ -3552,7 +3552,7 @@ a.dash-notif-row:focus-visible {
   height: 16px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(49, 47, 23, 0.28);
+  box-shadow: 0 1px 2px rgba(31, 31, 31, 0.28);
   transition: transform 0.16s ease;
   pointer-events: none;
 }
@@ -3571,7 +3571,7 @@ a.dash-notif-row:focus-visible {
   border: 1px solid var(--amber-400);
   border-left: 3px solid var(--amber-500);
   border-radius: 4px 12px 12px 4px;
-  background: rgba(234, 157, 62, 0.07);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .conn-token-title {
@@ -3721,15 +3721,11 @@ a.dash-notif-row:focus-visible {
    ========================================================================== */
 
 /* The cover.
-   --data-cover is the seam: set it to url(...) on this element and a real
-   image takes over with no other change, because the honeycomb pattern below
-   is a background LAYER rather than the element's only paint. The gradient
-   stays underneath as the fallback that shows while an image loads and if one
-   never arrives.
-
-   The pattern is two offset radial-gradient grids -- the same seven-cell
-   cluster as the logo, at low contrast. It is decoration and carries no
-   information, which is why the element is role="presentation". */
+   A plain white band: title, lede and status on the page ground, closed off
+   by the hairline below. --data-cover is still the seam -- set it to url(...)
+   on this element and an image takes over with no other change, under the
+   white scrim below so the type stays legible. With nothing set there is no
+   artwork at all. */
 .dash .data-cover {
   position: relative;
   display: flex;
@@ -3747,22 +3743,11 @@ a.dash-notif-row:focus-visible {
   border-bottom: 1px solid var(--md-outline-variant);
   border-radius: 0;
   overflow: hidden;
-  background-color: var(--md-surface-container-low);
-  /* The photograph on top, the drawn pattern beneath it. The pattern is not
-     dead weight: it is what shows while the image is still downloading and
-     what remains if it 404s, so the band is never a bare rectangle.
-     --data-cover is the override -- a panel can point it at its own image, or
-     at `none` to fall back to the pattern alone. */
-  background-image: var(--data-cover, url('/cover-honeycomb.jpg')),
-    radial-gradient(circle at 12px 10px, rgba(234, 157, 62, 0.16) 4px, transparent 4.5px),
-    radial-gradient(circle at 36px 10px, rgba(229, 189, 63, 0.13) 4px, transparent 4.5px),
-    radial-gradient(circle at 24px 31px, rgba(238, 195, 61, 0.15) 4px, transparent 4.5px),
-    linear-gradient(105deg, rgba(234, 157, 62, 0.14), rgba(238, 195, 61, 0.05) 62%, transparent);
-  background-size: cover, 48px 42px, 48px 42px, 48px 42px, auto;
-  /* 42% down: the crop already favours the comb, and this keeps the busiest
-     blossom below the line where the heading sits. */
-  background-position: center 42%, 0 0, 0 0, 0 0, 0 0;
-  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
+  background-color: var(--md-surface);
+  background-image: var(--data-cover, none);
+  background-size: cover;
+  background-position: center 42%;
+  background-repeat: no-repeat;
 }
 
 /* The scrim. Over a photograph this is doing real work -- the heading is ink
@@ -3776,12 +3761,12 @@ a.dash-notif-row:focus-visible {
   inset: 0;
   background: linear-gradient(
       100deg,
-      rgba(255, 252, 244, 0.97) 0%,
-      rgba(255, 252, 244, 0.9) 34%,
-      rgba(255, 252, 244, 0.55) 58%,
-      rgba(255, 252, 244, 0.18) 100%
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(255, 255, 255, 0.9) 34%,
+      rgba(255, 255, 255, 0.55) 58%,
+      rgba(255, 255, 255, 0.18) 100%
     ),
-    linear-gradient(to top, rgba(255, 252, 244, 0.5), transparent 70%);
+    linear-gradient(to top, rgba(255, 255, 255, 0.5), transparent 70%);
 }
 
 .dash .data-cover-body {
@@ -3818,7 +3803,7 @@ a.dash-notif-row:focus-visible {
 }
 
 /* ---- Dark cover ----
-   The same photograph under an ink scrim instead of a cream one, with the
+   The same photograph under an ink scrim instead of a white one, with the
    type inverted. Nothing else about the panel changes, so this is one class
    on the band rather than a second design.
 
@@ -3826,31 +3811,31 @@ a.dash-notif-row:focus-visible {
    photograph: this is a dark image, not a dark theme -- the page around it,
    the rail and every card stay exactly as they were. */
 .dash .data-cover-dark {
-  background-color: #241f10;
-  border-bottom-color: rgba(49, 47, 23, 0.25);
+  background-color: #1f1f1f;
+  border-bottom-color: rgba(31, 31, 31, 0.25);
 }
 
 .dash .data-cover-dark::after {
   background: linear-gradient(
       100deg,
-      rgba(28, 24, 12, 0.94) 0%,
-      rgba(28, 24, 12, 0.82) 36%,
-      rgba(28, 24, 12, 0.5) 62%,
-      rgba(28, 24, 12, 0.24) 100%
+      rgba(20, 20, 20, 0.94) 0%,
+      rgba(20, 20, 20, 0.82) 36%,
+      rgba(20, 20, 20, 0.5) 62%,
+      rgba(20, 20, 20, 0.24) 100%
     ),
-    linear-gradient(to top, rgba(28, 24, 12, 0.45), transparent 72%);
+    linear-gradient(to top, rgba(20, 20, 20, 0.45), transparent 72%);
 }
 
 .dash .data-cover-dark .data-cover-title {
-  color: #fbf4e4;
+  color: #f5f5f5;
 }
 
 .dash .data-cover-dark .data-cover-lede,
 .dash .data-cover-dark .data-cover-meta,
 .dash .data-cover-dark .data-cover-meta .mkt-count {
-  /* Not --muted: that grey was chosen against a cream ground and goes muddy
+  /* Not --muted: that grey was chosen against a light ground and goes muddy
      on ink. */
-  color: rgba(251, 244, 228, 0.72);
+  color: rgba(245, 245, 245, 0.72);
 }
 
 /* ---- Stat row ---- */
@@ -4234,7 +4219,7 @@ a.dash-notif-row:focus-visible {
   font-size: 12px;
   font-weight: 500;
   color: var(--ink);
-  background: rgba(234, 157, 62, 0.16);
+  background: rgba(0, 0, 0, 0.08);
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
@@ -4310,7 +4295,7 @@ a.dash-notif-row:focus-visible {
 
 /* Colours are declared as roles here so the two series live in one place.
    Brand amber and the reserved "critical" red were checked together against
-   this cream surface: CVD deltaE 18.3, normal-vision 22.1 -- comfortably clear.
+   this white surface: CVD deltaE 18.3, normal-vision 22.1 -- comfortably clear.
    Amber's own contrast against the surface is 2.2:1, under the 3:1 bar, which
    is why the panel ships a table view: the field is never the only way to read
    a number. Deepening the amber to pass contrast collides it with the red
@@ -4319,7 +4304,7 @@ a.dash-notif-row:focus-visible {
 .dash .ov-matrix {
   --cell-ok: var(--amber-500);
   --cell-bad: #d03b3b;
-  --cell-empty: rgba(49, 47, 23, 0.07);
+  --cell-empty: rgba(31, 31, 31, 0.07);
 
   margin: 0;
   padding: 18px 20px 14px;
@@ -4450,16 +4435,16 @@ a.dash-notif-row:focus-visible {
   padding: 8px 10px;
   border-radius: var(--md-shape-sm);
   background: var(--ink);
-  color: #f6efdc;
+  color: #f5f5f5;
   font-size: 12px;
   line-height: 1.45;
   pointer-events: none;
-  box-shadow: 0 8px 22px rgba(49, 47, 23, 0.22);
+  box-shadow: 0 8px 22px rgba(31, 31, 31, 0.22);
 }
 
 .dash .ov-matrix-tip-day {
   display: block;
-  color: rgba(246, 239, 220, 0.66);
+  color: rgba(245, 245, 245, 0.66);
   font-size: 11px;
   margin-bottom: 2px;
 }
@@ -4697,7 +4682,7 @@ a.dash-notif-row:focus-visible {
 }
 
 .dash .inv-row:hover {
-  border-color: #d8caa6;
+  border-color: #d9d9d9;
 }
 
 /* The failing row is marked on its edge, not with a badge in the flow of the
@@ -4824,7 +4809,7 @@ a.dash-notif-row:focus-visible {
    Everything else on this page is a document: it describes what a connector
    is and what it could do. This panel is an instrument, so it is framed like
    one — a white card with its controls in a bar across the top, sitting on
-   the page's cream ground rather than blending into it.
+   the page's white ground rather than blending into it.
    ========================================================================== */
 .dash .live {
   border: 1px solid var(--border);
@@ -4843,7 +4828,7 @@ a.dash-notif-row:focus-visible {
   border-bottom: 1px solid var(--border);
   /* A hair of amber so the control strip separates from the results without a
      second border doing the work. */
-  background: rgba(234, 157, 62, 0.05);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .live-pick,
@@ -5055,7 +5040,7 @@ a.dash-notif-row:focus-visible {
   letter-spacing: 0.03em;
   color: var(--muted);
   white-space: nowrap;
-  background: #fffdf8;
+  background: #ffffff;
   border-bottom: 1px solid var(--border);
 }
 
@@ -5083,7 +5068,7 @@ a.dash-notif-row:focus-visible {
 }
 
 .dash .live-table tbody tr:hover td {
-  background: rgba(234, 157, 62, 0.05);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .live-raw {
@@ -5109,7 +5094,7 @@ a.dash-notif-row:focus-visible {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--md-shape-sm);
-  background: #fffdf8;
+  background: #ffffff;
   font-size: 12px;
   line-height: 1.55;
   color: var(--ink);
@@ -5134,7 +5119,7 @@ a.dash-notif-row:focus-visible {
   margin-bottom: 4px;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: rgba(234, 157, 62, 0.06);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .dash .plug-head {
@@ -5253,7 +5238,7 @@ a.dash-notif-row:focus-visible {
 }
 
 .dash-search .gsearch-item.is-active {
-  background: rgba(234, 157, 62, 0.12);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .dash-search .gsearch-mark {
@@ -5314,7 +5299,7 @@ a.dash-notif-row:focus-visible {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #fffdf8;
+  background: #ffffff;
 }
 
 .team-invite .field {
