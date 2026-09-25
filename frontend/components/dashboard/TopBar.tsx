@@ -37,10 +37,18 @@ export default function TopBar() {
       : session.user.email;
   return (
     <header className="dash-topbar">
-      <div className="dash-brand">
+      {/* The way home from anywhere in the dashboard. It was a plain div, which
+          people reasonably tried to click. */}
+      <Link
+        href="/dashboard"
+        className="dash-brand"
+        title="Overview"
+        aria-label="Honeycomb, go to Overview"
+        aria-current={pathname === "/dashboard" ? "page" : undefined}
+      >
         <LogoMark size={22} />
         <span className="dash-brand-text">Honeycomb</span>
-      </div>
+      </Link>
 
       <GlobalSearch />
 
