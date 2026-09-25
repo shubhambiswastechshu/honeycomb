@@ -1190,6 +1190,41 @@ export function activitySummary(days?: number): Promise<ActivitySummary> {
   return request<ActivitySummary>(path, { method: "GET", authenticated: true });
 }
 
+/** One tool to run as part of a report. Read tools only; the server refuses the rest. */
+export interface ReportRun {
+  tool: string;
+  args?: Record<string, unknown>;
+}
+
+/**
+ * One tool's outcome inside a report. Each run succeeds or fails on its own, so
+ * a provider hiccup costs one section of a page and not the whole page: `ok`
+ * says which, and `error` is already redacted by the server.
+ */
+export type ReportResult =
+  | { tool: string; ok: true; duration_ms: number; data: unknown }
+  | { tool: string; ok: false; error: string; status?: number; duration_ms?: number };
+
+export interface ReportResponse {
+  duration_ms: number;
+  /** In the order the runs were sent. */
+  results: ReportResult[];
+}
+
+/**
+ * Run several read tools for one report page in a single request, concurrently.
+ * A page of sections sent through runConnectionTool one at a time would be a
+ * dozen round trips against the write throttle; this is one request with its
+ * own ceiling. It writes nothing to the activity log.
+ */
+export function runReport(id: number, runs: ReportRun[]): Promise<ReportResponse> {
+  return request<ReportResponse>("/connections/" + id + "/report/", {
+    method: "POST",
+    body: { runs: runs },
+    authenticated: true,
+  });
+}
+
 /** One clock hour of the last 24. start is an ISO UTC instant. */
 export interface LiveHour {
   start: string;

@@ -33,6 +33,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
+  ChartColumn,
   CircleAlert,
   Gauge,
   KeyRound,
@@ -53,6 +54,7 @@ import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
 import McpKeyPanel from "@/components/dashboard/McpKeyPanel";
 import LiveData from "@/components/dashboard/LiveData";
+import GoogleAdsReport from "@/components/reports/google-ads/GoogleAdsReport";
 import ToolSwitches from "@/components/dashboard/ToolSwitches";
 import {
   deleteConnection,
@@ -89,6 +91,20 @@ const TABS: TabSpec[] = [
   { id: "access", label: "Access", icon: KeyRound },
   { id: "activity", label: "Activity", icon: Activity },
 ];
+
+/**
+ * Connectors that have a purpose-built report, keyed by slug. A report is a
+ * finished view of the connection's data -- performance, breakdowns, health --
+ * where "Live data" is one raw tool at a time. It is the tab a person arrives
+ * for, so it comes first and is where the page lands once something is
+ * connected.
+ */
+const REPORT_TAB: TabSpec = { id: "reports", label: "Reports", icon: ChartColumn };
+const REPORT_SLUGS: string[] = ["google_ads"];
+
+function tabsFor(slug: string): TabSpec[] {
+  return REPORT_SLUGS.indexOf(slug) !== -1 ? [REPORT_TAB].concat(TABS) : TABS;
+}
 
 function messageOf(caught: unknown, fallback: string): string {
   if (caught instanceof Error && caught.message.length > 0) {
@@ -260,6 +276,30 @@ function ConnectorDetailView({ slug }: { slug: string }) {
   );
 
   const rows = connections !== null ? connections : [];
+  const tabs = tabsFor(slug);
+
+  // Land on the report the first time the connections arrive, if this connector
+  // has one and there is something to report on. Not after a round trip through
+  // Google, which has its own banner and its own next step.
+  const landedRef = useRef<boolean>(false);
+  useEffect(
+    function landOnReport() {
+      if (landedRef.current || connections === null) {
+        return;
+      }
+      landedRef.current = true;
+      if (
+        REPORT_SLUGS.indexOf(slug) !== -1 &&
+        connections.length > 0 &&
+        connectedParam === null &&
+        errorParam === null
+      ) {
+        setCurrent(REPORT_TAB.id);
+      }
+    },
+    [connections, slug, connectedParam, errorParam]
+  );
+
   const selected =
     rows.find(function isSelected(row: Connection) {
       return row.id === selectedId;
@@ -269,7 +309,7 @@ function ConnectorDetailView({ slug }: { slug: string }) {
   /* ---- Tab strip: identical behaviour to the Profile panel ---- */
 
   function selectByIndex(index: number): void {
-    const next = TABS[(index + TABS.length) % TABS.length];
+    const next = tabs[(index + tabs.length) % tabs.length];
     setCurrent(next.id);
     const list = listRef.current;
     if (list !== null) {
@@ -283,7 +323,7 @@ function ConnectorDetailView({ slug }: { slug: string }) {
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    const index = TABS.findIndex(function isCurrent(tab: TabSpec) {
+    const index = tabs.findIndex(function isCurrent(tab: TabSpec) {
       return tab.id === current;
     });
     if (event.key === "ArrowRight") {
@@ -297,7 +337,7 @@ function ConnectorDetailView({ slug }: { slug: string }) {
       selectByIndex(0);
     } else if (event.key === "End") {
       event.preventDefault();
-      selectByIndex(TABS.length - 1);
+      selectByIndex(tabs.length - 1);
     }
   }
 
@@ -381,9 +421,9 @@ function ConnectorDetailView({ slug }: { slug: string }) {
   }
 
   const active =
-    TABS.find(function isCurrent(tab: TabSpec) {
+    tabs.find(function isCurrent(tab: TabSpec) {
       return tab.id === current;
-    }) ?? TABS[0];
+    }) ?? tabs[0];
 
   return (
     <div className="panel">
@@ -453,7 +493,7 @@ function ConnectorDetailView({ slug }: { slug: string }) {
             ref={listRef}
             onKeyDown={onKeyDown}
           >
-            {TABS.map(function renderTab(tab: TabSpec) {
+            {tabs.map(function renderTab(tab: TabSpec) {
               const Icon = tab.icon;
               const isCurrent = tab.id === current;
               return (
@@ -527,6 +567,20 @@ function ConnectorDetailView({ slug }: { slug: string }) {
 
                 {active.id === "tools" ? (
                   <ToolsTab connector={connector} connection={selected} />
+                ) : null}
+
+                {active.id === "reports" ? (
+                  selected !== null ? (
+                    <GoogleAdsReport key={selected.id} connection={selected} />
+                  ) : (
+                    <NoInstances
+                      onConnect={function startConnect() {
+                        setEditing(null);
+                        setConnecting(true);
+                        setCurrent("instances");
+                      }}
+                    />
+                  )
                 ) : null}
 
                 {active.id === "data" ? (

@@ -28,6 +28,7 @@ from connectors import registry
 from .models import Connection
 from .serializers import (
     ConnectionSerializer,
+    ToolBatchSerializer,
     ToolRunSerializer,
     ToolToggleSerializer,
     catalog_tools,
@@ -143,6 +144,12 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         """
         if self.request.method in SAFE_METHODS:
             self.throttle_scope = 'connections_read'
+        elif getattr(self, 'action', None) == 'report':
+            # A report is a read that fans out to the provider. It is a POST
+            # only because it carries a body, so it must not spend the write
+            # ceiling above -- and it has a ceiling of its own because each one
+            # costs a real API call per section.
+            self.throttle_scope = 'reports'
         return super().get_throttles()
 
     def get_queryset(self):
@@ -266,6 +273,100 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log(McpActivity.STATUS_OK)
         return Response(
             {'tool': name, 'duration_ms': elapsed_ms(), 'data': payload},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='report')
+    def report(self, request, pk=None):
+        """Run several READ tools for one report page, in one request.
+
+        A report page needs a dozen tools at once. Sent one at a time through
+        ``run`` that is a dozen round trips against the 20-a-minute write
+        ceiling, and a second look at the page a few seconds later is a 429.
+        Here they arrive together, run concurrently, and come back as one
+        response with a result per tool -- each ``{ok: true, data}`` or
+        ``{ok: false, error}`` -- so one provider hiccup costs one section and
+        not the page.
+
+        Every run goes through the same gate as ``run``: it must exist, must
+        not be a write tool, and must not be switched off on this connection,
+        and the connection is fetched through the tenant-scoped queryset. Errors
+        are redacted with the same helpers, because some providers echo the
+        access token in a query string.
+
+        Unlike ``run`` this writes no McpActivity rows. Those rows are the
+        record of tool calls made through the MCP plane, and they feed the
+        Overview's counts and the live panel; a person opening a report is not
+        an AI client calling a tool, and a dozen rows per page view would bury
+        the real ones. Failures are returned inline instead.
+        """
+        from asgiref.sync import async_to_sync
+
+        from connectors.shims.errors import ConnectorError, redact_exc, redact_text
+        from mcp.endpoint import _tool_timeout
+
+        connection = self.get_object()
+        connector = registry.get(connection.connector)
+        if connector is None:
+            return Response({'detail': 'This connector is no longer available.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        batch = ToolBatchSerializer(data=request.data)
+        batch.is_valid(raise_exception=True)
+        handlers = getattr(connector, 'handlers', None) or {}
+
+        results = [None] * len(batch.validated_data['runs'])
+        pending = []
+        for index, raw in enumerate(batch.validated_data['runs']):
+            serializer = ToolRunSerializer(
+                data=raw, context={'connection': connection, 'connector': connector}
+            )
+            name = str(raw.get('tool', ''))[:64]
+            if not serializer.is_valid():
+                problems = serializer.errors.get('tool') or serializer.errors.get('args') or []
+                message = str(problems[0]) if problems else 'This report could not be run.'
+                results[index] = {'tool': name, 'ok': False, 'error': message, 'status': 400}
+                continue
+            name = serializer.validated_data['tool']
+            handler = handlers.get(name)
+            if handler is None:
+                results[index] = {'tool': name, 'ok': False, 'status': 400,
+                                  'error': "Tool '{0}' has no handler.".format(name)}
+                continue
+            pending.append((index, name, handler, serializer.validated_data['args']))
+
+        started = time.monotonic()
+
+        async def call(name, handler, args):
+            begun = time.monotonic()
+
+            def ms():
+                return int((time.monotonic() - begun) * 1000)
+
+            try:
+                data = await asyncio.wait_for(
+                    handler(connection, None, args), timeout=_tool_timeout())
+                return {'tool': name, 'ok': True, 'duration_ms': ms(), 'data': data}
+            except asyncio.TimeoutError:
+                return {'tool': name, 'ok': False, 'status': 504, 'duration_ms': ms(),
+                        'error': "'{0}' took longer than {1:.0f}s.".format(name, _tool_timeout())}
+            except ConnectorError as exc:
+                return {'tool': name, 'ok': False, 'status': 502, 'duration_ms': ms(),
+                        'error': redact_text(str(exc))}
+            except Exception as exc:  # noqa: BLE001 -- never a raw 500 with a token in it
+                logger.exception('Portal report %s.%s failed', connection.connector, name)
+                return {'tool': name, 'ok': False, 'status': 502, 'duration_ms': ms(),
+                        'error': redact_exc(exc)}
+
+        async def call_all():
+            return await asyncio.gather(*(call(n, h, a) for _, n, h, a in pending))
+
+        if pending:
+            for (index, _, _, _), outcome in zip(pending, async_to_sync(call_all)()):
+                results[index] = outcome
+
+        return Response(
+            {'duration_ms': int((time.monotonic() - started) * 1000), 'results': results},
             status=status.HTTP_200_OK,
         )
 

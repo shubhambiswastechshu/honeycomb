@@ -116,6 +116,24 @@ deliberate, throttled email-existence oracle — that tradeoff was made knowingl
   finished calls arriving within seconds (`GET /api/activity/live/`, polled every
   5 s only while the panel is open and the tab is visible). Showing calls that
   are still running would need a row written at the start of the call.
+- **The Google Ads report reads through the connection's own tools.** The
+  Reports tab on `/dashboard/connectors/google_ads` (`frontend/components/reports/
+  google-ads/`) has no data path of its own: each sub-tab sends ONE request to
+  `POST /api/connections/<id>/report/`, which runs a handful of the connector's
+  read tools concurrently and returns a result per tool, so one failing tool
+  costs one section. It refuses write and switched-off tools per item, is
+  tenant-scoped, has its own `reports` throttle (12/min) and deliberately writes
+  no `McpActivity` rows -- a person opening a report is not an AI tool call, and
+  a dozen rows per view would bury the real ones. Provider results are cached
+  server-side for 5 minutes (and client-side for the same), so "Refresh" is the
+  way past that. Dates are sent explicitly, in the ACCOUNT's time zone. Caps to
+  know about: campaign, keyword and impression-share pulls are limited to 500
+  rows, search terms to 2,000 examined (top 50 shown per list), and the
+  daily series comes from `get_daily_performance` (one row per day, so it is
+  never truncated). Country names are derived from Google's criterion ids (2000 +
+  the ISO 3166 numeric code) for the countries listed in `ads-model.ts`; any
+  other shows as "Country <id>". The model is checked with a small Node script
+  (not in the repo); there is no frontend test runner.
 - **Spike detection is a rule, not a model.** A bucket is a volume spike when it
   has 3+ calls and sits more than two standard deviations above the window's
   mean; a failure spike is 3+ failures making up 30%+ of the bucket. The rule

@@ -284,6 +284,24 @@ class ToolRunSerializer(serializers.Serializer):
         return value
 
 
+#: The most tools one report request may run. A page's worth of sections, not a
+#: crawl: every run is a real call against the provider's API.
+MAX_REPORT_RUNS = 16
+
+
+class ToolBatchSerializer(serializers.Serializer):
+    """Body of POST /api/connections/<id>/report/ -- {runs: [{tool, args}, ...]}.
+
+    Only the envelope is validated here. Each run is checked by
+    ToolRunSerializer inside the view, one at a time, so a switched-off or
+    misspelled tool costs its own section of the page and not the whole page.
+    """
+
+    runs = serializers.ListField(
+        child=serializers.DictField(), allow_empty=False, max_length=MAX_REPORT_RUNS
+    )
+
+
 class ToolToggleSerializer(serializers.Serializer):
     """Body of POST /api/connections/<id>/tools/.
 

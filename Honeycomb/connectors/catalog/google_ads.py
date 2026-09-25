@@ -1316,6 +1316,19 @@ async def get_day_of_week_performance(conn: Connection, db, args: dict) -> dict:
     return await _segment_perf(conn, db, args, "day_of_week", "dayOfWeek", "get_day_of_week_performance")
 
 
+async def get_daily_performance(conn: Connection, db, args: dict) -> dict:
+    """Account totals for each day in the window, one row per day.
+
+    This is what a trend line and a period-over-period comparison are built
+    from. It reads the customer resource segmented by date, exactly as the
+    hourly and weekday reports read it segmented by hour and weekday, so it is
+    one row per day and cannot be cut short by a row limit -- which a campaign
+    pull segmented by date can, because that returns campaigns x days rows and
+    stops at the ceiling. Rows are not guaranteed to arrive in date order.
+    """
+    return await _segment_perf(conn, db, args, "date", "date", "get_daily_performance")
+
+
 async def get_ad_position_performance(conn: Connection, db, args: dict) -> dict:
     """Top / absolute-top impression rate per campaign (modern position metric)."""
     cid = _customer_id(args)
@@ -2584,6 +2597,7 @@ _MCC_BLOCKED = {
     "get_product_performance",
     "get_hourly_performance",
     "get_day_of_week_performance",
+    "get_daily_performance",
     "get_conversion_lag",
     "get_auction_insights",
     "get_impression_share",
@@ -2647,6 +2661,7 @@ _RAW_HANDLERS: dict[str, Any] = {
     "get_product_performance": get_product_performance,
     "get_hourly_performance": get_hourly_performance,
     "get_day_of_week_performance": get_day_of_week_performance,
+    "get_daily_performance": get_daily_performance,
     "get_conversion_lag": get_conversion_lag,
     # OPTIMIZATION
     "negative_keyword_suggestions": negative_keyword_suggestions,
@@ -3006,6 +3021,14 @@ CATALOG: dict[str, dict] = {
     },
     "get_day_of_week_performance": {
         "description": "Performance segmented by day of week.",
+        "input": _schema(
+            {"customer_id": _CID, "login_customer_id": _LOGIN,
+             "date_range": _DATE, "start_date": _SD, "end_date": _ED},
+            ["customer_id"],
+        ),
+    },
+    "get_daily_performance": {
+        "description": "Account totals for each day (impressions, clicks, cost, conversions) -- the daily trend line.",
         "input": _schema(
             {"customer_id": _CID, "login_customer_id": _LOGIN,
              "date_range": _DATE, "start_date": _SD, "end_date": _ED},

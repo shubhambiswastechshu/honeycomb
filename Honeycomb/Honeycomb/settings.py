@@ -422,6 +422,11 @@ REST_FRAMEWORK = {
         # write scopes because it creates nothing, low enough that a tab left
         # polling in a loop is capped rather than free.
         'activity': '60/min',
+        # A report page's one request fans out to a dozen calls against the
+        # provider's API, so it is capped well under the read scopes -- but
+        # above what a person changing the date range a few times a minute
+        # will ever reach. Provider results are cached for minutes on top.
+        'reports': '12/min',
     },
 }
 
