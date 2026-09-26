@@ -1,5 +1,5 @@
 /**
- * Honeycomb wordmark: the same seven-hex comb cluster as the loader, drawn
+ * HatchBase wordmark: the same seven-hex comb cluster as the loader, drawn
  * static as SVG. Deliberately unanimated — the loader owns the motion.
  *
  * Geometry: pointy-top hexagons of circumradius 9.2 on a lattice of spacing
@@ -27,7 +27,7 @@ export function LogoMark({ size = 26 }: { size?: number }) {
       height={size}
       viewBox="-27 -26 54 52"
       role="img"
-      aria-label="Honeycomb"
+      aria-label="HatchBase"
       focusable="false"
     >
       {CELLS.map(function renderCell(cell) {
@@ -49,7 +49,7 @@ export default function Logo() {
   return (
     <div className="logo">
       <LogoMark />
-      <span className="logo-text">Honeycomb</span>
+      <span className="logo-text">HatchBase</span>
     </div>
   );
 }

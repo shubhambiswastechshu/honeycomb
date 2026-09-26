@@ -1,4 +1,4 @@
-# Honeycomb — design system
+# HatchBase — design system
 
 Paste this whole file to another AI to get the same look. It describes the
 theme only: colour, type, shape, motion, components and the loading animation.

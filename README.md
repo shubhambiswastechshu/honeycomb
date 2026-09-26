@@ -1,4 +1,10 @@
-# Honeycomb
+# HatchBase
+
+> **Renamed from Honeycomb.** The product name people read is HatchBase. The
+> names other systems depend on are unchanged on purpose: the `Honeycomb/` Django
+> package, the `HONEYCOMB_*` environment variables, the `hc_*` cookie and key
+> prefixes, and the deployed hostnames. Renaming those is a coordinated change
+> to configuration, cookies and OAuth redirect URIs, not a text edit.
 
 A multi-tenant SaaS starter: Django REST backend, Next.js frontend, cookie-based
 JWT auth with CSRF protection, and a dashboard shell ready for product features.

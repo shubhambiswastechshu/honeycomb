@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Honeycomb dashboard shell
+   HatchBase dashboard shell
    Imported by app/dashboard/layout.tsx.
 
    Every rule is scoped under .dash (or a .dash-* / .rail-* / .empty-* class of
@@ -1917,7 +1917,7 @@
 /* A rounded app tile, NOT the honeycomb hexagon.
    The hexagon is this product's own mark -- the logo, the loader, the
    empty-state frame -- so wearing it on every connector made fifteen different
-   vendors look like fifteen copies of Honeycomb, which is the single reason
+   vendors look like fifteen copies of HatchBase, which is the single reason
    the catalogue did not read as a store.
 
    --mark-h is set inline per connector, hashed from its slug (see

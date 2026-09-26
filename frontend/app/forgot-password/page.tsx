@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
       subtitle="We are still setting up email for this workspace."
     >
       <p className="footnote">
-        Ask your Honeycomb admin to set a new password for you — they can do it
+        Ask your HatchBase admin to set a new password for you — they can do it
         in seconds. Once email is switched on, this page will send you a reset
         link instead.
       </p>

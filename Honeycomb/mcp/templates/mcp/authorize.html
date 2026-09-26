@@ -10,7 +10,7 @@ that leaves a half-drawn approval button.
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect to Honeycomb</title>
+<title>Connect to HatchBase</title>
 <style>
   :root { color-scheme: light dark; }
   body {
@@ -67,7 +67,7 @@ that leaves a half-drawn approval button.
   {% endcomment %}
   <div class="brand">
     <svg width="34" height="34" viewBox="-27 -26 54 52" role="img"
-         aria-label="Honeycomb" focusable="false">
+         aria-label="HatchBase" focusable="false">
       <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#216e39" transform="translate(0 0)"/>
       <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#2a8a45" transform="translate(17.32 0)"/>
       <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#30a14e" transform="translate(8.66 -15)"/>
@@ -76,7 +76,7 @@ that leaves a half-drawn approval button.
       <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#6bd67f" transform="translate(-8.66 15)"/>
       <polygon points="0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6" fill="#9be9a8" transform="translate(8.66 15)"/>
     </svg>
-    <span class="wordmark">Honeycomb</span>
+    <span class="wordmark">HatchBase</span>
   </div>
 
   <h1>Connect <span class="who">{{ client.client_name|default:"an AI client" }}</span>?</h1>
@@ -120,7 +120,7 @@ that leaves a half-drawn approval button.
           This account has no connected data sources. If your connections belong
           to another account, sign out and sign in as that one -- the platform
           admin account deliberately owns none. Otherwise connect a source in the
-          <a href="{{ frontend }}/dashboard/connectors">Honeycomb dashboard</a>
+          <a href="{{ frontend }}/dashboard/connectors">HatchBase dashboard</a>
           first, then add this connector again.
         </p>
       {% endfor %}
@@ -137,7 +137,7 @@ that leaves a half-drawn approval button.
       <ul>
         <li>it can run this connection's tools and read the data they return</li>
         <li>it never receives your stored account credentials</li>
-        <li>you can revoke it at any time from the Honeycomb dashboard</li>
+        <li>you can revoke it at any time from the HatchBase dashboard</li>
       </ul>
     </div>
 

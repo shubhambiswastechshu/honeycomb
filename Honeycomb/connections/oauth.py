@@ -347,7 +347,7 @@ class GoogleOAuthCallbackView(APIView):
             # re-issue against. Say what fixes it.
             return (
                 'Google did not return a refresh token, so this connection '
-                'would stop working within the hour. Remove Honeycomb under '
+                'would stop working within the hour. Remove HatchBase under '
                 'your Google Account > Security > Third-party access, then '
                 'connect again.'
             ), slug

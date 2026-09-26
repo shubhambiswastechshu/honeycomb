@@ -1,6 +1,6 @@
 """Forager: crawl jobs dispatched to a machine that is not this server.
 
-The whole point of this app is that Honeycomb never crawls. A Forager worker --
+The whole point of this app is that HatchBase never crawls. A Forager worker --
 an always-on PC in the office, not the Coolify box -- claims jobs, does the
 memory-hungry work on its own hardware, and streams rows back. The server holds
 the queue, the log and the results; it never holds a page.

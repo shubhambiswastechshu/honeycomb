@@ -111,7 +111,7 @@ class InvitationListView(APIView):
         mail.send(
             'invitation',
             invitation.email,
-            '{0} invited you to {1} on Honeycomb'.format(
+            '{0} invited you to {1} on HatchBase'.format(
                 request.user.full_name or request.user.email, tenant.name),
             context={
                 'organization': tenant.name,

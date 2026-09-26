@@ -8,7 +8,7 @@ reach it routinely carry secrets:
     ``paging.next`` URLs that embed ``access_token=EAA…``; AWR export URLs are the
     same shape. Any exception that names the URL leaks a live credential.
   * Upstream 4xx bodies echo back the ``Authorization`` header or the key we sent.
-  * Honeycomb's own MCP bearer tokens (``hc_…``) arrive in that same header, so a
+  * HatchBase's own MCP bearer tokens (``hc_…``) arrive in that same header, so a
     handler that dumps its request headers would otherwise mint a working key into
     the activity log.
 
@@ -85,7 +85,7 @@ _URL_IN_TEXT = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s\"'<>\\^`{|}]+")
 # "Bearer <tok>" / "Basic <tok>" anywhere in a message or echoed header dump.
 _BEARER = re.compile(r'(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{4,}')
 # This repo's (and its upstreams') key prefixes — keep the prefix, drop the rest.
-# ``hc_`` is Honeycomb's own McpKey prefix; the rest are inherited from falcon
+# ``hc_`` is HatchBase's own McpKey prefix; the rest are inherited from falcon
 # because the same upstreams are being talked to.
 _PREFIXED_KEY = re.compile(
     r'\b(hc_|tsc_|fmcp_|fsh_|ghp_|gho_|ghs_|ghu_|ghr_|sk-|gsk_|xai-|AIza)[A-Za-z0-9_-]{4,}')

@@ -4,7 +4,7 @@
 
  * Two decisions, both deliberate.
  *
- * NOT the honeycomb hexagon. That shape is Honeycomb's own mark -- it is the
+ * NOT the honeycomb hexagon. That shape is HatchBase's own mark -- it is the
  * logo, the loader and the empty-state frame. Wearing it on every third-party
  * connector made fifteen different products look like fifteen copies of this
  * one, which is exactly why the catalogue did not read as a store. A store
@@ -216,7 +216,7 @@ export function hueFor(slug: string): number {
  *
  * These are third-party trademarks reproduced to identify each vendor's own
  * product in an integration list -- the ordinary nominative use an integrations
- * directory relies on. They are not recoloured, distorted or used as Honeycomb's
+ * directory relies on. They are not recoloured, distorted or used as HatchBase's
  * own branding, and a mark should be removed here rather than altered if a
  * vendor's guidelines ever require it.
  */

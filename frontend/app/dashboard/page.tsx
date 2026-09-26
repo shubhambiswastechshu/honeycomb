@@ -652,7 +652,7 @@ export default function OverviewPage() {
                 index={1}
                 done={stepConnected}
                 title="Connect a source"
-                text="Pick a connector and give it credentials. Honeycomb turns it into an MCP server."
+                text="Pick a connector and give it credentials. HatchBase turns it into an MCP server."
                 href="/dashboard/connectors"
                 linkLabel="Browse MCPs"
               />

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./crawl.css";
 
 export const metadata: Metadata = {
-  title: "Site crawler | Honeycomb",
+  title: "Site crawler | HatchBase",
   description: "Crawl any public website and see every page, status code and title as it happens.",
 };
 

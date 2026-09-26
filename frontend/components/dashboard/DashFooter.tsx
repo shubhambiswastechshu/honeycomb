@@ -16,7 +16,7 @@ export default function DashFooter() {
   return (
     <footer className="dash-footer">
       <p className="dash-footer-legal">
-        &copy; {new Date().getFullYear()} Honeycomb
+        &copy; {new Date().getFullYear()} HatchBase
       </p>
     </footer>
   );

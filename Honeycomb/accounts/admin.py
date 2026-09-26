@@ -58,6 +58,6 @@ class UserAdmin(BaseUserAdmin):
 # reads site_header for the wordmark beside it; these three also carry into the
 # <title>, the breadcrumbs and the password-reset emails, which the template
 # never touches.
-admin.site.site_header = 'Honeycomb Admin'
-admin.site.site_title = 'Honeycomb Admin'
+admin.site.site_header = 'HatchBase Admin'
+admin.site.site_title = 'HatchBase Admin'
 admin.site.index_title = 'Workspaces and members'

@@ -1,7 +1,7 @@
 """Forager connector -- crawl a site using hardware that is not this server.
 
 Every other connector in this catalog reaches out to somebody else's API. This
-one reaches into Honeycomb's own queue: a tool call writes a CrawlJob row, and
+one reaches into HatchBase's own queue: a tool call writes a CrawlJob row, and
 an always-on machine elsewhere claims it, does the work, and streams rows back.
 
 That shape is deliberate. Crawling is the one job in this product that would
@@ -317,7 +317,7 @@ async def list_workers(conn, db, args):
     return {
         'workers': rows,
         'online': sum(1 for w in rows if w['status'] == 'online'),
-        'note': ('Crawls run on these machines, not on the Honeycomb server. '
+        'note': ('Crawls run on these machines, not on the HatchBase server. '
                  'With none online, jobs queue until one connects.'),
     }
 
@@ -521,7 +521,7 @@ def _apply_named_segment(conn, pages, name):
 # A deliberately smaller registry than the crawler's sixty. The crawler runs
 # its reports as SQL over the whole crawl database -- link rows, anchor text,
 # hreflang pairs, response headers -- and that database never leaves the
-# worker. What Honeycomb holds is one row per URL, so what can be rebuilt here
+# worker. What HatchBase holds is one row per URL, so what can be rebuilt here
 # is exactly the reports whose SQL only ever touched the page row. The rest are
 # not reimplemented and not silently dropped either: list_reports names the
 # ones that need data this server does not have, because a caller asking what
@@ -1265,7 +1265,7 @@ CATALOG = {
     'start_crawl': {
         'description': (
             'Start crawling a website. Runs on a Forager worker machine, not on '
-            'the Honeycomb server, and returns a job_id immediately -- the crawl '
+            'the HatchBase server, and returns a job_id immediately -- the crawl '
             'itself may run for hours. Poll crawl_status with the job_id.'
         ),
         'input': {
@@ -1553,6 +1553,6 @@ registry.register(Connector(
     description=(
         'Crawl any website at full depth from your own hardware. Jobs run on a '
         'Forager worker machine you control and stream results back here, so a '
-        'million-page crawl never touches the Honeycomb server.'
+        'million-page crawl never touches the HatchBase server.'
     ),
 ))

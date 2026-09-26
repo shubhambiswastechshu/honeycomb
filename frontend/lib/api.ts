@@ -1,5 +1,5 @@
 /**
- * Tiny typed client for the Honeycomb API.
+ * Tiny typed client for the HatchBase API.
  *
  * Auth is cookie based. The backend sets "hc_access" and "hc_refresh" as
  * httpOnly cookies, so this file never sees, stores or forwards a token --

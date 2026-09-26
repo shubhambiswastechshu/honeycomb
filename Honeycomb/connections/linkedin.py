@@ -9,7 +9,7 @@ start view and the same never-render-an-error callback.
 Two differences from Google shape this file.
 
 *The access token is the credential.* A Google access token lasts an hour, so
-Honeycomb stores only the refresh token and mints a fresh one per use. A
+HatchBase stores only the refresh token and mints a fresh one per use. A
 LinkedIn access token lasts sixty days, so it is stored and used until it is
 nearly spent, and only then renewed with the refresh token (valid a year).
 

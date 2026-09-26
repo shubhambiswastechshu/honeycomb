@@ -314,7 +314,7 @@ class PasswordResetRequestView(PublicAPIView):
             mail.send(
                 'password_reset',
                 user.email,
-                'Reset your Honeycomb password',
+                'Reset your HatchBase password',
                 context={
                     'email': user.email,
                     'full_name': user.full_name,

@@ -390,7 +390,7 @@ export default function CrawlApp() {
         <TopBar overview={null} />
         <main className="cr-off">
           <h1>The public crawler is switched off</h1>
-          <p>This Honeycomb has not enabled crawling without an account.</p>
+          <p>This HatchBase has not enabled crawling without an account.</p>
           <Link className="cr-btn" href="/signin">
             Sign in instead
           </Link>
@@ -658,7 +658,7 @@ function TopBar({ overview, children }: { overview: Overview | null; children?: 
     <header className="cr-top">
       <Link href="/crawl" className="cr-brand">
         <LogoMark size={22} />
-        <span>Honeycomb</span>
+        <span>HatchBase</span>
         <span className="cr-brand-sub">Site crawler</span>
       </Link>
       {children}
