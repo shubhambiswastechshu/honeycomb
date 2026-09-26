@@ -12,7 +12,7 @@ Scoped exactly like public.py: only crawls started from the public page, only
 for the organization configured as HONEYCOMB_PUBLIC_CRAWL_TENANT, no login, and
 under the public read rate limit. A private crawl's id returns 404 here.
 
-What is deliberately not here, because HatchBase does not store it: spelling
+What is deliberately not here, because Honeycomb does not store it: spelling
 and grammar, image file sizes, and third-party data (PageSpeed, Analytics,
 Search Console).
 

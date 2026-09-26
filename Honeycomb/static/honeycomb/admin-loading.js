@@ -1,5 +1,5 @@
 /**
- * Drives the HatchBase ripple across admin page loads.
+ * Drives the Honeycomb ripple across admin page loads.
  *
  * The admin is server-rendered, so a click or a submit means the browser is
  * about to throw this document away and wait on Django. That wait is the only

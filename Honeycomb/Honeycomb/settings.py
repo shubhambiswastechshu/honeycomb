@@ -691,7 +691,7 @@ EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL', 'False')
 # inline, so this number is a page load somebody is watching.
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 DEFAULT_FROM_EMAIL = os.environ.get(
-    'DEFAULT_FROM_EMAIL', 'HatchBase <no-reply@localhost>')
+    'DEFAULT_FROM_EMAIL', 'Honeycomb <no-reply@localhost>')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 HONEYCOMB_EMAIL_ENABLED = bool(EMAIL_HOST) or DEBUG

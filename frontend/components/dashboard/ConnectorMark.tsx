@@ -4,7 +4,7 @@
 
  * Two decisions, both deliberate.
  *
- * NOT the honeycomb hexagon. That shape is HatchBase's own mark -- it is the
+ * NOT the honeycomb hexagon. That shape is Honeycomb's own mark -- it is the
  * logo, the loader and the empty-state frame. Wearing it on every third-party
  * connector made fifteen different products look like fifteen copies of this
  * one, which is exactly why the catalogue did not read as a store. A store
@@ -164,14 +164,13 @@ const CSS_SIZE = 34;
  * here: the amber ground and the ink belong to .mkt-mark.
  */
 /**
- * How many hues the marketplace uses. Twelve, about 21 degrees apart, laid out
- * from 110 degrees to 339 so the red-to-yellow band is never used.
+ * How many hues the marketplace uses. Twelve, 30 degrees apart.
  *
  * The hash is NOT taken modulo 360 directly. Hashing to a raw hue put
  * `awr` at 41 and `google_keywords` at 39 -- two degrees apart, which the eye
  * reads as one colour rendered wrong rather than as two connectors. Quantising
  * means two connectors either land on exactly the same hue, which reads as a
- * deliberate family, or a clear 21 degrees apart. Near-misses are the only
+ * deliberate family, or a clear 30 degrees apart. Near-misses are the only
  * outcome that looks like a bug, and this makes them impossible.
  */
 const HUE_SLOTS = 12;
@@ -195,10 +194,7 @@ export function hueFor(slug: string): number {
     hash >>>= 0;
   }
   // +12 so no connector lands on pure red at 0.
-  // The slots run from 110 degrees (green) through teal, blue, purple and pink
-  // to 339, and stop there: red, orange and yellow are never used, so no tile is
-  // ever yellow.
-  return 110 + (hash % HUE_SLOTS) * (250 / HUE_SLOTS);
+  return ((hash % HUE_SLOTS) * (360 / HUE_SLOTS) + 12) % 360;
 }
 
 /**
@@ -216,7 +212,7 @@ export function hueFor(slug: string): number {
  *
  * These are third-party trademarks reproduced to identify each vendor's own
  * product in an integration list -- the ordinary nominative use an integrations
- * directory relies on. They are not recoloured, distorted or used as HatchBase's
+ * directory relies on. They are not recoloured, distorted or used as Honeycomb's
  * own branding, and a mark should be removed here rather than altered if a
  * vendor's guidelines ever require it.
  */

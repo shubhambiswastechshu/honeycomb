@@ -38,7 +38,7 @@ const METRICS: Array<{ id: TimingMetric; label: string; color: string; additive:
   { id: "cost", label: "Spend", color: "#1a73e8", additive: true },
   { id: "conversions", label: "Conversions", color: "#30a14e", additive: true },
   { id: "ctr", label: "CTR", color: "#8e6cd1", additive: false },
-  { id: "convRate", label: "Conv. rate", color: "#216e39", additive: false },
+  { id: "convRate", label: "Conv. rate", color: "#e8a23f", additive: false },
 ];
 
 const WEEKDAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];

@@ -164,7 +164,7 @@ async def _log_activity(connection, connector, tool, status, duration_ms,
 def build_app():
     """Build the FastAPI data-plane app. Mounted by the project's asgi.py."""
     application = FastAPI(
-        title='HatchBase MCP',
+        title='Honeycomb MCP',
         version='0.1.0',
         # Nothing here is a browsable API; a schema endpoint under /mcp/ would
         # only be one more surface a client can trip over.
@@ -315,7 +315,7 @@ def build_app():
                                     _elapsed_ms(started), 'Tool switched off')
                 return _tool_result(
                     rid,
-                    "Tool '{0}' is switched off for this connection in the HatchBase "
+                    "Tool '{0}' is switched off for this connection in the Honeycomb "
                     'dashboard.'.format(name),
                     True,
                 )
@@ -377,15 +377,15 @@ def build_app():
         except json.JSONDecodeError:
             pass
         return _err(rid, -32001,
-                    'No HatchBase MCP endpoint at this URL. Copy the connection URL again '
-                    'from the HatchBase dashboard.')
+                    'No Honeycomb MCP endpoint at this URL. Copy the connection URL again '
+                    'from the Honeycomb dashboard.')
 
     @application.exception_handler(StarletteHTTPException)
     async def http_exception(request: Request, exc: StarletteHTTPException):
         # Belt and braces for the one thing that must never happen: a bare 404
         # reaching an MCP client.
         if exc.status_code == 404:
-            return _err(None, -32001, 'No HatchBase MCP endpoint at this URL.')
+            return _err(None, -32001, 'No Honeycomb MCP endpoint at this URL.')
         return JSONResponse({'detail': exc.detail}, status_code=exc.status_code,
                             headers=getattr(exc, 'headers', None))
 

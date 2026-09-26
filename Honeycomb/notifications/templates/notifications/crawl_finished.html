@@ -11,17 +11,17 @@
   {% endif %}
 </p>
 
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid #d1d1d1;border-radius:10px;border-collapse:separate;overflow:hidden;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid #e3d9bf;border-radius:10px;border-collapse:separate;overflow:hidden;">
   <tr>
-    <td style="padding:10px 14px;border-bottom:1px solid #e4e4e4;font-size:13px;color:#686868;">Pages crawled</td>
-    <td style="padding:10px 14px;border-bottom:1px solid #e4e4e4;font-size:14px;font-weight:600;text-align:right;">{{ pages }}</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:13px;color:#7a7357;">Pages crawled</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:14px;font-weight:600;text-align:right;">{{ pages }}</td>
   </tr>
   <tr>
-    <td style="padding:10px 14px;border-bottom:1px solid #e4e4e4;font-size:13px;color:#686868;">Links found</td>
-    <td style="padding:10px 14px;border-bottom:1px solid #e4e4e4;font-size:14px;font-weight:600;text-align:right;">{{ links }}</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:13px;color:#7a7357;">Links found</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #f1ead8;font-size:14px;font-weight:600;text-align:right;">{{ links }}</td>
   </tr>
   <tr>
-    <td style="padding:10px 14px;font-size:13px;color:#686868;">Failed requests</td>
+    <td style="padding:10px 14px;font-size:13px;color:#7a7357;">Failed requests</td>
     <td style="padding:10px 14px;font-size:14px;font-weight:600;text-align:right;{% if failures %}color:#b3401f;{% endif %}">{{ failures }}</td>
   </tr>
 </table>
@@ -34,7 +34,7 @@
 
 {% include "notifications/_button.html" with url=crawl_url label="Open the crawl" %}
 
-<p style="margin:0;font-size:13px;line-height:1.6;color:#686868;">
+<p style="margin:0;font-size:13px;line-height:1.6;color:#7a7357;">
   Started from <span style="word-break:break-all;">{{ seed_url }}</span>.
 </p>
 {% endblock %}

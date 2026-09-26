@@ -147,7 +147,7 @@ export default function SignInPage() {
   }
 
   return (
-    <AuthCard title="Sign in" subtitle="Access your HatchBase workspace.">
+    <AuthCard title="Sign in" subtitle="Access your Honeycomb workspace.">
       {error !== null ? <ErrorBanner message={error} /> : null}
       <form onSubmit={handleSubmit}>
         <Field

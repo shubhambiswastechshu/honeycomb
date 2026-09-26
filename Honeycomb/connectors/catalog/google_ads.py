@@ -2,7 +2,7 @@
 
 A full port of falcon's `app/connectors/google_ads/` package -- catalog
 (`tools.py`), handlers (`tools_impl.py`) and service layer (`services.py`) --
-collapsed into one HatchBase catalog module.
+collapsed into one Honeycomb catalog module.
 
 WHY the port is a straight copy: falcon's handlers touch the connection row for
 exactly one thing, `conn.id`, and only ever as a cache-namespace key. Every
@@ -10,7 +10,7 @@ Google Ads identifier they use (customer_id, login_customer_id) arrives in the
 tool `args` or is derived from `list_accounts`, never from a stored column, and
 the developer token is server-level configuration. So the whole connection
 surface those 2,370 lines depend on is the OAuth refresh token, which lives just
-as happily in HatchBase's encrypted creds blob as in falcon's dedicated table.
+as happily in Honeycomb's encrypted creds blob as in falcon's dedicated table.
 Only the four functions below the token line differ from the originals; the
 handler bodies are byte-identical apart from their type annotations.
 
@@ -101,7 +101,7 @@ def _headers(access_token: str, login_customer_id: str | None = None) -> dict:
 # --------------------------------------------------------------------------- #
 # Short-lived access tokens, keyed by connection id: {conn_id: (token, expiry)}.
 # falcon stored the access token encrypted on its ga_connections row and wrote a
-# new one back on every refresh. HatchBase's Connection is not writable from a
+# new one back on every refresh. Honeycomb's Connection is not writable from a
 # handler -- the data plane hands handlers `db=None` deliberately -- and a single
 # Google Ads tool call fans out into dozens of upstream requests (the account
 # tree alone queries every accessible customer), so refreshing per request would
@@ -116,7 +116,7 @@ async def get_valid_access_token(conn: Connection, db) -> str:
     """Exchange the stored refresh token for an access token, reusing a live one.
 
     `db` is accepted and ignored: it is the falcon handler signature, and the
-    HatchBase endpoint passes None for it.
+    Honeycomb endpoint passes None for it.
     """
     cached_token = _TOKENS.get(conn.id)
     if cached_token and cached_token[1] > time.monotonic():
@@ -126,7 +126,7 @@ async def get_valid_access_token(conn: Connection, db) -> str:
     if not refresh:
         raise GoogleAdsApiError(
             'Not connected: no Google refresh token stored. Reconnect this Google Ads '
-            'connection from the HatchBase dashboard.'
+            'connection from the Honeycomb dashboard.'
         )
     token_uri = getattr(settings, 'GOOGLE_OAUTH_TOKEN_URI', 'https://oauth2.googleapis.com/token')
     try:

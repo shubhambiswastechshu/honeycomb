@@ -30,8 +30,8 @@ const mono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HatchBase",
-  description: "HatchBase authentication",
+  title: "Honeycomb",
+  description: "Honeycomb authentication",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

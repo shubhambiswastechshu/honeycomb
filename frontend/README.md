@@ -1,4 +1,4 @@
-# HatchBase frontend
+# Honeycomb frontend
 
 A deliberately small Next.js 14 (App Router, TypeScript) app with exactly two screens:
 a sign up page and a sign in page. There is no home page and no dashboard — `/` redirects

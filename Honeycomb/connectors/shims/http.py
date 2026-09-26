@@ -9,7 +9,7 @@ so a client cached at module scope is a latent bug under any design that spins u
 a loop per request (``asyncio.run`` inside a sync view, ``async_to_sync`` per
 call) — the second loop inherits sockets belonging to a loop that is closed, and
 you get sporadic "Event loop is closed" / "attached to a different loop" errors.
-HatchBase's data plane is a FastAPI app mounted inside Django's ASGI app, served
+Honeycomb's data plane is a FastAPI app mounted inside Django's ASGI app, served
 by a single long-lived uvicorn/gunicorn-worker loop per process, so there is
 exactly one loop for the client's whole life. Keep it that way: if a connector is
 ever called from a per-request loop, this module must switch to a per-loop client
@@ -35,8 +35,8 @@ RETRY_STATUSES = {429, 500, 502, 503, 504}
 # security layers (Wordfence, Cloudflare bot-fight, mod_security), which made
 # every connector request to a hardened site look like a rejected auth token.
 # "Mozilla/5.0 (compatible; …)" is the standard well-behaved-bot form: it passes
-# naive UA filters while still honestly identifying HatchBase.
-USER_AGENT = 'Mozilla/5.0 (compatible; HatchBase-MCP/1.0; +https://honeycomb.a.techshu.in)'
+# naive UA filters while still honestly identifying Honeycomb.
+USER_AGENT = 'Mozilla/5.0 (compatible; Honeycomb-MCP/1.0; +https://honeycomb.a.techshu.in)'
 
 
 class UpstreamError(Exception):

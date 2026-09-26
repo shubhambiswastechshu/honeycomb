@@ -8,7 +8,7 @@ export default function SiteFooter() {
       <div className="site-footer-inner">
         <div className="site-footer-name">
           <LogoMark size={16} />
-          <span>HatchBase</span>
+          <span>Honeycomb</span>
         </div>
 
         <nav className="site-footer-nav" aria-label="Footer">
@@ -17,7 +17,7 @@ export default function SiteFooter() {
         </nav>
 
         <p className="site-footer-legal">
-          &copy; {new Date().getFullYear()} HatchBase
+          &copy; {new Date().getFullYear()} Honeycomb
         </p>
       </div>
     </footer>

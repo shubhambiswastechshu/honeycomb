@@ -9,7 +9,7 @@ import DashFooter from "@/components/dashboard/DashFooter";
 import "./dashboard.css";
 
 export const metadata: Metadata = {
-  title: "Dashboard | HatchBase",
+  title: "Dashboard | Honeycomb",
 };
 
 /**

@@ -47,7 +47,7 @@
   font: inherit;
   font-size: 13px;
 }
-.ts-search input:focus { outline: none; border-color: var(--amber-500); box-shadow: 0 0 0 3px rgba(31, 136, 61, 0.2); }
+.ts-search input:focus { outline: none; border-color: var(--amber-500); box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.2); }
 
 .ts-filters { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .ts-filter {
@@ -146,7 +146,7 @@
 }
 .ts-switch.is-on { background: var(--amber-500); }
 .ts-switch.is-on .ts-knob { transform: translateX(17px); }
-.ts-switch.is-mixed { background: #9be9a8; }
+.ts-switch.is-mixed { background: #eec48a; }
 .ts-switch.is-mixed .ts-knob { transform: translateX(8.5px); }
 .ts-switch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ts-switch:disabled { cursor: progress; opacity: 0.7; }

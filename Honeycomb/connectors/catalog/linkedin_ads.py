@@ -66,7 +66,7 @@ STATUS_LABELS = {
 #: every branch finding the same spent token must not each spend the refresh.
 _RENEW_LOCKS: dict[int, asyncio.Lock] = {}
 
-RECONNECT = "Reconnect it with Continue with LinkedIn in the HatchBase dashboard."
+RECONNECT = "Reconnect it with Continue with LinkedIn in the Honeycomb dashboard."
 
 
 async def _access_token(conn: Connection) -> str:

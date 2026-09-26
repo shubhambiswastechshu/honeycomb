@@ -45,7 +45,7 @@ _BEARER = 'Bearer '
 # exists or which connector a key is scoped to.
 _DENIED = (
     'This MCP key is not valid for this connection. Mint a key on the '
-    'connection you are calling, in the HatchBase dashboard, and paste it '
+    'connection you are calling, in the Honeycomb dashboard, and paste it '
     'into your AI client as an Authorization: Bearer header.'
 )
 
@@ -61,7 +61,7 @@ async def resolve_bearer(authorization, connector, slug):
     header = (authorization or '').strip()
     if not header:
         raise AuthError(
-            'This HatchBase MCP endpoint requires a key. Add an '
+            'This Honeycomb MCP endpoint requires a key. Add an '
             'Authorization: Bearer hc_... header in your AI client.',
             'missing_authorization',
         )

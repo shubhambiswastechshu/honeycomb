@@ -91,7 +91,7 @@ def send(template, to, subject, context=None, tenant=None, user=None,
     payload = dict(context or {})
     payload.setdefault('subject', subject)
     payload.setdefault('app_base', app_url())
-    payload.setdefault('product', 'HatchBase')
+    payload.setdefault('product', 'Honeycomb')
 
     try:
         message = EmailMultiAlternatives(

@@ -1,15 +1,11 @@
 :root {
   color-scheme: light;
 
-  /* Brand palette. The variable names still say "amber" -- that is what the
-     accent was, and a hundred rules read them -- but the ramp is now green:
-     GitHub's contribution greens, the same shades the activity calendar uses.
-     500 is the fill a white label sits on (4.5:1); 400 and 300 are outlines and
-     hovers; 200 is a light tint. */
-  --amber-500: #1f883d;
-  --amber-400: #30a14e;
-  --amber-300: #40c463;
-  --amber-200: #9be9a8;
+  /* Brand palette */
+  --amber-500: #ea9d3e;
+  --amber-400: #e5ac3f;
+  --amber-300: #e5bd3f;
+  --amber-200: #eec33d;
   --ink: #1f1f1f;
 
   --bg: #ffffff;
@@ -17,8 +13,8 @@
   --text: var(--ink);
   --muted: #6b6b6b;
   --accent: var(--amber-500);
-  --accent-hover: #196f30;
-  --accent-contrast: #ffffff;
+  --accent-hover: #d98c2d;
+  --accent-contrast: var(--ink);
   --error-text: #9b3d22;
 
   /* ------------------------------------------------------------------
@@ -26,17 +22,19 @@
 
      Material's roles on a NEUTRAL ground. Surfaces, text and outlines are
      white and true grey with no colour bias, so the product reads as clean
-     white; green is the accent -- primary actions, focus rings, active markers
-     and icon glyphs -- and is never spread across a surface or used as a wash.
-     --amber-500 is the fill a white label sits on, and --md-primary is the
-     darker shade text and icons use. Every pairing below clears 4.5:1.
+     white; the honeycomb amber (hue ~36deg) is kept only as the accent --
+     primary actions, focus rings, active markers and icon glyphs -- and is
+     never spread across a surface or used as a wash. --amber-500 sits around
+     tone 70, which cannot carry small text on a light ground, so it stays a
+     FILL colour and --md-primary is the one text and icons use. Every pairing
+     below clears 4.5:1.
 
      Nothing consumes these at :root. The auth screens keep the brand
      variables above; the dashboard is what draws from this block.
      ------------------------------------------------------------------ */
 
   /* Accent roles */
-  --md-primary: #1a7f37;
+  --md-primary: #7d5300;
   --md-on-primary: #ffffff;
   --md-primary-container: #e3e3e3;
   --md-on-primary-container: #1f1f1f;
@@ -432,7 +430,7 @@ body {
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(31, 136, 61, 0.22);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.22);
 }
 
 .input:disabled {
@@ -509,7 +507,7 @@ body {
 
 .button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(31, 136, 61, 0.32);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.35);
 }
 
 .button:disabled {
@@ -600,37 +598,37 @@ body {
 /* Ripple spreads from the center cell outward around the ring. */
 .cell.d-0 {
   animation-delay: 0ms;
-  --cell-color: #216e39;
+  --cell-color: #ea9d3e;
 }
 
 .cell.d-1 {
   animation-delay: 120ms;
-  --cell-color: #2a8a45;
+  --cell-color: #e8a23f;
 }
 
 .cell.d-2 {
   animation-delay: 200ms;
-  --cell-color: #30a14e;
+  --cell-color: #e5ac3f;
 }
 
 .cell.d-3 {
   animation-delay: 280ms;
-  --cell-color: #3bb356;
+  --cell-color: #e5b53f;
 }
 
 .cell.d-4 {
   animation-delay: 360ms;
-  --cell-color: #40c463;
+  --cell-color: #e5bd3f;
 }
 
 .cell.d-5 {
   animation-delay: 440ms;
-  --cell-color: #6bd67f;
+  --cell-color: #ecc23d;
 }
 
 .cell.d-6 {
   animation-delay: 520ms;
-  --cell-color: #9be9a8;
+  --cell-color: #eec33d;
 }
 
 @keyframes ripple {

@@ -43,11 +43,11 @@ export default function TopBar() {
         href="/dashboard"
         className="dash-brand"
         title="Overview"
-        aria-label="HatchBase, go to Overview"
+        aria-label="Honeycomb, go to Overview"
         aria-current={pathname === "/dashboard" ? "page" : undefined}
       >
         <LogoMark size={22} />
-        <span className="dash-brand-text">HatchBase</span>
+        <span className="dash-brand-text">Honeycomb</span>
       </Link>
 
       <GlobalSearch />

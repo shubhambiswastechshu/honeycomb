@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HatchBase dashboard shell
+   Honeycomb dashboard shell
    Imported by app/dashboard/layout.tsx.
 
    Every rule is scoped under .dash (or a .dash-* / .rail-* / .empty-* class of
@@ -443,8 +443,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--amber-500);
-  color: #ffffff;
+  background: var(--amber-400);
+  color: var(--ink);
   font: var(--md-type-title-sm);
   letter-spacing: 0;
   line-height: 1;
@@ -1591,8 +1591,8 @@
 }
 
 .hc-modal-confirm {
-  color: #ffffff;
-  background: var(--amber-500);
+  color: var(--ink);
+  background: var(--amber-400);
   border: 1px solid var(--amber-500);
 }
 
@@ -1917,7 +1917,7 @@
 /* A rounded app tile, NOT the honeycomb hexagon.
    The hexagon is this product's own mark -- the logo, the loader, the
    empty-state frame -- so wearing it on every connector made fifteen different
-   vendors look like fifteen copies of HatchBase, which is the single reason
+   vendors look like fifteen copies of Honeycomb, which is the single reason
    the catalogue did not read as a store.
 
    --mark-h is set inline per connector, hashed from its slug (see
@@ -1932,8 +1932,8 @@
   width: 34px;
   height: 34px;
   border-radius: var(--md-shape-sm);
-  background: hsl(var(--mark-h, 150) 58% 90%);
-  color: hsl(var(--mark-h, 150) 62% 28%);
+  background: hsl(var(--mark-h, 36) 58% 90%);
+  color: hsl(var(--mark-h, 36) 62% 28%);
   font: var(--md-type-title-md);
   letter-spacing: 0;
   line-height: 1;
@@ -2451,9 +2451,7 @@
   align-items: center;
   flex: none;
   padding: 1px 7px;
-  /* A write tool is a caution, not a brand accent, so it keeps a warning amber
-     when the accent is green. */
-  border: 1px solid #e0a33c;
+  border: 1px solid var(--amber-400);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.08);
   color: var(--ink);
@@ -3166,14 +3164,14 @@
 }
 
 .dash .conn-action-primary {
-  color: #ffffff;
-  background: var(--amber-500);
+  color: var(--ink);
+  background: var(--amber-400);
   border-color: var(--amber-500);
 }
 
 .dash .conn-action-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--amber-300);
+  border-color: var(--amber-500);
 }
 
 .dash .conn-action-danger {
@@ -3794,7 +3792,7 @@
 }
 
 .dash .ov-spark-area {
-  fill: rgba(31, 136, 61, 0.16);
+  fill: rgba(234, 157, 62, 0.16);
   stroke: none;
 }
 
@@ -3936,7 +3934,6 @@
 
 .dash .ov-step.is-done .ov-step-mark {
   background: var(--amber-500);
-  color: #ffffff;
 }
 
 .dash .ov-step-body {
@@ -4061,7 +4058,7 @@
 
 .dash .inv-search:focus-within {
   border-color: var(--amber-500);
-  box-shadow: 0 0 0 3px rgba(31, 136, 61, 0.16);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.16);
 }
 
 .dash .inv-search input {

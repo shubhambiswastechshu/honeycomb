@@ -146,7 +146,7 @@ def _raise_for(res) -> None:
     if code in (10, 200, 294, 3):
         raise ConnectorError(
             "Meta refused that for missing permissions ({0}). Each tool lists the "
-            "permission it needs on the connection's Tools tab in HatchBase; check "
+            "permission it needs on the connection's Tools tab in Honeycomb; check "
             "the token was granted it.".format(message or "code {0}".format(code))
         )
     raise ConnectorError("Meta API {0}: {1}".format(

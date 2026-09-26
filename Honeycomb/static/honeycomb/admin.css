@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HatchBase admin skin
+   Honeycomb admin skin
 
    Loaded from templates/admin/base_site.html via {% block responsive %}, the
    last stylesheet block base.html emits. That position is deliberate:
@@ -26,8 +26,8 @@
 
    The product's amber, brought back into the admin. The values are lifted
    verbatim from frontend/app/globals.css so the two halves of the app cannot
-   drift: --amber-500 #1f883d, --ink #242424, --bg #fcfcfc, --border #d1d1d1,
-   --muted #686868, --accent-hover #196f30.
+   drift: --amber-500 #ea9d3e, --ink #312f17, --bg #fffdf8, --border #e3d9bf,
+   --muted #7a7357, --accent-hover #d98c2d.
 
    How the accent is spent matters more than the accent itself. Amber carries
    the things you act on -- the primary button, the current row, focus, the
@@ -42,75 +42,75 @@
    back.
 
    Amber is a light hue: anything sitting on it takes the dark ink as its
-   foreground. White on #1f883d is about 1.9:1 and fails at any size.
+   foreground. White on #ea9d3e is about 1.9:1 and fails at any size.
    -------------------------------------------------------------------------- */
 
 html[data-theme="light"],
 :root {
   /* Brand, straight from the app. */
-  --hc-accent-500: #1f883d;
-  --hc-accent-400: #30a14e;
-  --hc-accent-300: #40c463;
-  --hc-accent-200: #9be9a8;
-  --hc-accent-deep: #196f30;
-  --hc-ink: #242424;
+  --hc-amber-500: #ea9d3e;
+  --hc-amber-400: #e5ac3f;
+  --hc-amber-300: #e5bd3f;
+  --hc-amber-200: #eec33d;
+  --hc-amber-deep: #d98c2d;
+  --hc-ink: #312f17;
 
-  /* Green at low alpha, for tints that sit over both the paper ground and a
+  /* Amber at low alpha, for tints that sit over both the paper ground and a
      panel without banding. The app tints its rail the same way. */
-  --hc-tint-soft: rgba(31,136,61,0.09);
-  --hc-tint: rgba(31,136,61,0.14);
-  --hc-ring: rgba(31,136,61,0.28);
+  --hc-tint-soft: rgba(234, 157, 62, 0.09);
+  --hc-tint: rgba(234, 157, 62, 0.14);
+  --hc-ring: rgba(234, 157, 62, 0.28);
 
-  --primary: #1f883d;
-  --secondary: #196f30;
+  --primary: #ea9d3e;
+  --secondary: #d98c2d;
   /* base.css paints #branding h1 from --accent directly, not through
      --header-branding-color, so this is the wordmark's colour. */
-  --accent: #242424;
-  --primary-fg: #ffffff;
+  --accent: #312f17;
+  --primary-fg: #312f17;
 
-  --body-bg: #fcfcfc;
-  --body-fg: #242424;
-  --body-quiet-color: #686868;
-  --body-loud-color: #181818;
+  --body-bg: #fffdf8;
+  --body-fg: #312f17;
+  --body-quiet-color: #7a7357;
+  --body-loud-color: #211f0f;
 
-  --header-color: #242424;
-  --header-branding-color: #242424;
-  --header-bg: #fcfcfc;
-  --header-link-color: #505050;
+  --header-color: #312f17;
+  --header-branding-color: #312f17;
+  --header-bg: #fffdf8;
+  --header-link-color: #5f5940;
 
-  --breadcrumbs-fg: #686868;
-  --breadcrumbs-link-fg: #242424;
-  --breadcrumbs-bg: #fcfcfc;
+  --breadcrumbs-fg: #7a7357;
+  --breadcrumbs-link-fg: #312f17;
+  --breadcrumbs-bg: #fffdf8;
 
-  --link-fg: #1a7f37;
-  --link-hover-color: #196f30;
-  --link-selected-fg: #1a7f37;
+  --link-fg: #8a5c1d;
+  --link-hover-color: #d98c2d;
+  --link-selected-fg: #8a5c1d;
 
-  --hairline-color: #e2e2e2;
-  --border-color: #d1d1d1;
+  --hairline-color: #efe8d6;
+  --border-color: #e3d9bf;
 
   --error-fg: #9b3d22;
   --message-success-bg: #f1f6ec;
   --message-warning-bg: #fdf4e2;
   --message-error-bg: #fbeee9;
 
-  --darkened-bg: #f3f3f3;
-  --selected-bg: #e8e8e8;
-  --selected-row: #f2f2f2;
+  --darkened-bg: #faf6ec;
+  --selected-bg: #f7eeda;
+  --selected-row: #fdf6e6;
 
-  --button-fg: #ffffff;
-  --button-bg: #1f883d;
-  --button-hover-bg: #196f30;
-  --default-button-bg: #1f883d;
-  --default-button-hover-bg: #196f30;
-  --close-button-bg: #9c9c9c;
-  --close-button-hover-bg: #686868;
+  --button-fg: #312f17;
+  --button-bg: #ea9d3e;
+  --button-hover-bg: #e5ac3f;
+  --default-button-bg: #ea9d3e;
+  --default-button-hover-bg: #e5ac3f;
+  --close-button-bg: #b3a986;
+  --close-button-hover-bg: #7a7357;
   --delete-button-bg: #9b3d22;
   --delete-button-hover-bg: #7f2f19;
 
-  --object-tools-fg: #ffffff;
-  --object-tools-bg: #1f883d;
-  --object-tools-hover-bg: #196f30;
+  --object-tools-fg: #312f17;
+  --object-tools-bg: #ea9d3e;
+  --object-tools-hover-bg: #e5ac3f;
 
   /* The admin routes every font through this one variable, so a single
      declaration re-faces the whole thing -- including widgets that build their
@@ -138,10 +138,10 @@ html[data-theme="light"],
   --hc-radius: 12px;
   --hc-radius-sm: 9px;
   --hc-radius-xs: 7px;
-  --hc-panel-head-bg: #f7f7f7;
-  --hc-sidebar-bg: #f7f7f7;
-  --hc-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  --hc-popover-shadow: 0 8px 24px rgba(0,0,0,0.13);
+  --hc-panel-head-bg: #fdfaf1;
+  --hc-sidebar-bg: #fdfaf1;
+  --hc-shadow: 0 1px 2px rgba(49, 47, 23, 0.05);
+  --hc-popover-shadow: 0 8px 24px rgba(49, 47, 23, 0.13);
   --hc-ease: 0.16s ease;
   /* The page heading's own line box and the gap under it. The Add button is
      pulled up by exactly their sum to sit on the heading's line -- see the
@@ -154,68 +154,68 @@ html[data-theme="light"],
 }
 
 html[data-theme="dark"] {
-  --hc-accent-500: #1f883d;
-  --hc-accent-400: #30a14e;
-  --hc-accent-300: #40c463;
-  --hc-accent-200: #9be9a8;
-  --hc-accent-deep: #196f30;
-  --hc-ink: #242424;
+  --hc-amber-500: #ea9d3e;
+  --hc-amber-400: #e5ac3f;
+  --hc-amber-300: #e5bd3f;
+  --hc-amber-200: #eec33d;
+  --hc-amber-deep: #d98c2d;
+  --hc-ink: #312f17;
 
-  --hc-tint-soft: rgba(31,136,61,0.10);
-  --hc-tint: rgba(31,136,61,0.16);
-  --hc-ring: rgba(31,136,61,0.32);
+  --hc-tint-soft: rgba(234, 157, 62, 0.10);
+  --hc-tint: rgba(234, 157, 62, 0.16);
+  --hc-ring: rgba(234, 157, 62, 0.32);
 
-  --primary: #1f883d;
-  --secondary: #196f30;
-  --accent: #9be9a8;
-  --primary-fg: #ffffff;
+  --primary: #ea9d3e;
+  --secondary: #d98c2d;
+  --accent: #eec33d;
+  --primary-fg: #312f17;
 
-  --body-bg: #131313;
-  --body-fg: #e0e0e0;
-  --body-quiet-color: #919191;
-  --body-loud-color: #f4f4f4;
+  --body-bg: #17160f;
+  --body-fg: #ece6d5;
+  --body-quiet-color: #a49b7e;
+  --body-loud-color: #fdf8ec;
 
-  --header-color: #e0e0e0;
-  --header-branding-color: #9be9a8;
-  --header-bg: #161616;
-  --header-link-color: #919191;
+  --header-color: #ece6d5;
+  --header-branding-color: #eec33d;
+  --header-bg: #1b1911;
+  --header-link-color: #a49b7e;
 
-  --breadcrumbs-fg: #919191;
-  --breadcrumbs-link-fg: #e0e0e0;
-  --breadcrumbs-bg: #161616;
+  --breadcrumbs-fg: #a49b7e;
+  --breadcrumbs-link-fg: #ece6d5;
+  --breadcrumbs-bg: #1b1911;
 
-  --link-fg: #40c463;
-  --link-hover-color: #9be9a8;
-  --link-selected-fg: #40c463;
+  --link-fg: #e5bd3f;
+  --link-hover-color: #eec33d;
+  --link-selected-fg: #e5bd3f;
 
-  --hairline-color: #222222;
-  --border-color: #2d2d2d;
+  --hairline-color: #2a271b;
+  --border-color: #383322;
 
   --error-fg: #e6907a;
   --message-success-bg: #1d2416;
-  --message-warning-bg: #202020;
+  --message-warning-bg: #2c2413;
   --message-error-bg: #2e1a14;
 
-  --darkened-bg: #181818;
-  --selected-bg: #202020;
-  --selected-row: #1b1b1b;
+  --darkened-bg: #1d1b13;
+  --selected-bg: #2a2517;
+  --selected-row: #221f14;
 
-  --button-fg: #ffffff;
-  --button-bg: #1f883d;
-  --button-hover-bg: #196f30;
-  --default-button-bg: #1f883d;
-  --default-button-hover-bg: #196f30;
-  --close-button-bg: #3c3c3c;
-  --close-button-hover-bg: #585858;
+  --button-fg: #312f17;
+  --button-bg: #ea9d3e;
+  --button-hover-bg: #e5ac3f;
+  --default-button-bg: #ea9d3e;
+  --default-button-hover-bg: #e5ac3f;
+  --close-button-bg: #4a442e;
+  --close-button-hover-bg: #6b6244;
   --delete-button-bg: #a8452a;
   --delete-button-hover-bg: #c05334;
 
-  --object-tools-fg: #ffffff;
-  --object-tools-bg: #1f883d;
-  --object-tools-hover-bg: #196f30;
+  --object-tools-fg: #312f17;
+  --object-tools-bg: #ea9d3e;
+  --object-tools-hover-bg: #e5ac3f;
 
-  --hc-panel-head-bg: #181818;
-  --hc-sidebar-bg: #161616;
+  --hc-panel-head-bg: #1d1b13;
+  --hc-sidebar-bg: #1b1911;
   --hc-shadow: none;
   --hc-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   --hc-icon-filter: grayscale(1) invert(1) opacity(0.7);
@@ -229,61 +229,61 @@ html[data-theme="dark"] {
 @media (prefers-color-scheme: dark) {
   html[data-theme="auto"],
   :root {
-    --hc-tint-soft: rgba(31,136,61,0.10);
-    --hc-tint: rgba(31,136,61,0.16);
-    --hc-ring: rgba(31,136,61,0.32);
+    --hc-tint-soft: rgba(234, 157, 62, 0.10);
+    --hc-tint: rgba(234, 157, 62, 0.16);
+    --hc-ring: rgba(234, 157, 62, 0.32);
 
-    --primary: #1f883d;
-    --secondary: #196f30;
-    --accent: #9be9a8;
-    --primary-fg: #ffffff;
+    --primary: #ea9d3e;
+    --secondary: #d98c2d;
+    --accent: #eec33d;
+    --primary-fg: #312f17;
 
-    --body-bg: #131313;
-    --body-fg: #e0e0e0;
-    --body-quiet-color: #919191;
-    --body-loud-color: #f4f4f4;
+    --body-bg: #17160f;
+    --body-fg: #ece6d5;
+    --body-quiet-color: #a49b7e;
+    --body-loud-color: #fdf8ec;
 
-    --header-color: #e0e0e0;
-    --header-branding-color: #9be9a8;
-    --header-bg: #161616;
-    --header-link-color: #919191;
+    --header-color: #ece6d5;
+    --header-branding-color: #eec33d;
+    --header-bg: #1b1911;
+    --header-link-color: #a49b7e;
 
-    --breadcrumbs-fg: #919191;
-    --breadcrumbs-link-fg: #e0e0e0;
-    --breadcrumbs-bg: #161616;
+    --breadcrumbs-fg: #a49b7e;
+    --breadcrumbs-link-fg: #ece6d5;
+    --breadcrumbs-bg: #1b1911;
 
-    --link-fg: #40c463;
-    --link-hover-color: #9be9a8;
-    --link-selected-fg: #40c463;
+    --link-fg: #e5bd3f;
+    --link-hover-color: #eec33d;
+    --link-selected-fg: #e5bd3f;
 
-    --hairline-color: #222222;
-    --border-color: #2d2d2d;
+    --hairline-color: #2a271b;
+    --border-color: #383322;
 
     --error-fg: #e6907a;
     --message-success-bg: #1d2416;
-    --message-warning-bg: #202020;
+    --message-warning-bg: #2c2413;
     --message-error-bg: #2e1a14;
 
-    --darkened-bg: #181818;
-    --selected-bg: #202020;
-    --selected-row: #1b1b1b;
+    --darkened-bg: #1d1b13;
+    --selected-bg: #2a2517;
+    --selected-row: #221f14;
 
-    --button-fg: #ffffff;
-    --button-bg: #1f883d;
-    --button-hover-bg: #196f30;
-    --default-button-bg: #1f883d;
-    --default-button-hover-bg: #196f30;
-    --close-button-bg: #3c3c3c;
-    --close-button-hover-bg: #585858;
+    --button-fg: #312f17;
+    --button-bg: #ea9d3e;
+    --button-hover-bg: #e5ac3f;
+    --default-button-bg: #ea9d3e;
+    --default-button-hover-bg: #e5ac3f;
+    --close-button-bg: #4a442e;
+    --close-button-hover-bg: #6b6244;
     --delete-button-bg: #a8452a;
     --delete-button-hover-bg: #c05334;
 
-    --object-tools-fg: #ffffff;
-    --object-tools-bg: #1f883d;
-    --object-tools-hover-bg: #196f30;
+    --object-tools-fg: #312f17;
+    --object-tools-bg: #ea9d3e;
+    --object-tools-hover-bg: #e5ac3f;
 
-    --hc-panel-head-bg: #181818;
-    --hc-sidebar-bg: #161616;
+    --hc-panel-head-bg: #1d1b13;
+    --hc-sidebar-bg: #1b1911;
     --hc-shadow: none;
     --hc-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     --hc-icon-filter: grayscale(1) invert(1) opacity(0.7);
@@ -393,8 +393,8 @@ div.breadcrumbs {
 /* Keyboard users hit this first on every page; stock leaves it unstyled. */
 .skip-to-content-link {
   border-radius: var(--hc-radius-sm);
-  background: var(--hc-accent-500);
-  color: #ffffff;
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
 }
 
 /* --------------------------------------------------------------------------
@@ -549,7 +549,7 @@ div.breadcrumbs {
 /* The stock focus ring sits at offset 2px, which on a 72px item inside a 78px
    rail is drawn half outside the column. Pulled inside instead. */
 .hc-rail .hc-rail-item:focus-visible {
-  outline: 2px solid var(--hc-accent-500);
+  outline: 2px solid var(--hc-amber-500);
   outline-offset: -1px;
 }
 
@@ -559,7 +559,7 @@ div.breadcrumbs {
 
 .hc-rail-item[aria-current="page"] .hc-rail-box {
   background: var(--hc-tint);
-  color: var(--hc-accent-deep);
+  color: var(--hc-amber-deep);
 }
 
 .hc-rail-item[aria-current="page"] .hc-rail-name {
@@ -567,7 +567,7 @@ div.breadcrumbs {
 }
 
 html[data-theme="dark"] .hc-rail-item[aria-current="page"] .hc-rail-box {
-  color: var(--hc-accent-300);
+  color: var(--hc-amber-300);
 }
 
 .hc-rail-icon {
@@ -652,7 +652,7 @@ html[data-theme="dark"] .hc-rail-item[aria-current="page"] .hc-rail-box {
 }
 
 .dashboard .module table th a:hover {
-  color: var(--hc-accent-deep);
+  color: var(--hc-amber-deep);
 }
 
 /* The add/change links sit at the row's end as quiet actions, not as two
@@ -787,7 +787,7 @@ input[type="submit"].default:hover,
 .submit-row a.closelink:hover,
 .submit-row input:not(.default):not([name="_delete"]):hover,
 .button:not(.default):not(.deletelink):hover {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
   color: var(--body-loud-color);
 }
@@ -802,7 +802,7 @@ input[type="submit"].default:hover,
   border-color: transparent;
   border-radius: var(--hc-radius-sm);
   background: var(--delete-button-bg);
-  color: #fcfcfc;
+  color: #fffdf8;
   line-height: 36px;
 }
 
@@ -811,7 +811,7 @@ input[type="submit"].default:hover,
 .submit-row a.deletelink:hover,
 .delete-confirmation form input[type="submit"]:hover {
   background: var(--delete-button-hover-bg);
-  color: #fcfcfc;
+  color: #fffdf8;
 }
 
 /* The cancel beside a delete is stock-filled in the same weight as the delete
@@ -828,7 +828,7 @@ input[type="submit"].default:hover,
 
 .delete-confirmation form .cancel-link:hover,
 .delete-confirmation form .cancel-link:focus {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
   color: var(--body-loud-color);
 }
@@ -843,7 +843,7 @@ a.button:focus-visible,
 .hc-rail-item:focus-visible,
 summary:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--hc-accent-500);
+  outline: 2px solid var(--hc-amber-500);
   outline-offset: 2px;
 }
 
@@ -909,7 +909,7 @@ textarea:focus,
 select:focus,
 .vTextField:focus {
   outline: none;
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   box-shadow: 0 0 0 3px var(--hc-ring);
 }
 
@@ -959,7 +959,7 @@ input[type="checkbox"],
 input[type="radio"] {
   width: 15px;
   height: 15px;
-  accent-color: var(--hc-accent-500);
+  accent-color: var(--hc-amber-500);
 }
 
 .help,
@@ -1055,7 +1055,7 @@ p.help,
 }
 
 #changelist #toolbar input[type="submit"]:hover {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
 }
 
@@ -1095,7 +1095,7 @@ p.help,
 }
 
 .changelist-form-container .actions .button:hover {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
 }
 
@@ -1188,12 +1188,12 @@ p.help,
 }
 
 .paginator a:hover {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
 }
 
 .paginator .this-page {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint);
   font-weight: 600;
 }
@@ -1294,7 +1294,7 @@ p.help,
 
 #changelist #changelist-filter details > summary:hover,
 #changelist #changelist-filter details[open] > summary {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint-soft);
 }
 
@@ -1303,7 +1303,7 @@ p.help,
    know it here -- filter.html renders with a bare three-name context and cannot
    see the request. Browsers without :has() simply do not get the highlight. */
 #changelist #changelist-filter details:has(li.selected:not(:first-child)) > summary {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   background: var(--hc-tint);
   color: var(--body-loud-color);
   font-weight: 600;
@@ -1594,12 +1594,12 @@ ul.errorlist {
 
 /* widgets.css paints this from --accent with a hardcoded #333 label. --accent is
    the wordmark colour in this skin -- dark ink in light mode -- so left alone
-   the caption is dark text on a dark bar. White, now that the bar is green. */
+   the caption is dark text on a dark bar. */
 .calendar caption,
 .calendarbox h2 {
   padding: 8px 0;
-  background: var(--hc-accent-500);
-  color: #ffffff;
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -1630,13 +1630,13 @@ ul.errorlist {
 }
 
 .calendar td.selected a {
-  background: var(--hc-accent-500);
-  color: #ffffff;
+  background: var(--hc-amber-500);
+  color: var(--hc-ink);
 }
 
 .calendar td.today a {
   font-weight: 700;
-  color: var(--hc-accent-deep);
+  color: var(--hc-amber-deep);
 }
 
 .calendar td.nonday {
@@ -1719,7 +1719,7 @@ ul.errorlist {
 
 .select2-container--admin-autocomplete.select2-container--focus .select2-selection,
 .select2-container--default.select2-container--focus .select2-selection {
-  border-color: var(--hc-accent-500);
+  border-color: var(--hc-amber-500);
   box-shadow: 0 0 0 3px var(--hc-ring);
 }
 
@@ -1757,7 +1757,7 @@ ul.errorlist {
 
 .select2-container--admin-autocomplete .select2-selection--multiple .select2-selection__choice,
 .select2-container--default .select2-selection--multiple .select2-selection__choice {
-  border: 1px solid var(--hc-accent-500);
+  border: 1px solid var(--hc-amber-500);
   border-radius: var(--hc-radius-xs);
   background: var(--hc-tint);
   color: var(--body-fg);
@@ -1779,7 +1779,7 @@ ul.messagelist li {
   margin: 0 40px 12px 40px;
   padding: 12px 16px;
   border: 1px solid var(--border-color);
-  border-left: 3px solid var(--hc-accent-500);
+  border-left: 3px solid var(--hc-amber-500);
   border-radius: var(--hc-radius-sm);
   background: var(--darkened-bg);
   background-image: none;
@@ -1788,7 +1788,7 @@ ul.messagelist li {
 }
 
 ul.messagelist li.warning {
-  border-left-color: var(--hc-accent-300);
+  border-left-color: var(--hc-amber-300);
   background: var(--message-warning-bg);
   background-image: none;
 }
@@ -1993,7 +1993,7 @@ td img[src*="/admin/img/icon-"] {
   filter: var(--hc-icon-filter);
 }
 
-/* icon-alert.svg is already #7d7d7d, near enough to the brand amber to keep. */
+/* icon-alert.svg is already #efb80b, near enough to the brand amber to keep. */
 td img[src$="icon-alert.svg"],
 ul.messagelist img {
   filter: none;
@@ -2077,13 +2077,13 @@ html.hc-leaving {
 }
 
 /* Ripple spreads from the centre cell outward around the ring. */
-.hc-cell.hc-d-0 { animation-delay: 0ms;   --cell-color: #1f883d; }
-.hc-cell.hc-d-1 { animation-delay: 120ms; --cell-color: #30a14e; }
-.hc-cell.hc-d-2 { animation-delay: 200ms; --cell-color: #30a14e; }
-.hc-cell.hc-d-3 { animation-delay: 280ms; --cell-color: #3bb356; }
-.hc-cell.hc-d-4 { animation-delay: 360ms; --cell-color: #40c463; }
-.hc-cell.hc-d-5 { animation-delay: 440ms; --cell-color: #6bd67f; }
-.hc-cell.hc-d-6 { animation-delay: 520ms; --cell-color: #9be9a8; }
+.hc-cell.hc-d-0 { animation-delay: 0ms;   --cell-color: #ea9d3e; }
+.hc-cell.hc-d-1 { animation-delay: 120ms; --cell-color: #e8a23f; }
+.hc-cell.hc-d-2 { animation-delay: 200ms; --cell-color: #e5ac3f; }
+.hc-cell.hc-d-3 { animation-delay: 280ms; --cell-color: #e5b53f; }
+.hc-cell.hc-d-4 { animation-delay: 360ms; --cell-color: #e5bd3f; }
+.hc-cell.hc-d-5 { animation-delay: 440ms; --cell-color: #ecc23d; }
+.hc-cell.hc-d-6 { animation-delay: 520ms; --cell-color: #eec33d; }
 
 @keyframes hc-ripple {
   0%   { background-color: transparent; }

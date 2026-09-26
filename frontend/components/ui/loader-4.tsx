@@ -1,5 +1,5 @@
 /**
- * HatchBase ripple loader.
+ * Honeycomb ripple loader.
  *
  * Seven hexagons in the classic comb cluster (one center cell ringed by six),
  * rippling outward from the middle. Plain CSS — see the `.loader` / `.cell`

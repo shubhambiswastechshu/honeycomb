@@ -52,7 +52,7 @@ LOC_RE = re.compile(r'<loc>\s*([^<\s][^<]*?)\s*</loc>', re.IGNORECASE)
 SITEMAP_INDEX_RE = re.compile(r'<sitemapindex', re.IGNORECASE)
 ROBOTS_SITEMAP_RE = re.compile(r'^\s*sitemap:\s*(\S+)', re.IGNORECASE | re.MULTILINE)
 
-USER_AGENT = 'Mozilla/5.0 (compatible; HatchBase-Sitemap/1.0; +https://honeycomb.a.techshu.in)'
+USER_AGENT = 'Mozilla/5.0 (compatible; Honeycomb-Sitemap/1.0; +https://honeycomb.a.techshu.in)'
 
 
 def _is_public(host):

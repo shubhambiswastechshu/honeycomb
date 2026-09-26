@@ -59,7 +59,7 @@ URL_INSPECT = "https://searchconsole.googleapis.com/v1/urlInspection/index:inspe
 def _oauth_conf() -> tuple[str, str, str]:
     """Google OAuth client config, read defensively.
 
-    HatchBase may be deployed without the Google client configured; a missing
+    Honeycomb may be deployed without the Google client configured; a missing
     setting must surface as a ConnectorError the user can act on, not as an
     AttributeError deep inside a tool call.
     """
