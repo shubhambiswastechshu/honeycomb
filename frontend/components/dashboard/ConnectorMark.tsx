@@ -164,13 +164,14 @@ const CSS_SIZE = 34;
  * here: the amber ground and the ink belong to .mkt-mark.
  */
 /**
- * How many hues the marketplace uses. Twelve, 30 degrees apart.
+ * How many hues the marketplace uses. Twelve, about 21 degrees apart, laid out
+ * from 110 degrees to 339 so the red-to-yellow band is never used.
  *
  * The hash is NOT taken modulo 360 directly. Hashing to a raw hue put
  * `awr` at 41 and `google_keywords` at 39 -- two degrees apart, which the eye
  * reads as one colour rendered wrong rather than as two connectors. Quantising
  * means two connectors either land on exactly the same hue, which reads as a
- * deliberate family, or a clear 30 degrees apart. Near-misses are the only
+ * deliberate family, or a clear 21 degrees apart. Near-misses are the only
  * outcome that looks like a bug, and this makes them impossible.
  */
 const HUE_SLOTS = 12;
@@ -194,7 +195,10 @@ export function hueFor(slug: string): number {
     hash >>>= 0;
   }
   // +12 so no connector lands on pure red at 0.
-  return ((hash % HUE_SLOTS) * (360 / HUE_SLOTS) + 12) % 360;
+  // The slots run from 110 degrees (green) through teal, blue, purple and pink
+  // to 339, and stop there: red, orange and yellow are never used, so no tile is
+  // ever yellow.
+  return 110 + (hash % HUE_SLOTS) * (250 / HUE_SLOTS);
 }
 
 /**

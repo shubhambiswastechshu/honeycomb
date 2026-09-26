@@ -10,13 +10,13 @@ const HEX_POINTS = "0,-9.2 -7.97,-4.6 -7.97,4.6 0,9.2 7.97,4.6 7.97,-4.6";
 
 // Center cell first, then the ring clockwise from due east.
 const CELLS: Array<{ x: number; y: number; fill: string }> = [
-  { x: 0, y: 0, fill: "#ea9d3e" },
-  { x: 17.32, y: 0, fill: "#e8a23f" },
-  { x: 8.66, y: -15, fill: "#e5ac3f" },
-  { x: -8.66, y: -15, fill: "#e5b53f" },
-  { x: -17.32, y: 0, fill: "#e5bd3f" },
-  { x: -8.66, y: 15, fill: "#ecc23d" },
-  { x: 8.66, y: 15, fill: "#eec33d" },
+  { x: 0, y: 0, fill: "#216e39" },
+  { x: 17.32, y: 0, fill: "#2a8a45" },
+  { x: 8.66, y: -15, fill: "#30a14e" },
+  { x: -8.66, y: -15, fill: "#3bb356" },
+  { x: -17.32, y: 0, fill: "#40c463" },
+  { x: -8.66, y: 15, fill: "#6bd67f" },
+  { x: 8.66, y: 15, fill: "#9be9a8" },
 ];
 
 export function LogoMark({ size = 26 }: { size?: number }) {

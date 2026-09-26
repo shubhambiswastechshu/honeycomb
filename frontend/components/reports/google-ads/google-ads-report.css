@@ -298,7 +298,7 @@
 .ga-btn.is-primary {
   border-color: var(--amber-500);
   background: var(--amber-500);
-  color: var(--ink);
+  color: #ffffff;
 }
 
 .ga-btn.is-primary:hover:not(:disabled) {

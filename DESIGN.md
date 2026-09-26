@@ -4,9 +4,9 @@ Paste this whole file to another AI to get the same look. It describes the
 theme only: colour, type, shape, motion, components and the loading animation.
 No features, no product behaviour.
 
-**The idea in one line:** white paper with a honey-amber accent. Flat — no
+**The idea in one line:** white paper with a green accent. Flat — no
 gradients, no glass. Structure comes from 1px hairline borders and true-grey
-tone steps, and the amber is an accent only: buttons, focus rings, active
+tone steps, and the green is an accent only: buttons, focus rings, active
 markers and icon glyphs — never a wash across a surface. Light theme only,
 committed to on purpose.
 
@@ -20,14 +20,17 @@ Put these on `:root` and never write a raw hex anywhere else.
 :root {
   color-scheme: light;
 
-  /* Brand ramp — amber, warm, desaturated. */
-  --amber-500: #ea9d3e;
-  --amber-400: #e5ac3f;
-  --amber-300: #e5bd3f;
-  --amber-200: #eec33d;
+  /* Brand ramp — GitHub's contribution greens. The variables keep the name
+     --amber-* (a hundred rules read them); the values are green. 500 is the
+     fill a white label sits on (4.5:1), 400 and 300 are outlines and hovers,
+     200 is a light tint. */
+  --amber-500: #1f883d;
+  --amber-400: #30a14e;
+  --amber-300: #40c463;
+  --amber-200: #9be9a8;
 
   /* Neutrals. True grey with no colour bias, so the page reads as clean
-     white. The amber above is the only colour in the chrome. */
+     white. The green above is the only colour in the chrome. */
   --ink:    #1f1f1f;   /* text, headings */
   --muted:  #6b6b6b;   /* secondary text, icons at rest */
   --bg:     #ffffff;   /* page */
@@ -35,8 +38,8 @@ Put these on `:root` and never write a raw hex anywhere else.
 
   --text:            var(--ink);
   --accent:          var(--amber-500);
-  --accent-hover:    #d98c2d;
-  --accent-contrast: var(--ink);   /* text ON amber is ink, not white */
+  --accent-hover:    #196f30;
+  --accent-contrast: #ffffff;      /* text ON the green fill is white */
   --error-text:      #9b3d22;      /* burnt red */
 }
 ```
@@ -50,7 +53,7 @@ Put these on `:root` and never write a raw hex anywhere else.
 | Fill: hover, notices, chips, search fields | `#f5f5f5` / `#f0f0f0` |
 | Selected item, pressed fill | `#ececec` |
 
-**Washes.** Hover and selected fills are a neutral black wash, never amber:
+**Washes.** Hover and selected fills are a neutral black wash, never green:
 `rgba(0, 0, 0, α)`.
 
 | α | Use |
@@ -59,9 +62,10 @@ Put these on `:root` and never write a raw hex anywhere else.
 | `0.06` | icon chip, count badge, active list row |
 | `0.08` | selected tab or row, icon-button hover |
 
-Amber keeps a role where it *is* the signal: the primary button fill, the focus
-ring (`rgba(234, 157, 62, 0.2)`), the active-nav marker, a toggle in its on
-state, chart series, and the warning / redirect status colour.
+Green keeps a role where it *is* the signal: the primary button fill, the focus
+ring (`rgba(31, 136, 61, 0.2)`), the active-nav marker, a toggle in its on
+state and chart series. Amber survives only as the warning, redirect and caution
+status colour (`#e0a33c`): a warning in green would read as fine.
 
 **Semantic dots** (status). Colour is never the only signal — always pair with
 a `title` or a word:
@@ -213,13 +217,13 @@ position):
 
 /* Ripple spreads from the centre cell outward around the ring. Each step is
    both later and a shade lighter, so the wave reads as it travels. */
-.cell.d-0 { animation-delay:   0ms; --cell-color: #ea9d3e; }
-.cell.d-1 { animation-delay: 120ms; --cell-color: #e8a23f; }
-.cell.d-2 { animation-delay: 200ms; --cell-color: #e5ac3f; }
-.cell.d-3 { animation-delay: 280ms; --cell-color: #e5b53f; }
-.cell.d-4 { animation-delay: 360ms; --cell-color: #e5bd3f; }
-.cell.d-5 { animation-delay: 440ms; --cell-color: #ecc23d; }
-.cell.d-6 { animation-delay: 520ms; --cell-color: #eec33d; }
+.cell.d-0 { animation-delay:   0ms; --cell-color: #216e39; }
+.cell.d-1 { animation-delay: 120ms; --cell-color: #2a8a45; }
+.cell.d-2 { animation-delay: 200ms; --cell-color: #30a14e; }
+.cell.d-3 { animation-delay: 280ms; --cell-color: #3bb356; }
+.cell.d-4 { animation-delay: 360ms; --cell-color: #40c463; }
+.cell.d-5 { animation-delay: 440ms; --cell-color: #6bd67f; }
+.cell.d-6 { animation-delay: 520ms; --cell-color: #9be9a8; }
 
 @keyframes ripple {
   0%   { background-color: transparent; }
@@ -266,7 +270,7 @@ element — an overlay that scrolls away from what it covers is worse than none.
 
 ## 6. Components
 
-**Primary button** — amber fill, ink text:
+**Primary button** — green fill, white text:
 
 ```css
 .button {
@@ -282,12 +286,12 @@ element — an overlay that scrolls away from what it covers is worse than none.
 }
 .button:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
 .button:active:not(:disabled) { transform: translateY(1px); }
-.button:focus-visible         { outline: none; box-shadow: 0 0 0 3px rgba(234,157,62,0.35); }
+.button:focus-visible         { outline: none; box-shadow: 0 0 0 3px rgba(31,136,61,0.35); }
 .button:disabled              { opacity: 0.65; cursor: default; }
 ```
 
 **Secondary button** — same geometry, `background: var(--bg)`, `color: var(--ink)`,
-`border-color: var(--border)`; on hover the border goes amber and the fill goes
+`border-color: var(--border)`; on hover the border goes green and the fill goes
 `#fdf6e7`. Give a button whose label changes ("Run" → "Running") a `min-width`
 so the row does not shift.
 
@@ -303,11 +307,11 @@ so the row does not shift.
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .input:hover:not(:focus):not(:disabled) { border-color: #cfc4a4; }
-.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(234,157,62,0.22); }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31,136,61,0.22); }
 .input:disabled { opacity: 0.6; }
 ```
 
-**Card / tile** — white on the off-white ground, hairline border, amber on hover:
+**Card / tile** — white on the ground, hairline border, green on hover:
 
 ```css
 .tile {
@@ -318,17 +322,17 @@ so the row does not shift.
   transition: border-color 0.16s ease, background-color 0.16s ease,
     transform 0.12s ease;
 }
-.tile:hover { border-color: var(--amber-400); background: rgba(234,157,62,0.05); }
-/* Icon sits in a soft amber chip, never a solid amber square. */
+.tile:hover { border-color: var(--amber-400); background: rgba(31,136,61,0.05); }
+/* Icon sits in a soft green chip, never a solid green square. */
 .tile-icon {
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; border-radius: 9px;
-  background: rgba(234,157,62,0.12); color: var(--amber-500);
+  background: rgba(31,136,61,0.12); color: var(--amber-500);
 }
 ```
 
 **Icon rail** — 60px wide, icons only, tooltips on hover. The active item gets
-a tint *and* a 3px amber tab on the left edge, so the state survives greyscale:
+a tint *and* a 3px green tab on the left edge, so the state survives greyscale:
 
 ```css
 .rail-item {
@@ -338,7 +342,7 @@ a tint *and* a 3px amber tab on the left edge, so the state survives greyscale:
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 .rail-item[aria-current="page"] {
-  color: var(--amber-500); background: rgba(234,157,62,0.14);
+  color: var(--amber-500); background: rgba(31,136,61,0.14);
 }
 .rail-item[aria-current="page"]::before {
   content: ""; position: absolute; left: -10px; top: 50%;
@@ -350,7 +354,7 @@ a tint *and* a 3px amber tab on the left edge, so the state survives greyscale:
 **Top bar** — 56px, sticky, `background: var(--bg)`, bottom hairline only.
 
 **Tabs / pills** — no underline. Inactive is `--muted` on transparent; active is
-`--ink` on `rgba(234,157,62,0.16)` with a 6px radius. Counts ride in a
+`--ink` on `rgba(31,136,61,0.16)` with a 6px radius. Counts ride in a
 `999px`-radius chip at `rgba(49,47,23,0.10)`.
 
 **Data table** — hairline row separators only, no vertical rules, no zebra:
@@ -358,7 +362,7 @@ a tint *and* a 3px amber tab on the left edge, so the state survives greyscale:
 - header sticky, `background: #fffcf4`, **opaque** (rows scroll under it)
 - header shows the column name in `--ink` 600 with its type beneath in
   `--muted` 10.5px
-- row hover `rgba(234,157,62,0.07)`
+- row hover `rgba(31,136,61,0.07)`
 - numbers right-aligned with `tabular-nums`
 - `null` renders as a dimmed `NULL`, never an empty cell — "no value" and
   "empty string" are different answers
@@ -371,10 +375,10 @@ for emphasis. 13px in dense lists, 15–16px in buttons, 19px in the rail.
 
 ## 7. Code surfaces
 
-Syntax colours are drawn from the brand where possible. Amber carries keywords;
+Syntax colours are drawn from the brand where possible. Green carries keywords;
 strings and numbers take the two greens, which are the only hues invented for
 this purpose — highlighting needs distinctions the brand does not have, and two
-new colours beats making amber mean four things.
+new colours beats making green mean four things.
 
 ```
 keyword   #a86a12  (600 weight)      string    #3f7d3a
@@ -384,9 +388,9 @@ operator  #7a7357                    invalid   #9b3d22
 ```
 
 Editor chrome: transparent gutter with a right hairline, gutter numbers
-`#b6ac8e`, active line `rgba(234,157,62,0.07)` as a **band not a border** (a 1px
+`#b6ac8e`, active line `rgba(31,136,61,0.07)` as a **band not a border** (a 1px
 outline shifts the text as the cursor moves), caret `--accent-hover` at 2px,
-selection `rgba(234,157,62,0.24)`.
+selection `rgba(31,136,61,0.24)`.
 
 ---
 
@@ -407,6 +411,6 @@ selection `rgba(234,157,62,0.24)`.
 - No shadows for depth, no gradients, no glassmorphism, no rounded-2xl.
 - No second accent colour. Semantic green/red are for status only and never
   become a brand colour.
-- No amber text on an amber fill — text on accent is always `--ink`.
+- No dark text on the green fill — text on accent is always white.
 - Don't centre body copy; centre only empty states.
 - Don't animate on every state change. Entrances and busy states only.

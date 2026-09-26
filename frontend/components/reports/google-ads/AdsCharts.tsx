@@ -48,7 +48,7 @@ export const TREND_METRICS: Array<{
   { id: "impressions", label: "Impressions", color: "#8e6cd1", kind: "int" },
   { id: "clicks", label: "Clicks", color: "#0f9d9d", kind: "int" },
   { id: "conversions", label: "Conversions", color: "#30a14e", kind: "num" },
-  { id: "conversionValue", label: "Conv. value", color: "#e8a23f", kind: "money" },
+  { id: "conversionValue", label: "Conv. value", color: "#216e39", kind: "money" },
 ];
 
 const HEIGHT = 270;

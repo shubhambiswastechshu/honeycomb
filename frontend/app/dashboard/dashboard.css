@@ -443,8 +443,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--amber-400);
-  color: var(--ink);
+  background: var(--amber-500);
+  color: #ffffff;
   font: var(--md-type-title-sm);
   letter-spacing: 0;
   line-height: 1;
@@ -1591,8 +1591,8 @@
 }
 
 .hc-modal-confirm {
-  color: var(--ink);
-  background: var(--amber-400);
+  color: #ffffff;
+  background: var(--amber-500);
   border: 1px solid var(--amber-500);
 }
 
@@ -1932,8 +1932,8 @@
   width: 34px;
   height: 34px;
   border-radius: var(--md-shape-sm);
-  background: hsl(var(--mark-h, 36) 58% 90%);
-  color: hsl(var(--mark-h, 36) 62% 28%);
+  background: hsl(var(--mark-h, 150) 58% 90%);
+  color: hsl(var(--mark-h, 150) 62% 28%);
   font: var(--md-type-title-md);
   letter-spacing: 0;
   line-height: 1;
@@ -2451,7 +2451,9 @@
   align-items: center;
   flex: none;
   padding: 1px 7px;
-  border: 1px solid var(--amber-400);
+  /* A write tool is a caution, not a brand accent, so it keeps a warning amber
+     when the accent is green. */
+  border: 1px solid #e0a33c;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.08);
   color: var(--ink);
@@ -3164,14 +3166,14 @@
 }
 
 .dash .conn-action-primary {
-  color: var(--ink);
-  background: var(--amber-400);
+  color: #ffffff;
+  background: var(--amber-500);
   border-color: var(--amber-500);
 }
 
 .dash .conn-action-primary:hover:not(:disabled) {
-  background: var(--amber-300);
-  border-color: var(--amber-500);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .dash .conn-action-danger {
@@ -3792,7 +3794,7 @@
 }
 
 .dash .ov-spark-area {
-  fill: rgba(234, 157, 62, 0.16);
+  fill: rgba(31, 136, 61, 0.16);
   stroke: none;
 }
 
@@ -3934,6 +3936,7 @@
 
 .dash .ov-step.is-done .ov-step-mark {
   background: var(--amber-500);
+  color: #ffffff;
 }
 
 .dash .ov-step-body {
@@ -4058,7 +4061,7 @@
 
 .dash .inv-search:focus-within {
   border-color: var(--amber-500);
-  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.16);
+  box-shadow: 0 0 0 3px rgba(31, 136, 61, 0.16);
 }
 
 .dash .inv-search input {
