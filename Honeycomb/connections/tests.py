@@ -7,6 +7,7 @@ time instead of all at once, and that it never writes the activity rows the
 Overview counts as AI tool calls.
 """
 import asyncio
+import time
 from unittest import mock
 
 from django.core.cache import cache
@@ -20,6 +21,7 @@ from connectors.shims.errors import ConnectorError
 from mcp.models import McpActivity
 
 from .models import Connection
+from .runner import prepare_runs as _real_prepare_runs
 from .serializers import MAX_REPORT_RUNS
 
 SLUG = 'faketest'
@@ -102,6 +104,28 @@ class ReportEndpointTests(TestCase):
         self.assertEqual([r['ok'] for r in results], [True, False, True])
         self.assertEqual(results[1]['error'], 'upstream said no')
         self.assertEqual(results[1]['status'], 502)
+
+    def test_duration_ms_times_only_the_provider_calls_not_the_gating_before_them(self):
+        # Gating -- checking every run's tool, refusing writes and unknown
+        # tools -- runs for every item before the clock starts. A slow gating
+        # step (simulated here; ordinarily fast) must not be counted, or a page
+        # with many refused runs would report a large duration_ms for work that
+        # made no provider call at all.
+        #
+        # A throwaway call first: async_to_sync's first use in a process pays a
+        # one-off setup cost (measured at several hundred ms) that has nothing
+        # to do with this route, and would swamp the 200ms this test injects if
+        # it happened to land on the measured call instead.
+        self.post([{'tool': 'read_a'}])
+
+        def slow(*args, **kwargs):
+            time.sleep(0.2)
+            return _real_prepare_runs(*args, **kwargs)
+
+        with mock.patch('connections.views.prepare_runs', side_effect=slow):
+            response = self.post([{'tool': 'read_a'}])
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.json()['duration_ms'], 100)
 
     def test_a_write_tool_is_refused_per_item_and_never_runs(self):
         results = self.post([{'tool': 'writes'}, {'tool': 'read_a'}]).json()['results']

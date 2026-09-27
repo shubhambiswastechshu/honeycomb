@@ -134,6 +134,43 @@ deliberate, throttled email-existence oracle — that tradeoff was made knowingl
   the ISO 3166 numeric code) for the countries listed in `ads-model.ts`; any
   other shows as "Country <id>". The model is checked with a small Node script
   (not in the repo); there is no frontend test runner.
+- **Saved reports are tenant-owned dashboards, and their data path is the same
+  gate as the Google Ads report.** The `reports` app stores a `Report` whose
+  `layout` (at most 30 widgets on a 12-column grid) and `filters` are JSON,
+  validated on every save by `reports/layout.py` -- a closed set of keys, whole
+  numbers, hard size and nesting limits. A widget names its connection by id
+  inside that JSON, so there is no foreign key to enforce ownership: the id is
+  checked against the caller's tenant on save AND again on every run
+  (`reports/execution.py` only ever looks connections up through the tenant), and
+  an id from another organization is a failed widget, never a call. `POST
+  /api/reports/<id>/run/` collapses identical tool+args across widgets into one
+  provider call and runs them through `connections/runner.py` (shared with the
+  Ads report: read-only, switched-off tools refused, errors redacted, no
+  `McpActivity` rows), at most 8 in flight. A widget's args may hold the
+  placeholders `$date.start`, `$date.end`, `$date.prev_start`, `$date.prev_end`, filled
+  from the report's date filter; presets resolve on the UTC date, so send a
+  CUSTOM range for an exact window. Saves may carry `version`; a stale one is a
+  409, so two tabs cannot silently overwrite each other. Everyone in the
+  workspace can view, run and edit a report; only its author or an owner/admin
+  can delete it. `client` is a free-text label, not a table. Three throttle
+  scopes: `reports_read`, `reports_write`, `report_run` (the older `reports`
+  scope is the Ads report's). A connection id inside layout JSON is bounded to
+  `layout.MAX_CONNECTION_ID` (2**63-1): it is the one layout number that
+  reaches a database lookup rather than only arithmetic, and an unbounded one
+  crashes the ORM with an `OverflowError` instead of failing validation
+  cleanly. Every free-text value in a layout (title, args, fields, options) and
+  every report text field (name, description, client) refuses embedded C0
+  control characters other than tab/newline/CR, because PostgreSQL's text and
+  jsonb storage cannot hold a NUL byte at all. Creating a report takes a
+  `select_for_update` lock on the tenant row first, so two concurrent creates
+  cannot both slip past the 500-report cap.
+  A per-request cap on distinct provider calls in one `run` was deliberately
+  NOT added: 30 widgets with `compare` on can reach 60 calls (double the
+  connection-level report route's 16), which is a real, already-identified
+  cost/latency question for the product owner to size -- not shrunk here
+  because it would silently break the documented 30-widgets-with-compare
+  capability and the test that pins it down
+  (`test_thirty_comparing_widgets_make_sixty_runs_main_before_comparison`).
 - **Spike detection is a rule, not a model.** A bucket is a volume spike when it
   has 3+ calls and sits more than two standard deviations above the window's
   mean; a failure spike is 3+ failures making up 30%+ of the bucket. The rule

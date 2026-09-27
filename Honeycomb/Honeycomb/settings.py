@@ -128,6 +128,10 @@ INSTALLED_APPS = [
     # Forager: the crawl queue and the results a worker machine streams back.
     # It owns tables, so unlike `connectors` it is a real app with migrations.
     'foraging',
+    # Saved reports: dashboards of widgets a person composes from their
+    # connections' read tools. It owns tables and nothing else -- the data path
+    # is connections.runner, the same gate the Google Ads report goes through.
+    'reports',
 ]
 
 MIDDLEWARE = [
@@ -427,6 +431,15 @@ REST_FRAMEWORK = {
         # above what a person changing the date range a few times a minute
         # will ever reach. Provider results are cached for minutes on top.
         'reports': '12/min',
+        # Saved dashboards (the reports app; not the Google Ads report above).
+        # Reads are a list plus a detail per page. Writes are the builder's
+        # autosave, debounced to one every second or two, so the ceiling sits
+        # above what editing produces and below a runaway loop. A run fans out
+        # to the provider like 'reports' does, but the builder re-runs a widget
+        # as its settings change, so it gets a little more headroom.
+        'reports_read': '120/min',
+        'reports_write': '60/min',
+        'report_run': '20/min',
     },
 }
 

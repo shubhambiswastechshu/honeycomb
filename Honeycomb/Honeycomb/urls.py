@@ -39,6 +39,8 @@ urlpatterns = [
     # itself, /mcp/**, is deliberately not routed here. See below.
     path('api/', include('connections.urls')),
     path('api/', include('mcp.urls')),
+    # Saved reports: the dashboards people build from their connections' data.
+    path('api/', include('reports.urls')),
     # Forager. The /api/forager/agent/** half is the worker plane -- a machine
     # elsewhere polling for crawl jobs on a bearer token, with no session and
     # therefore no CSRF surface. The rest is the console the dashboard reads.

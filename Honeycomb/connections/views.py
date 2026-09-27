@@ -26,6 +26,7 @@ from accounts.mixins import TenantScopedQuerysetMixin
 from connectors import registry
 
 from .models import Connection
+from .runner import prepare_runs, run_pending
 from .serializers import (
     ConnectionSerializer,
     ToolBatchSerializer,
@@ -299,12 +300,10 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         Overview's counts and the live panel; a person opening a report is not
         an AI client calling a tool, and a dozen rows per page view would bury
         the real ones. Failures are returned inline instead.
+
+        The gate and the concurrent run live in ``connections.runner``, shared
+        with the saved-report run route in the reports app.
         """
-        from asgiref.sync import async_to_sync
-
-        from connectors.shims.errors import ConnectorError, redact_exc, redact_text
-        from mcp.endpoint import _tool_timeout
-
         connection = self.get_object()
         connector = registry.get(connection.connector)
         if connector is None:
@@ -313,58 +312,14 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
 
         batch = ToolBatchSerializer(data=request.data)
         batch.is_valid(raise_exception=True)
-        handlers = getattr(connector, 'handlers', None) or {}
 
-        results = [None] * len(batch.validated_data['runs'])
-        pending = []
-        for index, raw in enumerate(batch.validated_data['runs']):
-            serializer = ToolRunSerializer(
-                data=raw, context={'connection': connection, 'connector': connector}
-            )
-            name = str(raw.get('tool', ''))[:64]
-            if not serializer.is_valid():
-                problems = serializer.errors.get('tool') or serializer.errors.get('args') or []
-                message = str(problems[0]) if problems else 'This report could not be run.'
-                results[index] = {'tool': name, 'ok': False, 'error': message, 'status': 400}
-                continue
-            name = serializer.validated_data['tool']
-            handler = handlers.get(name)
-            if handler is None:
-                results[index] = {'tool': name, 'ok': False, 'status': 400,
-                                  'error': "Tool '{0}' has no handler.".format(name)}
-                continue
-            pending.append((index, name, handler, serializer.validated_data['args']))
-
+        # Gate every run first (unknown/write/switched-off tools are refused
+        # here, not run), and only then start the clock: duration_ms measures
+        # the concurrent provider calls, not the validation before them.
+        results, pending = prepare_runs(connection, connector, batch.validated_data['runs'])
         started = time.monotonic()
-
-        async def call(name, handler, args):
-            begun = time.monotonic()
-
-            def ms():
-                return int((time.monotonic() - begun) * 1000)
-
-            try:
-                data = await asyncio.wait_for(
-                    handler(connection, None, args), timeout=_tool_timeout())
-                return {'tool': name, 'ok': True, 'duration_ms': ms(), 'data': data}
-            except asyncio.TimeoutError:
-                return {'tool': name, 'ok': False, 'status': 504, 'duration_ms': ms(),
-                        'error': "'{0}' took longer than {1:.0f}s.".format(name, _tool_timeout())}
-            except ConnectorError as exc:
-                return {'tool': name, 'ok': False, 'status': 502, 'duration_ms': ms(),
-                        'error': redact_text(str(exc))}
-            except Exception as exc:  # noqa: BLE001 -- never a raw 500 with a token in it
-                logger.exception('Portal report %s.%s failed', connection.connector, name)
-                return {'tool': name, 'ok': False, 'status': 502, 'duration_ms': ms(),
-                        'error': redact_exc(exc)}
-
-        async def call_all():
-            return await asyncio.gather(*(call(n, h, a) for _, n, h, a in pending))
-
-        if pending:
-            for (index, _, _, _), outcome in zip(pending, async_to_sync(call_all)()):
-                results[index] = outcome
-
+        for item, outcome in zip(pending, run_pending(pending)):
+            results[item.index] = outcome
         return Response(
             {'duration_ms': int((time.monotonic() - started) * 1000), 'results': results},
             status=status.HTTP_200_OK,
