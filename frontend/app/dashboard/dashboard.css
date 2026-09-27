@@ -4272,6 +4272,549 @@
 }
 
 /* ==========================================================================
+   Reports — the saved-dashboard list.
+
+   Same visual language as the Data page's connection inventory (.inv-*): a
+   summary line, an optional client filter and search, then a flat list of
+   rows. Three columns instead of four -- there is no icon and no URL here,
+   just a name, who touched it and when, and a delete control for whoever may
+   use it.
+
+   Prefix: rpt-.
+   ========================================================================== */
+
+.dash .rpt-head {
+  margin-bottom: 14px;
+}
+
+.dash .rpt-heading {
+  margin: 0;
+  font: var(--md-type-title-sm);
+  letter-spacing: 0.1px;
+  color: var(--md-on-surface-variant);
+}
+
+.dash .rpt-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.dash .rpt-client-filter {
+  width: auto;
+  min-width: 140px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.dash .rpt-search {
+  flex: 0 1 260px;
+}
+
+.dash .rpt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash .rpt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 6px;
+  padding: 12px 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dash .rpt-row:hover {
+  border-color: #d9d9d9;
+}
+
+.dash .rpt-id {
+  min-width: 0;
+}
+
+.dash .rpt-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: -0.006em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash .rpt-name:hover {
+  color: var(--accent-hover);
+}
+
+.dash .rpt-name:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.dash .rpt-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash .rpt-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash .rpt-client {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: var(--md-surface-container-low);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.dash .rpt-delete {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dash .rpt-delete:hover {
+  border-color: var(--border);
+  color: var(--error-text);
+  background: #fdf3ef;
+}
+
+.dash .rpt-delete:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .dash .rpt-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dash .rpt-meta {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .dash .rpt-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dash .rpt-search {
+    flex: none;
+  }
+}
+
+/* ==========================================================================
+   Report widgets — the canvas a saved report's tiles render on.
+
+   One card style for every widget type (kpi/table/bar today; line/area/donut/
+   stacked_bar/calendar are not built yet). The card itself is plain -- white,
+   hairline border, like every other card in the dashboard -- so a table
+   widget can still borrow the Google Ads report's DataTable for its BODY
+   (wrapped in .ga) without importing that report's own card chrome.
+
+   Prefix: rpt-widget, rpt-kpi, rpt-bar, rpt-stats.
+   ========================================================================== */
+
+.dash .rpt-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dash .rpt-widget {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.dash .rpt-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash .rpt-widget-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash .rpt-widget-remove {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dash .rpt-widget-remove:hover {
+  border-color: var(--border);
+  color: var(--error-text);
+  background: #fdf3ef;
+}
+
+.dash .rpt-widget-remove:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 2px;
+}
+
+.dash .rpt-widget-body {
+  padding: 16px;
+  min-height: 60px;
+}
+
+.dash .rpt-widget-skeleton {
+  height: 64px;
+  border-radius: var(--md-shape-sm);
+  background: linear-gradient(90deg, var(--md-surface-container-low) 25%, var(--border) 37%, var(--md-surface-container-low) 63%);
+  background-size: 400% 100%;
+  animation: rpt-shimmer 1.4s ease infinite;
+}
+
+@keyframes rpt-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.dash .rpt-widget-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--md-shape-sm);
+  background: #fdf3ef;
+  color: var(--error-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dash .rpt-widget-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dash .rpt-widget-truncated {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---- KPI ---- */
+
+.dash .rpt-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash .rpt-kpi-value {
+  margin: 0;
+  font: var(--md-type-headline-md);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .rpt-kpi-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dash .rpt-kpi-delta {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.dash .rpt-kpi-delta.is-up {
+  color: #188038;
+}
+
+.dash .rpt-kpi-delta.is-down {
+  color: #c5221f;
+}
+
+.dash .rpt-kpi-delta-note {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ---- Stats (a scalar-only result with no table to show) ---- */
+
+.dash .rpt-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.dash .rpt-stat dt {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dash .rpt-stat dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Bar chart ---- */
+
+.dash .rpt-bar-chart {
+  width: 100%;
+  height: auto;
+}
+
+.dash .rpt-bar-label {
+  font-size: 6px;
+  fill: var(--muted);
+}
+
+.dash .rpt-bar-value {
+  font-size: 6px;
+  fill: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .rpt-bar-rect {
+  fill: var(--amber-400);
+}
+
+/* ==========================================================================
+   Report editor — the header, filter bar and "add a widget" panel around
+   the canvas above.
+
+   Prefix: rpt-editor, rpt-name, rpt-client, rpt-range, rpt-compare, rpt-add.
+   ========================================================================== */
+
+.dash .rpt-editor-top {
+  margin-bottom: 10px;
+}
+
+.dash .rpt-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.dash .rpt-back:hover {
+  color: var(--text);
+}
+
+.dash .rpt-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.dash .rpt-editor-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.dash .rpt-name-input {
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  font: var(--md-type-headline-sm);
+  color: var(--text);
+  background: transparent;
+  width: 100%;
+  max-width: 480px;
+}
+
+.dash .rpt-name-input:hover {
+  border-color: var(--border);
+}
+
+.dash .rpt-name-input:focus {
+  outline: none;
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.16);
+  background: #fff;
+}
+
+.dash .rpt-client-input {
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  padding: 3px 8px;
+  margin: 0 -8px;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  width: 100%;
+  max-width: 280px;
+}
+
+.dash .rpt-client-input:hover {
+  border-color: var(--border);
+}
+
+.dash .rpt-client-input:focus {
+  outline: none;
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 3px rgba(234, 157, 62, 0.16);
+  background: #fff;
+  color: var(--text);
+}
+
+.dash .rpt-editor-filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.dash .rpt-range-select {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.dash .rpt-compare {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dash .rpt-empty-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 32px 0;
+}
+
+.dash .rpt-add-trigger {
+  margin-top: 16px;
+}
+
+.dash .rpt-add {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--md-surface-container-low);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash .rpt-add-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.dash .rpt-add-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.dash .rpt-add-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dash .rpt-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 620px) {
+  .dash .rpt-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash .rpt-editor-filters {
+    justify-content: space-between;
+  }
+}
+
+/* ==========================================================================
    Live data — the connector page's one moving part.
    
    Everything else on this page is a document: it describes what a connector

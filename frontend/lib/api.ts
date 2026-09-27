@@ -102,14 +102,21 @@ export class AmbiguousOrganizationError extends Error {
   }
 }
 
-/** Internal: an ordinary Error that also remembers the HTTP status. */
-class ApiError extends Error {
+/**
+ * An ordinary Error that also remembers the HTTP status and the parsed body.
+ * Exported so a caller that needs a field the generic message-extraction
+ * throws away (e.g. a saved report's 409 current_version) can read `body`
+ * itself, rather than every such field growing its own bespoke error class.
+ */
+export class ApiError extends Error {
   status: number;
+  body: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.body = body;
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
@@ -300,7 +307,7 @@ async function send<T>(path: string, config: RequestConfig): Promise<T> {
         throw new AmbiguousOrganizationError(message, organizations);
       }
     }
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, parsed);
   }
 
   return parsed as T;
@@ -1270,6 +1277,246 @@ export interface ActivityLive {
 export function activityLive(): Promise<ActivityLive> {
   return request<ActivityLive>("/activity/live/", {
     method: "GET",
+    authenticated: true,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Saved reports                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A saved dashboard: a grid of widgets a marketer composes from their
+ * connections' data, keeps, and reruns. Everything in this section is named
+ * "SavedReport" rather than "Report" on purpose -- ReportRun/ReportResult
+ * above already mean the Google Ads report's one-off batch fetch, a
+ * different thing from a workspace asset with an id, a version and widgets.
+ */
+
+export type WidgetType =
+  | "kpi"
+  | "bar"
+  | "column"
+  | "line"
+  | "area"
+  | "stacked_bar"
+  | "donut"
+  | "table"
+  | "calendar";
+
+/** What a widget reads: one tool, on one of the tenant's own connections. */
+export interface WidgetSource {
+  connection_id: number;
+  tool: string;
+  args?: Record<string, unknown>;
+}
+
+/**
+ * One tile on the 12-column canvas. `fields` and `options` are opaque to the
+ * server -- they hold whatever the visual needs (which columns, which
+ * aggregation, a chart's colour) and are never interpreted by Django.
+ */
+export interface SavedReportWidget {
+  id: string;
+  type: WidgetType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  title?: string;
+  source: WidgetSource;
+  fields?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+}
+
+/** Same ids as RangeId in the Google Ads report's ads-model.ts. */
+export type SavedReportRangeId =
+  | "LAST_7_DAYS"
+  | "LAST_14_DAYS"
+  | "LAST_30_DAYS"
+  | "LAST_90_DAYS"
+  | "THIS_MONTH"
+  | "LAST_MONTH"
+  | "CUSTOM";
+
+export interface SavedReportDateFilter {
+  range: SavedReportRangeId;
+  /** Only present, and only accepted, together with range "CUSTOM". */
+  start?: string;
+  end?: string;
+}
+
+export interface SavedReportFilters {
+  date?: SavedReportDateFilter;
+  compare?: boolean;
+}
+
+/** The reports list row: enough to find one and say whose it is, not to draw it. */
+export interface SavedReportSummary {
+  id: number;
+  name: string;
+  description: string;
+  client: string;
+  version: number;
+  created_by: number | null;
+  created_by_name: string;
+  updated_by_name: string;
+  created_at: string;
+  updated_at: string;
+  /** Whether the CALLER may delete this one -- author, or an owner/admin. */
+  can_delete: boolean;
+}
+
+/** The full report: the summary plus what draws it. */
+export interface SavedReport extends SavedReportSummary {
+  layout: SavedReportWidget[];
+  filters: SavedReportFilters;
+  schema_version: number;
+}
+
+/** Body of POST/PATCH/PUT. Every key optional: a rename need not resend the layout. */
+export interface SavedReportPayload {
+  name?: string;
+  description?: string;
+  client?: string;
+  layout?: SavedReportWidget[];
+  filters?: SavedReportFilters;
+  /** The version this save was made against. Omit it to save regardless. */
+  version?: number;
+}
+
+/**
+ * GET /api/reports/, optionally narrowed to one client or a text match across
+ * name/client/description. At most 500 rows -- see MAX_LIST on the server.
+ */
+export function listSavedReports(params?: { client?: string; q?: string }): Promise<SavedReportSummary[]> {
+  const query = new URLSearchParams();
+  if (params?.client !== undefined && params.client.length > 0) {
+    query.set("client", params.client);
+  }
+  if (params?.q !== undefined && params.q.length > 0) {
+    query.set("q", params.q);
+  }
+  const qs = query.toString();
+  return request<SavedReportSummary[]>("/reports/" + (qs.length > 0 ? "?" + qs : ""), {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+export function getSavedReport(id: number): Promise<SavedReport> {
+  return request<SavedReport>("/reports/" + id + "/", { method: "GET", authenticated: true });
+}
+
+/**
+ * Creates a report and hands back the full detail -- an empty body is valid
+ * and gives "Untitled report" with an empty canvas, which is how the builder
+ * starts one: create first, then autosave into the id it gets back.
+ */
+export function createSavedReport(payload: SavedReportPayload = {}): Promise<SavedReport> {
+  return request<SavedReport>("/reports/", {
+    method: "POST",
+    body: payload as Record<string, unknown>,
+    authenticated: true,
+  });
+}
+
+/**
+ * A save the caller knows is against an out-of-date copy: someone else's edit
+ * has already been accepted, named by `currentVersion`. Thrown instead of a
+ * generic ApiError so the editor can offer "reload" rather than just showing
+ * the message.
+ */
+export class SavedReportConflictError extends Error {
+  currentVersion: number;
+
+  constructor(message: string, currentVersion: number) {
+    super(message);
+    this.name = "SavedReportConflictError";
+    this.currentVersion = currentVersion;
+    Object.setPrototypeOf(this, SavedReportConflictError.prototype);
+  }
+}
+
+function conflictVersion(body: unknown): number | null {
+  if (body !== null && typeof body === "object") {
+    const value = (body as Record<string, unknown>)["current_version"];
+    if (typeof value === "number") {
+      return value;
+    }
+  }
+  return null;
+}
+
+/**
+ * PATCH (partial) by default; pass every field to replace the whole report.
+ * A 409 -- someone else saved a version newer than the one this call named --
+ * becomes SavedReportConflictError, never a silent overwrite.
+ */
+export async function updateSavedReport(
+  id: number,
+  payload: SavedReportPayload,
+  full?: boolean
+): Promise<SavedReport> {
+  try {
+    return await request<SavedReport>("/reports/" + id + "/", {
+      method: full === true ? "PUT" : "PATCH",
+      body: payload as Record<string, unknown>,
+      authenticated: true,
+    });
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 409) {
+      const current = conflictVersion(caught.body);
+      if (current !== null) {
+        throw new SavedReportConflictError(caught.message, current);
+      }
+    }
+    throw caught;
+  }
+}
+
+export async function deleteSavedReport(id: number): Promise<void> {
+  await request<void>("/reports/" + id + "/", { method: "DELETE", authenticated: true });
+}
+
+/** One provider call planned for a run: what it read and what came back. */
+export type SavedReportRun =
+  | { tool: string; ok: true; connection_id: number; duration_ms: number; data: unknown }
+  | { tool: string; ok: false; connection_id: number; error: string; status: number; duration_ms?: number };
+
+/** Which run answers a widget, and which (if any) answers its comparison. */
+export interface SavedReportRunRef {
+  run: string;
+  prev_run: string | null;
+}
+
+export interface SavedReportWindow {
+  start: string;
+  end: string;
+  prev_start: string;
+  prev_end: string;
+}
+
+export interface SavedReportRunResponse {
+  generated_at: string;
+  duration_ms: number;
+  window: SavedReportWindow;
+  runs: Record<string, SavedReportRun>;
+  widgets: Record<string, SavedReportRunRef>;
+}
+
+/**
+ * Runs a report's widgets, or -- with `draft` -- a layout/filters not yet
+ * saved. Identical tool+args across widgets collapse into one provider call;
+ * nothing here writes to the report or to the activity log.
+ */
+export function runSavedReport(
+  id: number,
+  draft?: { layout?: SavedReportWidget[]; filters?: SavedReportFilters }
+): Promise<SavedReportRunResponse> {
+  return request<SavedReportRunResponse>("/reports/" + id + "/run/", {
+    method: "POST",
+    body: (draft || {}) as Record<string, unknown>,
     authenticated: true,
   });
 }

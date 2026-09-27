@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BarChart3,
   Database,
   LayoutGrid,
   Blocks,
@@ -50,6 +51,7 @@ const MAIN_ITEMS: RailItem[] = [
      so this entry stays lit while a single connector is open. */
   { href: "/dashboard/connectors", label: "MCPs", icon: Blocks },
   { href: "/dashboard/data", label: "Data", icon: Database },
+  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

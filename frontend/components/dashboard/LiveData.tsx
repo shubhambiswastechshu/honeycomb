@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { runConnectionTool } from "@/lib/api";
 import type { ConnectorTool } from "@/lib/api";
+import { cell, columnsOf, label, shape } from "@/lib/reports/shape";
+import type { Json } from "@/lib/reports/shape";
 
 /**
  * Live data: what this connection actually returns, on the page that owns it.
@@ -45,120 +47,6 @@ export interface LiveDataProps {
   ready: boolean;
 }
 
-type Json = unknown;
-
-interface Shaped {
-  /** Scalar leaves of the top-level object, shown as a stat row. */
-  stats: Array<{ key: string; value: string }>;
-  /** The first array-of-records found, shown as a table. */
-  rows: Array<Record<string, Json>> | null;
-  /** Where that array was found, so the table can be labelled honestly. */
-  rowsKey: string | null;
-  /** Total rows before truncation. */
-  rowsTotal: number;
-}
-
-function isRecord(value: Json): value is Record<string, Json> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isScalar(value: Json): boolean {
-  return (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  );
-}
-
-/** Human label for a snake_case key, without inventing words. */
-function label(key: string): string {
-  const spaced = key.replace(/_/g, " ").trim();
-  return spaced.length === 0 ? key : spaced[0].toUpperCase() + spaced.slice(1);
-}
-
-function cell(value: Json): string {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-  if (typeof value === "boolean") {
-    return value ? "yes" : "no";
-  }
-  if (typeof value === "number") {
-    // Provider ids are numbers too, and grouping them reads as a quantity that
-    // it is not. Only group values small enough to plausibly be a count.
-    return Number.isInteger(value) && Math.abs(value) < 1e15
-      ? value.toLocaleString("en-GB")
-      : String(value);
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.length + " item" + (value.length === 1 ? "" : "s");
-  }
-  return "{…}";
-}
-
-/**
- * Find the shape worth rendering.
- *
- * Deliberately shallow: one pass over the top level, and one level into it for
- * an array. A recursive walk finds more, but it also finds arrays buried in
- * metadata and puts them on screen as though they were the answer.
- */
-function shape(data: Json): Shaped {
-  const empty: Shaped = { stats: [], rows: null, rowsKey: null, rowsTotal: 0 };
-
-  if (Array.isArray(data)) {
-    const records = data.filter(isRecord);
-    if (records.length === data.length && records.length > 0) {
-      return { stats: [], rows: records.slice(0, MAX_ROWS), rowsKey: null, rowsTotal: data.length };
-    }
-    return empty;
-  }
-
-  if (!isRecord(data)) {
-    return empty;
-  }
-
-  const stats: Array<{ key: string; value: string }> = [];
-  let rows: Array<Record<string, Json>> | null = null;
-  let rowsKey: string | null = null;
-  let rowsTotal = 0;
-
-  for (const key of Object.keys(data)) {
-    const value = data[key];
-    if (isScalar(value)) {
-      stats.push({ key: key, value: cell(value) });
-      continue;
-    }
-    if (rows === null && Array.isArray(value)) {
-      const records = value.filter(isRecord);
-      if (records.length > 0 && records.length === value.length) {
-        rows = records.slice(0, MAX_ROWS);
-        rowsKey = key;
-        rowsTotal = value.length;
-      }
-    }
-  }
-
-  return { stats: stats, rows: rows, rowsKey: rowsKey, rowsTotal: rowsTotal };
-}
-
-/** Union of keys across the rows, capped, in first-seen order. */
-function columnsOf(rows: Array<Record<string, Json>>): string[] {
-  const seen: string[] = [];
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      if (seen.indexOf(key) === -1) {
-        seen.push(key);
-      }
-    }
-  }
-  return seen.slice(0, MAX_COLS);
-}
-
 function ago(at: number | null): string {
   if (at === null) {
     return "";
@@ -182,7 +70,7 @@ function Table({
      every record 50 times to answer the same question. */
   const columns = useMemo(
     function derive() {
-      return columnsOf(rows);
+      return columnsOf(rows, MAX_COLS);
     },
     [rows],
   );
@@ -377,7 +265,7 @@ export default function LiveData({ connectionId, tools, ready }: LiveDataProps) 
 
   const shaped = useMemo(
     function reshape() {
-      return data === null ? null : shape(data);
+      return data === null ? null : shape(data, MAX_ROWS);
     },
     [data],
   );
