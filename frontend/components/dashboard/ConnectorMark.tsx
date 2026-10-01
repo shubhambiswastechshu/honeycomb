@@ -34,6 +34,7 @@
 
 import {
   Bot,
+  BotMessageSquare,
   ChartColumn,
   CreditCard,
   Database,
@@ -96,6 +97,8 @@ const MARKS: Record<string, LucideIcon> = {
   meta_business_suite: Users,
   ms_clarity: MousePointerClick,
   open_data: Database,
+  // A chat bubble with a bot in it: these ads appear inside ChatGPT answers.
+  openai_ads: BotMessageSquare,
   // Both were listed below as anticipated; they are registered now, so they
   // move up into the block of connectors the backend actually serves.
   salesforce_commerce: ShoppingCart,
