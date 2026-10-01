@@ -49,6 +49,8 @@ Regulatory and reference, the rest of the world (all keyless):
   openalex_works       : scholarly works with citation counts (OpenAlex)
   mesh_lookup          : MeSH medical vocabulary and synonyms (NLM)
   cdsco_alerts         : CDSCO alerts and circulars, live from cdsco.gov.in
+  canada_drug_products : Health Canada Drug Product Database (DIN, status,
+                         ingredients, company)
 """
 import html
 import json
@@ -78,6 +80,7 @@ EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 PUBCHEM = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
 OPENALEX = "https://api.openalex.org"
 CDSCO_ALERTS = "https://cdsco.gov.in/opencms/opencms/en/Notifications/Alerts/"
+HEALTH_CANADA_DPD = "https://health-products.canada.ca/api/drug"
 
 INDIA_DATA = Path(__file__).resolve().parent.parent / "data" / "india"
 
@@ -1167,6 +1170,47 @@ async def cdsco_alerts(conn: Connection, db, args: dict) -> dict:
             "source": "CDSCO, Notifications > Alerts (cdsco.gov.in)",
             "note": "Not-of-standard-quality (NSQ) drug lists are published separately on cdsco.gov.in."}
 
+
+async def _dpd(endpoint: str, params: dict):
+    data = await _get_json(f"{HEALTH_CANADA_DPD}/{endpoint}/", {**params, "lang": "en", "type": "json"})
+    # The DPD answers a list for searches and a single object for some ids.
+    if isinstance(data, dict):
+        return [] if data.get("results") == [] else [data]
+    return data if isinstance(data, list) else []
+
+
+async def canada_drug_products(conn: Connection, db, args: dict) -> dict:
+    """Health Canada Drug Product Database: Canadian products, DINs, status and ingredients."""
+    name = _name(args)
+    limit = _limit(args, 10, 25)
+
+    async def _loader():
+        products = (await _dpd("drugproduct", {"brandname": name}))[:limit]
+        out = []
+        for p in products:
+            code = p.get("drug_code")
+            ingredients = await _dpd("activeingredient", {"id": code}) if code else []
+            status = (await _dpd("status", {"id": code}) if code else []) or [{}]
+            out.append({
+                "brand_name": p.get("brand_name"),
+                "din": p.get("drug_identification_number"),
+                "company": p.get("company_name"),
+                "class": p.get("class_name"),
+                "descriptor": p.get("descriptor") or None,
+                "status": status[0].get("status"),
+                "first_marketed": status[0].get("original_market_date"),
+                "ingredients": [{"name": i.get("ingredient_name"),
+                                 "strength": f"{i.get('strength', '')} {i.get('strength_unit', '')}".strip()}
+                                for i in ingredients],
+                "last_updated": p.get("last_update_date"),
+                "url": f"https://health-products.canada.ca/dpd-bdpp/info?lang=eng&code={code}" if code else None,
+            })
+        return {"name": name, "found": bool(out), "products": out,
+                "source": "Health Canada Drug Product Database"}
+
+    return await cached("medicines", conn.id, "canada_drug_products", TTL_LONG, _loader,
+                        args={"name": name, "limit": limit})
+
 # ============================================================
 # Catalog
 # ============================================================
@@ -1384,6 +1428,10 @@ CATALOG = {
         "input": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}},
                   "required": [], "additionalProperties": False},
     },
+    "canada_drug_products": {
+        "description": "Canada: Health Canada Drug Product Database -- brand, DIN, company, marketing status, first-marketed date and active ingredients with strengths.",
+        "input": {"type": "object", "properties": dict(_NAME_LIMIT), "required": ["name"], "additionalProperties": False},
+    },
     "europe_pmc_full_text": {
         "description": "Full text of an open-access paper, section by section, capped at max_chars.",
         "input": {
@@ -1425,6 +1473,7 @@ HANDLERS = {
     "openalex_works": openalex_works,
     "mesh_lookup": mesh_lookup,
     "cdsco_alerts": cdsco_alerts,
+    "canada_drug_products": canada_drug_products,
 }
 
 registry.register(

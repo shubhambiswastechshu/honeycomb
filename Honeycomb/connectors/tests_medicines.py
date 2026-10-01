@@ -84,3 +84,27 @@ class ReferenceToolTests(SimpleTestCase):
         self.assertEqual(medicines._us_date('12/05/2031'), '2031-12-05')
         self.assertEqual(medicines._eu_date('06/01/2022'), '2022-01-06')
         self.assertEqual(medicines._fda_date('20190920'), '2019-09-20')
+
+
+class CanadaDpdTests(SimpleTestCase):
+    def test_products_are_shaped_from_the_dpd(self):
+        from unittest import mock
+        replies = {
+            'drugproduct': [{'drug_code': 97796, 'drug_identification_number': '02471477',
+                             'brand_name': 'OZEMPIC', 'company_name': 'NOVO NORDISK CANADA INC',
+                             'class_name': 'Human', 'descriptor': '', 'last_update_date': '2026-01-01'}],
+            'activeingredient': [{'ingredient_name': 'SEMAGLUTIDE', 'strength': '1.34', 'strength_unit': 'MG'}],
+            'status': {'status': 'Marketed', 'original_market_date': '2018-04-09'},
+        }
+
+        async def fake(url, params):
+            return replies[url.rstrip('/').rsplit('/', 1)[-1]]
+
+        class Conn:
+            id = 'canada-test'
+        with mock.patch.object(medicines, '_get_json', side_effect=fake):
+            out = async_to_sync(medicines.canada_drug_products)(Conn(), None, {'name': 'ozempic'})
+        product = out['products'][0]
+        self.assertEqual(product['din'], '02471477')
+        self.assertEqual(product['status'], 'Marketed')
+        self.assertEqual(product['ingredients'][0], {'name': 'SEMAGLUTIDE', 'strength': '1.34 MG'})
