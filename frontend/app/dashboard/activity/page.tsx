@@ -3,23 +3,43 @@
 /**
  * The full activity log: every MCP tool call this workspace has made.
  *
- * The Overview shows the newest handful of these beside everything else it
- * has to fit. This page is the one that shows the log itself, so it asks for
- * the server's maximum rather than a preview slice, and adds the filter the
- * Overview has no room for.
+ * Four tabs, because one scroll held four different questions badly:
  *
- * Both halves come from endpoints that already existed and are tenant-scoped
- * by the server -- GET /api/activity/ and /api/activity/summary/. Nothing
- * here is invented: this page was a hardcoded "No activity yet" empty state,
- * which said the workspace was quiet whether or not it was.
+ *   Live        the log itself, refreshing while you watch it
+ *   Errors      only what failed, with the message each failed with
+ *   Connectors  which connector and which tool, over the last 24 hours
+ *   Trends      the year calendar and the spike chart
  *
- * The summary counts and the row list are fetched separately and kept
- * separate. They answer different questions, they fail independently, and a
- * failed count must not blank a log that loaded fine.
+ * Everything comes from endpoints that already existed and are tenant-scoped
+ * by the server -- GET /api/activity/, /api/activity/summary/ and
+ * /api/activity/live/. Nothing here is invented.
+ *
+ * LIVE. The rows refresh on their own timer while the tab is visible and the
+ * stream is not paused. That is a deliberate change from this page's old rule
+ * of "refresh when the tab is focused": a log you are watching for failures is
+ * the one case where a timer earns its keep. It stops dead when the browser
+ * tab is hidden, so a forgotten tab costs nothing, and Pause stops it for
+ * someone reading a row that keeps sliding away.
+ *
+ * The timer runs on every tab, not just Live, because the failure alerts are
+ * driven by the same rows -- being on Trends must not mean missing an alert.
+ *
+ * The summary counts and the row list stay separate. They answer different
+ * questions, they fail independently, and a failed count must not blank a log
+ * that loaded fine.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  Pause,
+  Play,
+  Radio,
+} from "lucide-react";
+import ActivityAlerts from "@/components/dashboard/ActivityAlerts";
 import ActivityCalendar from "@/components/dashboard/ActivityCalendar";
 import ActivityTrend from "@/components/dashboard/ActivityTrend";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
@@ -27,15 +47,32 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import { useLive } from "@/components/dashboard/LiveProvider";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { listActivity } from "@/lib/api";
-import type { ActivityEvent } from "@/lib/api";
+import type { ActivityEvent, LiveShare } from "@/lib/api";
+import "@/components/dashboard/activity-tabs.css";
 
 /** The server clamps this to 100; asking for its maximum is the point here. */
 const EVENT_LIMIT = 100;
 
+/** How often the log refreshes itself. Matches the live panel's cadence. */
+const STREAM_EVERY_MS = 5000;
+
 const EVENTS_FAILED = "The activity log could not be loaded.";
 const SUMMARY_FAILED = "The activity counts could not be loaded.";
 
-type Filter = "all" | "errors";
+type TabKey = "live" | "errors" | "connectors" | "trends";
+
+interface TabDef {
+  key: TabKey;
+  label: string;
+  icon: typeof Activity;
+}
+
+const TABS: TabDef[] = [
+  { key: "live", label: "Live", icon: Radio },
+  { key: "errors", label: "Errors", icon: AlertTriangle },
+  { key: "connectors", label: "Connectors", icon: BarChart3 },
+  { key: "trends", label: "Trends", icon: CalendarDays },
+];
 
 function count(n: number, one: string, many: string): string {
   return String(n) + " " + (n === 1 ? one : many);
@@ -69,6 +106,110 @@ function absoluteTime(iso: string): string {
   return Number.isNaN(when.getTime()) ? iso : when.toLocaleString();
 }
 
+/** One row of the log. Shared by the Live and Errors tabs, which differ only in what they are given. */
+function EventRow({ row }: { row: ActivityEvent }) {
+  const failed = row.status !== "ok";
+  return (
+    <li className="conn-row ov-event" key={row.id}>
+      <ConnectorMark
+        slug={row.connector}
+        label={row.connector_label || row.connector}
+        size={26}
+      />
+      <div className="conn-row-body">
+        <p className="conn-row-title">
+          <code className="conn-tool-name">{row.tool_name}</code>
+          <span
+            className={failed ? "conn-status conn-status-error" : "conn-status"}
+          >
+            <span className="conn-status-dot" aria-hidden="true" />
+            <span>{failed ? "Error" : "OK"}</span>
+          </span>
+        </p>
+        <p className="conn-row-meta">
+          {/* Null once the connection has been deleted, which is the case
+              McpActivity.connection SET_NULL exists to preserve. The
+              connector's label is what is left to name the row by. */}
+          {row.connection_name !== null && row.connection_name.length > 0
+            ? row.connection_name
+            : row.connector_label}
+          {" · "}
+          <time
+            className="ov-event-time"
+            dateTime={row.created_at}
+            title={absoluteTime(row.created_at)}
+          >
+            {relativeTime(row.created_at)}
+          </time>
+          {/* Absent for a call that failed before it could be timed, and an
+              invented 0 ms would be a lie. */}
+          {row.duration_ms !== null
+            ? " · " + String(row.duration_ms) + " ms"
+            : ""}
+        </p>
+        {failed && row.error_message.length > 0 ? (
+          <p className="conn-row-error">{row.error_message}</p>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * One connector's or one tool's 24 hours.
+ *
+ * The bar is the share of this row's calls that failed, not its share of all
+ * calls: a connector with four calls and three failures is the one worth
+ * looking at, and sizing by volume would bury it under a healthy one.
+ */
+function ShareRow({ share }: { share: LiveShare }) {
+  const failRate = share.calls > 0 ? share.error / share.calls : 0;
+  const pct = Math.round(failRate * 100);
+  return (
+    <li className="act-share">
+      <ConnectorMark
+        slug={share.connector}
+        label={share.connector_label || share.connector}
+        size={22}
+      />
+      <div className="act-share-body">
+        <p className="act-share-title">
+          {typeof share.tool_name === "string" && share.tool_name.length > 0 ? (
+            <code className="conn-tool-name">{share.tool_name}</code>
+          ) : (
+            <span>{share.connector_label || share.connector}</span>
+          )}
+          <span className="act-share-counts">
+            {count(share.calls, "call", "calls")}
+            {share.avg_ms !== null
+              ? " · " + String(Math.round(share.avg_ms)) + " ms avg"
+              : ""}
+          </span>
+        </p>
+        <div
+          className="act-bar"
+          role="img"
+          aria-label={
+            share.error === 0
+              ? "No failures"
+              : String(pct) + "% of calls failed"
+          }
+        >
+          <span
+            className={share.error > 0 ? "act-bar-fill act-bar-bad" : "act-bar-fill"}
+            style={{ width: String(share.error > 0 ? Math.max(pct, 3) : 0) + "%" }}
+          />
+        </div>
+        <p className="act-share-meta">
+          {share.error === 0
+            ? "No failures"
+            : count(share.error, "failure", "failures") + " · " + String(pct) + "%"}
+        </p>
+      </div>
+    </li>
+  );
+}
+
 export default function ActivityPage() {
   // null is "not loaded yet"; [] is "the log is empty". Two different facts
   // that render two different things, so they get two different values rather
@@ -79,7 +220,9 @@ export default function ActivityPage() {
   // the panel beside this page shares. They fail on their own, separately from
   // the rows below.
   const { summary, summaryError, live } = useLive();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [tab, setTab] = useState<TabKey>("live");
+  const [paused, setPaused] = useState<boolean>(false);
+  const [lastAt, setLastAt] = useState<number | null>(null);
 
   const aliveRef = useRef<boolean>(true);
 
@@ -89,6 +232,7 @@ export default function ActivityPage() {
         if (aliveRef.current) {
           setEvents(rows);
           setEventsError(null);
+          setLastAt(Date.now());
         }
       })
       .catch(function failed(caught: unknown) {
@@ -109,46 +253,91 @@ export default function ActivityPage() {
     [load]
   );
 
-  /* Refreshed when the tab comes back, never on a timer -- the same rule the
-     Overview follows. A log nobody is looking at should not cost a request a
-     minute for the life of the tab. */
+  /* The stream. Runs while the page is visible and not paused, and is torn
+     down entirely otherwise -- a hidden tab holds no timer at all, which is
+     the rule the live panel follows for the same reason. */
   useEffect(
-    function refreshOnFocus() {
-      function onFocus(): void {
-        if (document.visibilityState !== "hidden") {
-          load();
+    function stream() {
+      if (paused) {
+        return;
+      }
+
+      let timer: number | null = null;
+
+      function start(): void {
+        if (timer === null) {
+          timer = window.setInterval(load, STREAM_EVERY_MS);
         }
       }
-      window.addEventListener("focus", onFocus);
-      document.addEventListener("visibilitychange", onFocus);
+      function stop(): void {
+        if (timer !== null) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+      }
+      function onVisibility(): void {
+        if (document.visibilityState === "hidden") {
+          stop();
+        } else {
+          // Catch up immediately rather than waiting out a whole interval on
+          // a log that may have moved a lot while the tab was away.
+          load();
+          start();
+        }
+      }
+
+      if (document.visibilityState !== "hidden") {
+        start();
+      }
+      document.addEventListener("visibilitychange", onVisibility);
       return function unbind() {
-        window.removeEventListener("focus", onFocus);
-        document.removeEventListener("visibilitychange", onFocus);
+        stop();
+        document.removeEventListener("visibilitychange", onVisibility);
       };
     },
-    [load]
+    [load, paused]
   );
 
-  const errorCount = useMemo(
-    function countErrors(): number {
+  const failures = useMemo(
+    function onlyFailures(): ActivityEvent[] {
       return (events || []).filter(function failed(row: ActivityEvent) {
         return row.status !== "ok";
-      }).length;
+      });
     },
     [events]
   );
 
-  const visible = useMemo(
-    function applyFilter(): ActivityEvent[] {
-      const rows = events || [];
-      return filter === "errors"
-        ? rows.filter(function failed(row: ActivityEvent) {
-            return row.status !== "ok";
-          })
-        : rows;
-    },
-    [events, filter]
-  );
+  const counts: Record<TabKey, number | null> = {
+    live: events === null ? null : events.length,
+    errors: events === null ? null : failures.length,
+    connectors: live === null ? null : live.connectors.length,
+    trends: null,
+  };
+
+  function renderRows(rows: ActivityEvent[], emptyTitle: string, emptyBody: string) {
+    if (eventsError !== null) {
+      return (
+        <p className="error" role="alert">
+          {eventsError}
+        </p>
+      );
+    }
+    if (events === null) {
+      return <LoadingScreen label="Loading activity" />;
+    }
+    if (rows.length === 0) {
+      return (
+        <EmptyState icon={Activity} title={emptyTitle} description={emptyBody} />
+      );
+    }
+    return (
+      <ul className="conn-list ov-events">
+        {rows.map(function renderEvent(row: ActivityEvent) {
+          return <EventRow row={row} key={row.id} />;
+        })}
+      </ul>
+    );
+  }
 
   return (
     <div className="panel">
@@ -159,125 +348,166 @@ export default function ActivityPage() {
       </p>
 
       <div className="panel-body">
-        {summary === null && summaryError ? (
-          <p className="error" role="alert">
-            {SUMMARY_FAILED}
-          </p>
-        ) : summary !== null ? (
-          /* The calendar and the spike trend, above the log they summarise.
-             Both size themselves to the pane, so neither can grow tall enough
-             to push the rows below the fold. */
-          <div className="act-trend">
-            <ActivityCalendar summary={summary} />
-            <ActivityTrend summary={summary} live={live} />
+        <div className="act-toolbar">
+          <div
+            className="act-tabs"
+            role="tablist"
+            aria-label="Activity views"
+          >
+            {TABS.map(function renderTab(def: TabDef) {
+              const Icon = def.icon;
+              const n = counts[def.key];
+              return (
+                <button
+                  key={def.key}
+                  type="button"
+                  role="tab"
+                  id={"act-tab-" + def.key}
+                  aria-selected={tab === def.key}
+                  aria-controls={"act-panel-" + def.key}
+                  className={
+                    tab === def.key ? "act-tab act-tab-on" : "act-tab"
+                  }
+                  onClick={function choose() {
+                    setTab(def.key);
+                  }}
+                >
+                  <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
+                  {def.label}
+                  {n !== null && n > 0 ? (
+                    <span className="mkt-shelf-count">{n}</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
-        ) : null}
 
-        {eventsError !== null ? (
-          <p className="error" role="alert">
-            {eventsError}
-          </p>
-        ) : events === null ? (
-          <LoadingScreen label="Loading activity" />
-        ) : events.length === 0 ? (
-          <EmptyState
-            icon={Activity}
-            title="No calls yet"
-            description="Paste an MCP URL into Claude or another AI client, and every tool call it makes shows up here."
-          />
-        ) : (
-          <>
-            {/* Only when there is something to filter to. A lone "Errors 0"
-                chip beside "All" answers a question nobody asked. */}
-            {errorCount > 0 ? (
-              <div
-                className="mkt-chips act-filter"
-                role="group"
-                aria-label="Filter activity"
-              >
-                <button
-                  type="button"
-                  className="mkt-chip"
-                  aria-pressed={filter === "all"}
-                  onClick={function showAll() {
-                    setFilter("all");
-                  }}
-                >
-                  All
-                  <span className="mkt-shelf-count">{events.length}</span>
-                </button>
-                <button
-                  type="button"
-                  className="mkt-chip"
-                  aria-pressed={filter === "errors"}
-                  onClick={function showErrors() {
-                    setFilter("errors");
-                  }}
-                >
-                  <AlertTriangle size={15} strokeWidth={2.2} aria-hidden="true" />
-                  Errors
-                  <span className="mkt-shelf-count">{errorCount}</span>
-                </button>
-              </div>
-            ) : null}
+          <div className="act-stream-state">
+            <span
+              className={paused ? "act-pulse act-pulse-off" : "act-pulse"}
+              aria-hidden="true"
+            />
+            <span className="act-stream-label">
+              {paused
+                ? "Paused"
+                : lastAt === null
+                  ? "Connecting"
+                  : "Live"}
+            </span>
+            <button
+              type="button"
+              className="mkt-chip act-pause"
+              aria-pressed={paused}
+              onClick={function togglePause() {
+                setPaused(function flip(was: boolean) {
+                  return !was;
+                });
+              }}
+            >
+              {paused ? (
+                <Play size={14} strokeWidth={2.2} aria-hidden="true" />
+              ) : (
+                <Pause size={14} strokeWidth={2.2} aria-hidden="true" />
+              )}
+              {paused ? "Resume" : "Pause"}
+            </button>
+          </div>
+        </div>
 
-            <ul className="conn-list ov-events">
-              {visible.map(function renderEvent(row: ActivityEvent) {
-                const failed = row.status !== "ok";
-                return (
-                  <li className="conn-row ov-event" key={row.id}>
-                    <ConnectorMark
-                      slug={row.connector}
-                      label={row.connector_label || row.connector}
-                      size={26}
-                    />
-                    <div className="conn-row-body">
-                      <p className="conn-row-title">
-                        <code className="conn-tool-name">{row.tool_name}</code>
-                        <span
-                          className={
-                            failed
-                              ? "conn-status conn-status-error"
-                              : "conn-status"
-                          }
-                        >
-                          <span className="conn-status-dot" aria-hidden="true" />
-                          <span>{failed ? "Error" : "OK"}</span>
-                        </span>
-                      </p>
-                      <p className="conn-row-meta">
-                        {/* Null once the connection has been deleted, which is
-                            the case McpActivity.connection SET_NULL exists to
-                            preserve. The connector's label is what is left to
-                            name the row by. */}
-                        {row.connection_name !== null &&
-                        row.connection_name.length > 0
-                          ? row.connection_name
-                          : row.connector_label}
-                        {" · "}
-                        <time
-                          className="ov-event-time"
-                          dateTime={row.created_at}
-                          title={absoluteTime(row.created_at)}
-                        >
-                          {relativeTime(row.created_at)}
-                        </time>
-                        {/* Absent for a call that failed before it could be
-                            timed, and an invented 0 ms would be a lie. */}
-                        {row.duration_ms !== null
-                          ? " · " + String(row.duration_ms) + " ms"
-                          : ""}
-                      </p>
-                      {failed && row.error_message.length > 0 ? (
-                        <p className="conn-row-error">{row.error_message}</p>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
+        {/* Mounted on every tab, not just Errors: it is what fires the desktop
+            alerts, and it must keep watching while you read the charts. */}
+        <ActivityAlerts failures={failures} />
+
+        <div
+          role="tabpanel"
+          id="act-panel-live"
+          aria-labelledby="act-tab-live"
+          hidden={tab !== "live"}
+        >
+          {renderRows(
+            events || [],
+            "No calls yet",
+            "Paste an MCP URL into Claude or another AI client, and every tool call it makes shows up here."
+          )}
+        </div>
+
+        <div
+          role="tabpanel"
+          id="act-panel-errors"
+          aria-labelledby="act-tab-errors"
+          hidden={tab !== "errors"}
+        >
+          {renderRows(
+            failures,
+            "Nothing has failed",
+            "Every call in the window above succeeded. Failures appear here the moment one happens."
+          )}
+        </div>
+
+        <div
+          role="tabpanel"
+          id="act-panel-connectors"
+          aria-labelledby="act-tab-connectors"
+          hidden={tab !== "connectors"}
+        >
+          {live === null ? (
+            <LoadingScreen label="Loading the last 24 hours" />
+          ) : live.connectors.length === 0 ? (
+            <EmptyState
+              icon={BarChart3}
+              title="Nothing in the last 24 hours"
+              description="This view covers the last day only. The Trends tab goes back a year."
+            />
+          ) : (
+            <div className="act-breakdown">
+              <section>
+                <h2 className="act-section-title">By connector</h2>
+                <ul className="act-shares">
+                  {live.connectors.map(function byConnector(share: LiveShare) {
+                    return <ShareRow share={share} key={share.connector} />;
+                  })}
+                </ul>
+              </section>
+              {live.tools.length > 0 ? (
+                <section>
+                  <h2 className="act-section-title">By tool</h2>
+                  <ul className="act-shares">
+                    {live.tools.map(function byTool(share: LiveShare) {
+                      return (
+                        <ShareRow
+                          share={share}
+                          key={share.connector + "/" + String(share.tool_name)}
+                        />
+                      );
+                    })}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div
+          role="tabpanel"
+          id="act-panel-trends"
+          aria-labelledby="act-tab-trends"
+          hidden={tab !== "trends"}
+        >
+          {summary === null && summaryError ? (
+            <p className="error" role="alert">
+              {SUMMARY_FAILED}
+            </p>
+          ) : summary === null ? (
+            <LoadingScreen label="Loading trends" />
+          ) : (
+            /* Both size themselves to the pane, so neither can grow tall
+               enough to push the rest below the fold. */
+            <div className="act-trend">
+              <ActivityCalendar summary={summary} />
+              <ActivityTrend summary={summary} live={live} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
