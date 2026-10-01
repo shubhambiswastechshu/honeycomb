@@ -20,7 +20,29 @@ Tools:
   rxnorm_lookup       : normalise a drug name to its RxCUI + standard name
   drug_variants       : brand & generic variants of a drug (RxNav)
   spelling_suggestions: approximate-match suggestions for a misspelled drug name
+
+Evidence, for content that has to cite something (all keyless):
+  search_clinical_trials / get_clinical_trial : ClinicalTrials.gov API v2,
+      which also registers most trials run in India
+  search_pubmed / get_pubmed_abstracts        : NCBI E-utilities (PubMed)
+  dailymed_labels                             : NLM DailyMed label versions
+
+India. There is no public API for Indian drug regulation, so these search
+datasets bundled in connectors/data/india/, extracted from the regulators'
+own PDFs by build_cdsco.py there:
+  india_approved_drugs     : CDSCO "new drugs approved" lists, 1961-2026
+  india_essential_medicines: National List of Essential Medicines 2022
+  india_ceiling_prices     : NPPA ceiling prices under DPCO 2013 -- as of
+                             30.09.2020, the latest consolidated list NPPA
+                             publishes; every answer says so
+  india_drug_profile       : all three for one drug in one call
 """
+import json
+import re
+from functools import lru_cache
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
 from connections.models import Connection
 from connectors import registry
 from connectors.registry import Connector
@@ -31,6 +53,11 @@ from connectors.shims.http import UpstreamUnavailable, get as http_get
 
 FDA_BASE = "https://api.fda.gov"
 RXNAV_BASE = "https://rxnav.nlm.nih.gov/REST"
+CTGOV_BASE = "https://clinicaltrials.gov/api/v2"
+EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+DAILYMED_BASE = "https://dailymed.nlm.nih.gov/dailymed/services/v2"
+
+INDIA_DATA = Path(__file__).resolve().parent.parent / "data" / "india"
 
 _HEADERS = {"Accept": "application/json", "User-Agent": "TechShu-Connect-MCP/1.0 (+medicines connector)"}
 
@@ -271,6 +298,337 @@ async def spelling_suggestions(conn: Connection, db, args: dict) -> dict:
     return await cached("medicines", conn.id, "spelling_suggestions", TTL_MEDIUM, _loader, args={"term": term, "limit": limit})
 
 
+
+# ============================================================
+# Evidence: ClinicalTrials.gov, PubMed, DailyMed
+# ============================================================
+
+TRIAL_STATUSES = (
+    "RECRUITING", "NOT_YET_RECRUITING", "ACTIVE_NOT_RECRUITING", "COMPLETED",
+    "TERMINATED", "WITHDRAWN", "SUSPENDED", "ENROLLING_BY_INVITATION", "UNKNOWN",
+)
+TRIAL_PHASES = ("EARLY_PHASE1", "PHASE1", "PHASE2", "PHASE3", "PHASE4", "NA")
+
+
+def _trial_row(study: dict) -> dict:
+    ps = study.get("protocolSection") or {}
+    ident = ps.get("identificationModule") or {}
+    status = ps.get("statusModule") or {}
+    design = ps.get("designModule") or {}
+    nct = ident.get("nctId")
+    countries = sorted({
+        loc.get("country") for loc in (ps.get("contactsLocationsModule") or {}).get("locations", []) or []
+        if loc.get("country")
+    })
+    return {
+        "nct_id": nct,
+        "title": ident.get("briefTitle"),
+        "status": status.get("overallStatus"),
+        "phases": design.get("phases") or [],
+        "start_date": (status.get("startDateStruct") or {}).get("date"),
+        "completion_date": (status.get("completionDateStruct") or {}).get("date"),
+        "conditions": (ps.get("conditionsModule") or {}).get("conditions") or [],
+        "interventions": [i.get("name") for i in (ps.get("armsInterventionsModule") or {}).get("interventions", []) or []],
+        "sponsor": ((ps.get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}).get("name"),
+        "countries": countries,
+        "has_results": bool(study.get("hasResults")),
+        "url": f"https://clinicaltrials.gov/study/{nct}" if nct else None,
+    }
+
+
+async def search_clinical_trials(conn: Connection, db, args: dict) -> dict:
+    """Registered clinical trials, filterable by drug, condition, country, status and phase."""
+    params: dict = {"pageSize": _limit(args, 10, 50), "countTotal": "true", "format": "json"}
+    for arg, key in (("query", "query.term"), ("condition", "query.cond"),
+                     ("intervention", "query.intr"), ("location", "query.locn"),
+                     ("sponsor", "query.spons")):
+        value = str(args.get(arg) or "").strip()
+        if value:
+            params[key] = value
+    if not any(k.startswith("query.") for k in params):
+        raise ConnectorError("Give at least one of query, condition, intervention, location or sponsor.")
+    statuses = [s.upper() for s in (args.get("status") or []) if s]
+    bad = [s for s in statuses if s not in TRIAL_STATUSES]
+    if bad:
+        raise ConnectorError(f"Unknown status {bad}; use {', '.join(TRIAL_STATUSES)}.")
+    if statuses:
+        params["filter.overallStatus"] = ",".join(statuses)
+    phase = str(args.get("phase") or "").upper()
+    if phase:
+        if phase not in TRIAL_PHASES:
+            raise ConnectorError(f"phase must be one of {', '.join(TRIAL_PHASES)}.")
+        params["filter.advanced"] = f"AREA[Phase]{phase}"
+    if args.get("page_token"):
+        params["pageToken"] = str(args["page_token"])
+    sort = args.get("sort")
+    if sort == "newest":
+        params["sort"] = "StartDate:desc"
+
+    async def _loader():
+        data = await _get_json(f"{CTGOV_BASE}/studies", params)
+        return {
+            "total_count": data.get("totalCount"),
+            "trials": [_trial_row(s) for s in data.get("studies") or []],
+            "next_page_token": data.get("nextPageToken"),
+            "source": "ClinicalTrials.gov",
+        }
+
+    return await cached("medicines", conn.id, "search_clinical_trials", TTL_MEDIUM, _loader, args=params)
+
+
+async def get_clinical_trial(conn: Connection, db, args: dict) -> dict:
+    """One trial in detail: summary, design, enrolment, eligibility, outcomes and sites."""
+    nct = str(args.get("nct_id") or "").strip().upper()
+    if not re.fullmatch(r"NCT\d{8}", nct):
+        raise ConnectorError("nct_id must look like NCT01234567.")
+
+    async def _loader():
+        data = await _get_json(f"{CTGOV_BASE}/studies/{nct}", {"format": "json"})
+        if not data or not data.get("protocolSection"):
+            return {"nct_id": nct, "found": False}
+        ps = data["protocolSection"]
+        row = _trial_row(data)
+        design = ps.get("designModule") or {}
+        locations = (ps.get("contactsLocationsModule") or {}).get("locations", []) or []
+        row.update({
+            "found": True,
+            "official_title": (ps.get("identificationModule") or {}).get("officialTitle"),
+            "brief_summary": (ps.get("descriptionModule") or {}).get("briefSummary"),
+            "study_type": design.get("studyType"),
+            "enrollment": (design.get("enrollmentInfo") or {}).get("count"),
+            "primary_outcomes": [o.get("measure") for o in (ps.get("outcomesModule") or {}).get("primaryOutcomes", []) or []],
+            "eligibility": (ps.get("eligibilityModule") or {}).get("eligibilityCriteria"),
+            "sites_in_india": [
+                {"facility": loc.get("facility"), "city": loc.get("city")}
+                for loc in locations if loc.get("country") == "India"
+            ][:50],
+            "site_count": len(locations),
+        })
+        return row
+
+    return await cached("medicines", conn.id, "get_clinical_trial", TTL_MEDIUM, _loader, args={"nct": nct})
+
+
+_NCBI = {"tool": "honeycomb", "retmode": "json"}
+
+
+async def search_pubmed(conn: Connection, db, args: dict) -> dict:
+    """PubMed citations for a query, with journal, date, authors and DOI."""
+    query = str(args.get("query") or "").strip()
+    if not query:
+        raise ConnectorError("query is required, e.g. 'semaglutide India'.")
+    limit = _limit(args, 10, 50)
+    params = {**_NCBI, "db": "pubmed", "term": query, "retmax": limit,
+              "sort": "pub_date" if args.get("sort") == "newest" else "relevance"}
+    if args.get("from_year") or args.get("to_year"):
+        params.update({"datetype": "pdat", "mindate": str(args.get("from_year") or 1800),
+                       "maxdate": str(args.get("to_year") or 3000)})
+
+    async def _loader():
+        found = (await _get_json(f"{EUTILS_BASE}/esearch.fcgi", params)).get("esearchresult") or {}
+        ids = found.get("idlist") or []
+        rows = []
+        if ids:
+            summary = (await _get_json(f"{EUTILS_BASE}/esummary.fcgi",
+                                       {**_NCBI, "db": "pubmed", "id": ",".join(ids)})).get("result") or {}
+            for pmid in ids:
+                item = summary.get(pmid) or {}
+                doi = next((a.get("value") for a in item.get("articleids", []) if a.get("idtype") == "doi"), None)
+                rows.append({
+                    "pmid": pmid,
+                    "title": item.get("title"),
+                    "journal": item.get("fulljournalname") or item.get("source"),
+                    "published": item.get("pubdate"),
+                    "authors": [a.get("name") for a in item.get("authors", [])[:3]],
+                    "publication_types": item.get("pubtype", []),
+                    "doi": doi,
+                    "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                })
+        return {"query": query, "total_count": int(found.get("count") or 0), "articles": rows,
+                "source": "PubMed (NCBI E-utilities)"}
+
+    return await cached("medicines", conn.id, "search_pubmed", TTL_MEDIUM, _loader, args=params)
+
+
+async def get_pubmed_abstracts(conn: Connection, db, args: dict) -> dict:
+    """Full abstracts for up to 20 PubMed ids."""
+    raw = args.get("pmids") or []
+    pmids = [str(p).strip() for p in (raw if isinstance(raw, list) else str(raw).split(","))]
+    pmids = [p for p in pmids if p.isdigit()][:20]
+    if not pmids:
+        raise ConnectorError("pmids is required: a list of PubMed ids, e.g. ['37622681'].")
+
+    async def _loader():
+        url = f"{EUTILS_BASE}/efetch.fcgi"
+        try:
+            async with limit_for(url):
+                res = await http_get(url, headers={"User-Agent": _HEADERS["User-Agent"]},
+                                     params={"tool": "honeycomb", "db": "pubmed",
+                                             "id": ",".join(pmids), "retmode": "xml"})
+        except UpstreamUnavailable as e:
+            raise ConnectorError(str(e))
+        if res.status_code >= 400:
+            raise ConnectorError(f"PubMed error {res.status_code}.")
+        try:
+            root = ET.fromstring(res.content)
+        except ET.ParseError:
+            raise ConnectorError("PubMed returned unreadable XML.")
+        out = []
+        for art in root.findall(".//PubmedArticle"):
+            text = lambda path: "".join(art.find(path).itertext()).strip() if art.find(path) is not None else None
+            parts = []
+            for node in art.findall(".//Abstract/AbstractText"):
+                label = node.get("Label")
+                body = "".join(node.itertext()).strip()
+                parts.append(f"{label}: {body}" if label else body)
+            out.append({
+                "pmid": text(".//PMID"),
+                "title": text(".//ArticleTitle"),
+                "journal": text(".//Journal/Title"),
+                "year": text(".//JournalIssue/PubDate/Year") or text(".//JournalIssue/PubDate/MedlineDate"),
+                "abstract": "\n".join(parts) or None,
+                "doi": next(("".join(i.itertext()) for i in art.findall(".//ArticleId")
+                             if i.get("IdType") == "doi"), None),
+                "mesh_terms": ["".join(m.itertext()) for m in art.findall(".//MeshHeading/DescriptorName")],
+            })
+        return {"count": len(out), "articles": out, "source": "PubMed (NCBI E-utilities)"}
+
+    return await cached("medicines", conn.id, "get_pubmed_abstracts", TTL_LONG, _loader, args={"ids": pmids})
+
+
+async def dailymed_labels(conn: Connection, db, args: dict) -> dict:
+    """Current US product labels (SPL) on DailyMed for a drug name, with links."""
+    name = _name(args)
+    limit = _limit(args, 10, 50)
+
+    async def _loader():
+        data = await _get_json(f"{DAILYMED_BASE}/spls.json", {"drug_name": name, "pagesize": limit})
+        rows = [{
+            "title": r.get("title"),
+            "published": r.get("published_date"),
+            "version": r.get("spl_version"),
+            "setid": r.get("setid"),
+            "url": f"https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid={r.get('setid')}",
+            "pdf": f"https://dailymed.nlm.nih.gov/dailymed/downloadpdffile.cfm?setId={r.get('setid')}",
+        } for r in data.get("data") or []]
+        return {"name": name, "total_count": (data.get("metadata") or {}).get("total_elements"),
+                "labels": rows, "source": "DailyMed (US National Library of Medicine)"}
+
+    return await cached("medicines", conn.id, "dailymed_labels", TTL_LONG, _loader, args={"name": name, "limit": limit})
+
+
+# ============================================================
+# India: bundled CDSCO / NLEM / NPPA data
+# ============================================================
+
+@lru_cache(maxsize=None)
+def _india(name: str) -> dict:
+    """One bundled dataset, read once per process."""
+    try:
+        return json.loads((INDIA_DATA / name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise ConnectorError(f"The bundled India dataset {name} is missing or unreadable.")
+
+
+def _tokens(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def _matches(query: str, *fields: str) -> bool:
+    wanted = _tokens(query)
+    haystack = " ".join(_tokens(" ".join(fields)))
+    return bool(wanted) and all(t in haystack for t in wanted)
+
+
+def _query(args: dict) -> str:
+    q = str(args.get("query") or args.get("name") or "").strip()
+    if not q:
+        raise ConnectorError("query is required: a drug name (or, where offered, an indication).")
+    return q
+
+
+def _year(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _india_approvals(query: str, in_indication: bool, year_from, year_to, limit: int) -> dict:
+    data = _india("cdsco_new_drugs.json")
+    lo, hi = _year(year_from), _year(year_to)
+    hits = []
+    for row in data["rows"]:
+        fields = (row["drug"], row["indication"]) if in_indication else (row["drug"],)
+        if not _matches(query, *fields):
+            continue
+        year = _year((row.get("date") or "")[:4])
+        if (lo and (not year or year < lo)) or (hi and (not year or year > hi)):
+            continue
+        hits.append(row)
+    hits.sort(key=lambda r: r.get("date") or "", reverse=True)
+    return {
+        "match_count": len(hits),
+        "approvals": [{**r, "source_pdf": data["lists"].get(r["list"])} for r in hits[:limit]],
+        "source": data["source"],
+        "coverage_note": data["note"],
+    }
+
+
+async def india_approved_drugs(conn: Connection, db, args: dict) -> dict:
+    """CDSCO new-drug approvals in India: what, for which indication, and when."""
+    return _india_approvals(_query(args), bool(args.get("search_indications")),
+                            args.get("year_from"), args.get("year_to"), _limit(args, 20, 200))
+
+
+def _india_nlem(query: str, limit: int) -> dict:
+    data = _india("nlem_2022.json")
+    hits = [r for r in data["rows"] if _matches(query, r["medicine"])]
+    return {"on_nlem_2022": bool(hits), "entries": hits[:limit], "source": data["source"],
+            "source_pdf": data["url"],
+            "note": "Dosage forms are extracted from the gazette PDF; quote them from the source."}
+
+
+async def india_essential_medicines(conn: Connection, db, args: dict) -> dict:
+    """Whether a medicine is on India's National List of Essential Medicines 2022."""
+    return _india_nlem(_query(args), _limit(args, 20, 100))
+
+
+def _india_prices(query: str, limit: int) -> dict:
+    data = _india("nppa_ceiling_prices.json")
+    hits = [r for r in data["rows"] if _matches(query, r["medicine"])]
+    return {
+        "match_count": len(hits),
+        "prices": hits[:limit],
+        "as_of": data["as_of"],
+        "source": data["source"],
+        "source_pdf": data["url"],
+        "note": ("Ceiling prices (INR, excluding GST) as of {0}. NPPA revises them every April "
+                 "with the wholesale price index, so check the current NPPA notification before "
+                 "publishing a price.").format(data["as_of"]),
+    }
+
+
+async def india_ceiling_prices(conn: Connection, db, args: dict) -> dict:
+    """NPPA ceiling prices for scheduled formulations (price-controlled medicines)."""
+    return _india_prices(_query(args), _limit(args, 20, 100))
+
+
+async def india_drug_profile(conn: Connection, db, args: dict) -> dict:
+    """Everything the bundled India data says about one drug, in one call."""
+    query = _query(args)
+    approvals = _india_approvals(query, False, None, None, 10)
+    nlem = _india_nlem(query, 10)
+    prices = _india_prices(query, 20)
+    return {
+        "query": query,
+        "cdsco_approvals": approvals,
+        "essential_medicine": nlem,
+        "price_control": {**prices, "price_controlled": bool(prices["match_count"])},
+        "tip": "For US label text use drug_label; for evidence use search_pubmed and "
+               "search_clinical_trials with location='India'.",
+    }
+
 # ============================================================
 # Catalog
 # ============================================================
@@ -318,6 +676,87 @@ CATALOG = {
             "additionalProperties": False,
         },
     },
+    "search_clinical_trials": {
+        "description": "Search registered clinical trials (ClinicalTrials.gov) by drug, condition, sponsor or country -- e.g. location='India' -- with status and phase filters. Returns NCT id, phase, status, dates, sponsor, countries and a link.",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Free text, e.g. 'semaglutide obesity'."},
+                "condition": {"type": "string", "description": "Condition or disease."},
+                "intervention": {"type": "string", "description": "Drug or intervention name."},
+                "location": {"type": "string", "description": "Country or city, e.g. 'India' or 'Mumbai'."},
+                "sponsor": {"type": "string", "description": "Lead sponsor, e.g. 'Sun Pharma'."},
+                "status": {"type": "array", "items": {"type": "string", "enum": list(TRIAL_STATUSES)}},
+                "phase": {"type": "string", "enum": list(TRIAL_PHASES)},
+                "sort": {"type": "string", "enum": ["relevance", "newest"]},
+                "limit": {"type": "integer", "description": "1-50. Default 10."},
+                "page_token": {"type": "string", "description": "next_page_token from a previous call."},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+    },
+    "get_clinical_trial": {
+        "description": "One clinical trial in detail: summary, design, enrolment, eligibility, primary outcomes, and its sites in India.",
+        "input": {"type": "object", "properties": {"nct_id": {"type": "string", "description": "e.g. NCT05352815"}},
+                  "required": ["nct_id"], "additionalProperties": False},
+    },
+    "search_pubmed": {
+        "description": "Search PubMed for studies to cite: title, journal, date, first authors, publication type, DOI and link.",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "PubMed query, e.g. 'metformin India randomized'."},
+                "from_year": {"type": "integer"},
+                "to_year": {"type": "integer"},
+                "sort": {"type": "string", "enum": ["relevance", "newest"]},
+                "limit": {"type": "integer", "description": "1-50. Default 10."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    "get_pubmed_abstracts": {
+        "description": "Full abstracts, DOI and MeSH terms for up to 20 PubMed ids (from search_pubmed).",
+        "input": {"type": "object", "properties": {"pmids": {"type": "array", "items": {"type": "string"}}},
+                  "required": ["pmids"], "additionalProperties": False},
+    },
+    "dailymed_labels": {
+        "description": "Current US product labels for a drug on DailyMed, with version, date and links to the label page and PDF.",
+        "input": {"type": "object", "properties": dict(_NAME_LIMIT), "required": ["name"], "additionalProperties": False},
+    },
+    "india_approved_drugs": {
+        "description": "India: CDSCO new-drug approvals 1961-2026 -- drug and strength, approved indication, approval date, and the source PDF. Search by drug name, or by indication with search_indications.",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Drug name, or an indication when search_indications is true."},
+                "search_indications": {"type": "boolean", "description": "Also match the indication text."},
+                "year_from": {"type": "integer"},
+                "year_to": {"type": "integer"},
+                "limit": {"type": "integer", "description": "1-200. Default 20."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    "india_essential_medicines": {
+        "description": "India: whether a medicine is on the National List of Essential Medicines 2022, with its section, level of care and dosage forms.",
+        "input": {"type": "object", "properties": {"query": {"type": "string", "description": "Medicine name."},
+                                                   "limit": {"type": "integer"}},
+                  "required": ["query"], "additionalProperties": False},
+    },
+    "india_ceiling_prices": {
+        "description": "India: NPPA ceiling prices (INR per unit) for price-controlled formulations under DPCO 2013. Data as of 30 Sep 2020 -- the answer says so; confirm current prices with NPPA.",
+        "input": {"type": "object", "properties": {"query": {"type": "string", "description": "Medicine name."},
+                                                   "limit": {"type": "integer"}},
+                  "required": ["query"], "additionalProperties": False},
+    },
+    "india_drug_profile": {
+        "description": "India in one call: CDSCO approvals, NLEM 2022 status and NPPA price control for a drug.",
+        "input": {"type": "object", "properties": {"query": {"type": "string", "description": "Drug name."}},
+                  "required": ["query"], "additionalProperties": False},
+    },
 }
 
 HANDLERS = {
@@ -328,6 +767,15 @@ HANDLERS = {
     "rxnorm_lookup": rxnorm_lookup,
     "drug_variants": drug_variants,
     "spelling_suggestions": spelling_suggestions,
+    "search_clinical_trials": search_clinical_trials,
+    "get_clinical_trial": get_clinical_trial,
+    "search_pubmed": search_pubmed,
+    "get_pubmed_abstracts": get_pubmed_abstracts,
+    "dailymed_labels": dailymed_labels,
+    "india_approved_drugs": india_approved_drugs,
+    "india_essential_medicines": india_essential_medicines,
+    "india_ceiling_prices": india_ceiling_prices,
+    "india_drug_profile": india_drug_profile,
 }
 
 registry.register(
@@ -338,7 +786,9 @@ registry.register(
         cred_fields=[],
         catalog=CATALOG,
         handlers=HANDLERS,
-        description='Reads FDA drug labels, adverse-event reports, recalls and NDC entries from openFDA, plus RxNorm/RxNav drug-name normalisation. No API key.',
+        description=('Drug facts and evidence for pharma content: FDA labels, adverse events and recalls, '
+                     'DailyMed, RxNorm names, ClinicalTrials.gov and PubMed, plus India -- CDSCO approvals, '
+                     'the National List of Essential Medicines 2022 and NPPA ceiling prices. No API key.'),
         category='Reference',
     )
 )
