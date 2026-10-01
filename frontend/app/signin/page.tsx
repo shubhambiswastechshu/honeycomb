@@ -11,7 +11,7 @@ import {
   OrganizationField,
 } from "@/app/AuthCard";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-import { AmbiguousOrganizationError, ensureCsrf, signIn } from "@/lib/api";
+import { API_BASE, AmbiguousOrganizationError, ensureCsrf, signIn } from "@/lib/api";
 import type { OrganizationChoice } from "@/lib/api";
 
 const DEFAULT_DESTINATION = "/dashboard";
@@ -30,6 +30,34 @@ const DEFAULT_DESTINATION = "/dashboard";
  * then let the URL parser have the final word by comparing the resolved
  * origin. The authority is what actually decides where the browser goes.
  */
+const OAUTH_AUTHORIZE_PATHS = ["/oauth/authorize", "/oauth/authorize/"];
+
+/**
+ * The one cross-origin ?next= that is allowed: the API's own
+ * /oauth/authorize, where a claude.ai connector flow paused to send the
+ * visitor here. It is an absolute URL because the API is on its own host, and
+ * dropping it -- as the same-origin rule below would -- landed people on the
+ * dashboard with the connector never finishing. Only that exact path on that
+ * exact origin passes, so this is not a general redirect.
+ */
+function oauthAuthorizeUrl(raw: string): string | null {
+  let apiOrigin: string;
+  let resolved: URL;
+  try {
+    apiOrigin = new URL(API_BASE, window.location.origin).origin;
+    resolved = new URL(raw, window.location.origin);
+  } catch (invalid) {
+    return null;
+  }
+  if (resolved.origin !== apiOrigin) {
+    return null;
+  }
+  if (OAUTH_AUTHORIZE_PATHS.indexOf(resolved.pathname) === -1) {
+    return null;
+  }
+  return resolved.href;
+}
+
 function safeNextPath(raw: string | null): string {
   if (raw === null || raw.length === 0) {
     return DEFAULT_DESTINATION;
@@ -37,6 +65,10 @@ function safeNextPath(raw: string | null): string {
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f]/.test(raw)) {
     return DEFAULT_DESTINATION;
+  }
+  const authorize = oauthAuthorizeUrl(raw);
+  if (authorize !== null) {
+    return authorize;
   }
   if (raw.charAt(0) !== "/") {
     return DEFAULT_DESTINATION;
@@ -111,7 +143,14 @@ export default function SignInPage() {
       setPassword("");
       // The auth cookies are set; middleware will let the dashboard through.
       // Loading stays on so the button does not flick back mid-navigation.
-      router.replace(destinationRef.current);
+      const destination = destinationRef.current;
+      if (/^https?:\/\//.test(destination)) {
+        // The OAuth resume URL lives on the API host; the router only knows
+        // this app's routes, so leave the app for it.
+        window.location.assign(destination);
+      } else {
+        router.replace(destination);
+      }
     } catch (caught) {
       if (caught instanceof AmbiguousOrganizationError) {
         // The password was right, but in more than one organization. Show the

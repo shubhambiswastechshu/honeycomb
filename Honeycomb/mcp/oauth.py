@@ -369,23 +369,40 @@ def _signed_in_user(request):
     sources yet". The account that owns connections is the one that must be
     asked to share them.
 
+    The refresh cookie counts too. The access token lives an hour and the
+    session a week, so someone who signed in this morning holds an expired
+    access cookie beside a perfectly good refresh cookie. Reading only the
+    access cookie sent them to /signin in the middle of adding a connector --
+    asked to sign in to an app they were plainly signed in to. The refresh
+    cookie grants nothing /auth/refresh/ would not mint from it anyway, and the
+    subject goes through the same get_user() check, so a deactivated account
+    is still refused.
+
     The Django session remains a fallback so that a staff user who only ever
     signs in at /admin/ can still complete a flow.
     """
     try:
-        from accounts.authentication import access_cookie_name
-        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from accounts.authentication import (
+            CookieJWTAuthentication, access_cookie_name, refresh_cookie_name,
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
     except ImportError:
-        access_cookie_name = None
-    if access_cookie_name is not None:
+        CookieJWTAuthentication = None
+    if CookieJWTAuthentication is not None:
+        backend = CookieJWTAuthentication()
         raw = request.COOKIES.get(access_cookie_name())
         if raw:
             try:
-                backend = JWTAuthentication()
                 return backend.get_user(backend.get_validated_token(raw))
             except Exception:
-                # An expired or tampered cookie is simply "not signed in" --
-                # fall through to the session, then to the /signin redirect.
+                # Expired or tampered: try the refresh cookie next.
+                pass
+        raw = request.COOKIES.get(refresh_cookie_name())
+        if raw:
+            try:
+                return backend.get_user(RefreshToken(raw).access_token)
+            except Exception:
+                # Dead too -- fall through to the session, then to /signin.
                 pass
     user = getattr(request, 'user', None)
     if user is not None and user.is_authenticated:

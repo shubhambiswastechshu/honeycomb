@@ -139,3 +139,54 @@ class ActivitySummaryWindowTests(TestCase):
     def test_the_window_is_still_clamped(self):
         data = self.client.get(reverse('mcp:activity-summary'), {'days': 100000}).json()
         self.assertEqual(len(data['days']), MAX_SUMMARY_DAYS)
+
+
+class AuthorizeSignedInUserTests(TestCase):
+    """Who /oauth/authorize thinks is signed in, from the portal's cookies.
+
+    The case that matters is the everyday one: signed in this morning, so the
+    hour-long access cookie has expired while the week-long refresh cookie is
+    still good. That person must not be sent to /signin mid-flow.
+    """
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.factory = RequestFactory()
+        self.user = make_user(Tenant.objects.create(name='Acme'), 'me@acme.test')
+
+    def _request(self, **cookies):
+        from django.contrib.auth.models import AnonymousUser
+        request = self.factory.get('/oauth/authorize')
+        request.COOKIES.update(cookies)
+        request.user = AnonymousUser()
+        return request
+
+    def _expired_access(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        token = AccessToken.for_user(self.user)
+        token.set_exp(lifetime=-timedelta(minutes=1))
+        return str(token)
+
+    def test_a_valid_access_cookie(self):
+        from accounts.authentication import issue_tokens
+        from .oauth import _signed_in_user
+        access = str(issue_tokens(self.user).access_token)
+        self.assertEqual(_signed_in_user(self._request(hc_access=access)), self.user)
+
+    def test_an_expired_access_cookie_falls_back_to_the_refresh_cookie(self):
+        from accounts.authentication import issue_tokens
+        from .oauth import _signed_in_user
+        request = self._request(hc_access=self._expired_access(),
+                                hc_refresh=str(issue_tokens(self.user)))
+        self.assertEqual(_signed_in_user(request), self.user)
+
+    def test_a_deactivated_account_is_refused_even_with_a_good_refresh_cookie(self):
+        from accounts.authentication import issue_tokens
+        from .oauth import _signed_in_user
+        refresh = str(issue_tokens(self.user))
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        self.assertIsNone(_signed_in_user(self._request(hc_refresh=refresh)))
+
+    def test_garbage_cookies_mean_signed_out(self):
+        from .oauth import _signed_in_user
+        self.assertIsNone(_signed_in_user(self._request(hc_access='x', hc_refresh='y')))
