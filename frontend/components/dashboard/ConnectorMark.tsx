@@ -240,6 +240,7 @@ const BRAND_IMAGES: Record<string, string> = {
   linkedin_ads: "/brand/linkedin.png",
   meta_ad_library: "/brand/meta.png",
   openai_ads: "/brand/chatgpt.png",
+  pinterest: "/brand/pinterest.png",
   meta_ads: "/brand/meta.png",
   meta_business_suite: "/brand/meta.png",
   ms_clarity: "/brand/ms-clarity.png",
