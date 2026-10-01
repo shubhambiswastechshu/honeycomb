@@ -45,6 +45,10 @@ Regulatory and reference, the rest of the world (all keyless):
   atc_classification   : WHO ATC classes, via NIH RxClass
   patient_drug_info    : MedlinePlus plain-language drug pages
   europe_pmc_search / europe_pmc_full_text : open-access papers, full text
+  pubchem_compound     : molecule identity and properties (NIH PubChem)
+  openalex_works       : scholarly works with citation counts (OpenAlex)
+  mesh_lookup          : MeSH medical vocabulary and synonyms (NLM)
+  cdsco_alerts         : CDSCO alerts and circulars, live from cdsco.gov.in
 """
 import html
 import json
@@ -71,6 +75,9 @@ ORANGE_BOOK = "https://www.accessdata.fda.gov/scripts/cder/ob"
 EMA_JSON = "https://www.ema.europa.eu/en/documents/report/medicines-output-medicines_json-report_en.json"
 MEDLINEPLUS_CONNECT = "https://connect.medlineplus.gov/service"
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
+PUBCHEM = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+OPENALEX = "https://api.openalex.org"
+CDSCO_ALERTS = "https://cdsco.gov.in/opencms/opencms/en/Notifications/Alerts/"
 
 INDIA_DATA = Path(__file__).resolve().parent.parent / "data" / "india"
 
@@ -1034,6 +1041,132 @@ async def europe_pmc_full_text(conn: Connection, db, args: dict) -> dict:
     return await cached("medicines", conn.id, "europe_pmc_full_text", TTL_LONG, _loader,
                         args={"id": pmcid, "max": max_chars})
 
+
+async def pubchem_compound(conn: Connection, db, args: dict) -> dict:
+    """Molecule identity and properties from PubChem: formula, weight, IUPAC name, SMILES."""
+    name = _name(args)
+    props = ("MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES,InChIKey,XLogP,"
+             "HBondDonorCount,HBondAcceptorCount,TPSA")
+
+    async def _loader():
+        safe = re.sub(r"[/?#]", " ", name)
+        data = await _get_json(f"{PUBCHEM}/compound/name/{safe}/property/{props}/JSON", {})
+        rows = (data.get("PropertyTable") or {}).get("Properties") or []
+        if not rows:
+            return {"name": name, "found": False}
+        cid = rows[0].get("CID")
+        synonyms = await _get_json(f"{PUBCHEM}/compound/cid/{cid}/synonyms/JSON", {})
+        names = ((synonyms.get("InformationList") or {}).get("Information") or [{}])[0].get("Synonym") or []
+        return {"name": name, "found": True, **rows[0], "synonyms": names[:15],
+                "url": f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}", "source": "NIH PubChem"}
+
+    return await cached("medicines", conn.id, "pubchem_compound", TTL_LONG, _loader, args={"name": name})
+
+
+async def openalex_works(conn: Connection, db, args: dict) -> dict:
+    """Scholarly works from OpenAlex, sortable by citations, with open-access links."""
+    query = str(args.get("query") or "").strip()
+    if not query:
+        raise ConnectorError("query is required.")
+    params = {"search": query, "per-page": _limit(args, 10, 50),
+              "select": "id,doi,title,publication_year,cited_by_count,primary_location,open_access,authorships,type"}
+    sort = {"most_cited": "cited_by_count:desc", "newest": "publication_date:desc"}.get(args.get("sort"))
+    if sort:
+        params["sort"] = sort
+    filters = []
+    if args.get("from_year"):
+        filters.append(f"from_publication_date:{int(args['from_year'])}-01-01")
+    if args.get("open_access_only"):
+        filters.append("is_oa:true")
+    if args.get("country"):
+        filters.append(f"authorships.countries:{str(args['country']).upper()[:2]}")
+    if filters:
+        params["filter"] = ",".join(filters)
+
+    async def _loader():
+        data = await _get_json(f"{OPENALEX}/works", params)
+        rows = []
+        for w in data.get("results") or []:
+            source = ((w.get("primary_location") or {}).get("source") or {})
+            rows.append({
+                "title": w.get("title"),
+                "year": w.get("publication_year"),
+                "type": w.get("type"),
+                "journal": source.get("display_name"),
+                "cited_by": w.get("cited_by_count"),
+                "doi": w.get("doi"),
+                "open_access_url": (w.get("open_access") or {}).get("oa_url"),
+                "authors": [((a.get("author") or {}).get("display_name")) for a in (w.get("authorships") or [])[:3]],
+                "openalex_id": w.get("id"),
+            })
+        return {"query": query, "total_count": (data.get("meta") or {}).get("count"), "works": rows,
+                "source": "OpenAlex"}
+
+    return await cached("medicines", conn.id, "openalex_works", TTL_MEDIUM, _loader, args=params)
+
+
+async def mesh_lookup(conn: Connection, db, args: dict) -> dict:
+    """MeSH headings for a term, with their synonyms -- the vocabulary PubMed indexes by."""
+    term = str(args.get("term") or args.get("query") or "").strip()
+    if not term:
+        raise ConnectorError("term is required, e.g. 'type 2 diabetes'.")
+    limit = _limit(args, 5, 20)
+
+    async def _loader():
+        # NCBI's MeSH database maps everyday phrasing ("type 2 diabetes") onto
+        # headings ("Diabetes Mellitus, Type 2"); NLM's label lookup only
+        # matches the heading text itself.
+        found = (await _get_json(f"{EUTILS_BASE}/esearch.fcgi",
+                                 {**_NCBI, "db": "mesh", "term": term, "retmax": limit})
+                 ).get("esearchresult") or {}
+        ids = found.get("idlist") or []
+        out = []
+        if ids:
+            summary = (await _get_json(f"{EUTILS_BASE}/esummary.fcgi",
+                                       {**_NCBI, "db": "mesh", "id": ",".join(ids)})).get("result") or {}
+            for uid in ids:
+                item = summary.get(uid) or {}
+                terms = item.get("ds_meshterms") or []
+                ui = item.get("ds_meshui")
+                out.append({
+                    "heading": terms[0] if terms else None,
+                    "mesh_id": ui,
+                    "entry_terms": terms[1:16],
+                    "scope_note": _plain(item.get("ds_scopenote"), 600),
+                    "type": item.get("ds_recordtype"),
+                    "url": f"https://meshb.nlm.nih.gov/record/ui?ui={ui}" if ui else None,
+                })
+        return {"term": term, "headings": out, "source": "NLM Medical Subject Headings (MeSH)",
+                "tip": 'Use a heading in search_pubmed as "<heading>"[MeSH] for precise results.'}
+
+    return await cached("medicines", conn.id, "mesh_lookup", TTL_LONG, _loader, args={"t": term, "l": limit})
+
+
+async def cdsco_alerts(conn: Connection, db, args: dict) -> dict:
+    """CDSCO alerts, circulars and drug safety notices, newest first, with PDF links."""
+    query = str(args.get("query") or "").strip()
+    limit = _limit(args, 20, 100)
+
+    async def _loader():
+        try:
+            async with limit_for(CDSCO_ALERTS):
+                res = await http_get(CDSCO_ALERTS, headers={"User-Agent": "Mozilla/5.0"}, timeout=45)
+        except UpstreamUnavailable as e:
+            raise ConnectorError(str(e))
+        if res.status_code >= 400:
+            raise ConnectorError(f"cdsco.gov.in returned {res.status_code}.")
+        rows = re.findall(r"<td>(\d+)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td><a href='([^']+)'",
+                          res.text, re.S)
+        return [{"title": " ".join(html.unescape(re.sub(r"<[^>]+>", " ", t)).split()),
+                 "date": " ".join(d.split()),
+                 "pdf": "https://cdsco.gov.in" + link} for _n, t, d, link in rows]
+
+    alerts = await cached("medicines", conn.id, "cdsco_alerts", TTL_MEDIUM, _loader, args={})
+    hits = [a for a in alerts if not query or _matches(query, a["title"])]
+    return {"query": query or None, "match_count": len(hits), "alerts": hits[:limit],
+            "source": "CDSCO, Notifications > Alerts (cdsco.gov.in)",
+            "note": "Not-of-standard-quality (NSQ) drug lists are published separately on cdsco.gov.in."}
+
 # ============================================================
 # Catalog
 # ============================================================
@@ -1221,6 +1354,36 @@ CATALOG = {
             "additionalProperties": False,
         },
     },
+    "pubchem_compound": {
+        "description": "Molecule identity and properties from NIH PubChem: formula, molecular weight, IUPAC name, SMILES, InChIKey, logP and synonyms.",
+        "input": {"type": "object", "properties": dict(_NAME_PROP), "required": ["name"], "additionalProperties": False},
+    },
+    "openalex_works": {
+        "description": "Scholarly works from OpenAlex with citation counts and open-access links; sort by most cited or newest, filter by year, open access or author country (e.g. IN).",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "sort": {"type": "string", "enum": ["relevance", "most_cited", "newest"]},
+                "from_year": {"type": "integer"},
+                "open_access_only": {"type": "boolean"},
+                "country": {"type": "string", "description": "Two-letter author country code, e.g. IN."},
+                "limit": {"type": "integer", "description": "1-50. Default 10."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    "mesh_lookup": {
+        "description": "MeSH medical subject headings matching a term, with synonyms -- for precise PubMed searches and consistent terminology.",
+        "input": {"type": "object", "properties": {"term": {"type": "string"}, "limit": {"type": "integer"}},
+                  "required": ["term"], "additionalProperties": False},
+    },
+    "cdsco_alerts": {
+        "description": "India: CDSCO alerts, circulars and drug-safety notices (e.g. theft, spurious or recalled batches), newest first, with PDF links. Optional keyword filter.",
+        "input": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}},
+                  "required": [], "additionalProperties": False},
+    },
     "europe_pmc_full_text": {
         "description": "Full text of an open-access paper, section by section, capped at max_chars.",
         "input": {
@@ -1258,6 +1421,10 @@ HANDLERS = {
     "patient_drug_info": patient_drug_info,
     "europe_pmc_search": europe_pmc_search,
     "europe_pmc_full_text": europe_pmc_full_text,
+    "pubchem_compound": pubchem_compound,
+    "openalex_works": openalex_works,
+    "mesh_lookup": mesh_lookup,
+    "cdsco_alerts": cdsco_alerts,
 }
 
 registry.register(
@@ -1270,8 +1437,9 @@ registry.register(
         handlers=HANDLERS,
         description=('Drug facts and evidence for pharma content: FDA labels, approvals, Orange Book '
                      'patents, shortages, adverse events and recalls; EMA (EU) medicines; WHO ATC classes; '
-                     'MedlinePlus patient pages; ClinicalTrials.gov, PubMed and Europe PMC full text; plus '
-                     'India -- CDSCO approvals, NLEM 2022 and NPPA ceiling prices. No API key.'),
+                     'MedlinePlus patient pages; ClinicalTrials.gov, PubMed, Europe PMC, OpenAlex, MeSH and '
+                     'PubChem; plus India -- CDSCO approvals and alerts, NLEM 2022 and NPPA ceiling '
+                     'prices. No API key.'),
         category='Reference',
     )
 )
