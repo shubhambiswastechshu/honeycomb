@@ -277,7 +277,7 @@ class ToolRunSerializer(serializers.Serializer):
                 '"{0}" changes data, so it can only be run from a connected '
                 'AI client, not from the dashboard.'.format(value)
             )
-        if value in set(connection.disabled_tools or []):
+        if not registry.tool_enabled(connection, value, connector):
             raise serializers.ValidationError(
                 '"{0}" is switched off for this connection.'.format(value)
             )

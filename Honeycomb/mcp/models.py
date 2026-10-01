@@ -108,8 +108,10 @@ class McpActivity(TenantOwnedModel):
         blank=True,
         related_name='activity',
     )
-    connector = models.CharField(max_length=48, db_index=True)
-    tool_name = models.CharField(max_length=64, db_index=True)
+    # Not indexed on their own: nothing filters by either alone, and this is
+    # the hottest insert in the product -- every index is paid on every call.
+    connector = models.CharField(max_length=48)
+    tool_name = models.CharField(max_length=64)
     status = models.CharField(max_length=8, choices=STATUS_CHOICES, default=STATUS_OK)
     duration_ms = models.IntegerField(null=True, blank=True)
     detail = models.JSONField(default=dict, blank=True)
@@ -123,6 +125,9 @@ class McpActivity(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'connector', '-created_at'], name='mcpact_tenant_conn_idx'),
             models.Index(fields=['connection', '-created_at'], name='mcpact_conn_time_idx'),
+            # Every dashboard read is "this tenant, newest first / since T",
+            # across connectors -- which the connector-led index cannot serve.
+            models.Index(fields=['tenant', '-created_at'], name='mcpact_tenant_time_idx'),
         ]
 
     def __str__(self):
@@ -209,6 +214,10 @@ class OAuthToken(models.Model):
 
     PREFIX = 'hco_'
     LIFETIME_SECONDS = 60 * 60 * 24 * 30
+    # However often it is refreshed, a chain of tokens descended from one
+    # approval ends this long after that approval; the client then runs the
+    # authorization flow again. Without it a stolen refresh token was forever.
+    FAMILY_LIFETIME_SECONDS = 60 * 60 * 24 * 90
 
     client = models.ForeignKey(OAuthClient, on_delete=models.CASCADE, related_name='tokens')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -221,6 +230,10 @@ class OAuthToken(models.Model):
     last_used_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # When the approval this token descends from was given. Copied forward on
+    # every refresh; NULL on rows from before the column existed, which are
+    # then measured from created_at.
+    family_started_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'OAuth token'

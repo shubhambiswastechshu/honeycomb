@@ -59,3 +59,22 @@ def get(slug: str) -> Connector | None:
 
 def all_connectors() -> list[Connector]:
     return list(REGISTRY.values())
+
+
+def tool_enabled(connection, name: str, connector: Connector | None = None) -> bool:
+    """Whether ``connection`` may run tool ``name``. The single rule, used by the
+    MCP endpoint, the dashboard's tool list and the portal runner alike.
+
+    Read tools are on unless switched off (disabled_tools is a deny-list, so a
+    read tool a connector gains later appears everywhere). Write tools are off
+    unless switched on: they must also be listed in enabled_write_tools, so a
+    write tool shipped in a later release starts off on every existing
+    connection instead of quietly arriving switched on.
+    """
+    if name in (connection.disabled_tools or []):
+        return False
+    connector = connector or get(connection.connector)
+    entry = connector.catalog.get(name) if connector is not None else None
+    if entry is not None and entry.get('write'):
+        return name in (getattr(connection, 'enabled_write_tools', None) or [])
+    return True

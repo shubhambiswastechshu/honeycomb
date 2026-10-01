@@ -53,6 +53,7 @@ import ConnectForm from "@/components/dashboard/ConnectForm";
 import ConnectorMark from "@/components/dashboard/ConnectorMark";
 import EmptyState from "@/components/dashboard/EmptyState";
 import McpKeyPanel from "@/components/dashboard/McpKeyPanel";
+import OAuthClientsPanel from "@/components/dashboard/OAuthClientsPanel";
 import LiveData from "@/components/dashboard/LiveData";
 import GoogleAdsReport from "@/components/reports/google-ads/GoogleAdsReport";
 import ToolSwitches from "@/components/dashboard/ToolSwitches";
@@ -599,13 +600,19 @@ function ConnectorDetailView({ slug }: { slug: string }) {
 
                 {active.id === "access" ? (
                   selected !== null ? (
-                    <McpKeyPanel
-                      key={selected.id}
-                      connection={selected}
-                      onKeysChanged={function refreshCounts() {
-                        void reloadConnections();
-                      }}
-                    />
+                    <div className="acct-stack">
+                      <McpKeyPanel
+                        key={selected.id}
+                        connection={selected}
+                        onKeysChanged={function refreshCounts() {
+                          void reloadConnections();
+                        }}
+                      />
+                      <OAuthClientsPanel
+                        key={"oauth-" + selected.id}
+                        connectionId={selected.id}
+                      />
+                    </div>
                   ) : (
                     <NoInstances
                       onConnect={function startConnect() {

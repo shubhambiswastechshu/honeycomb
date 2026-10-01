@@ -63,11 +63,39 @@ palette; do not add `prefers-color-scheme: dark` blocks.
 
 7. **The `?next=` guard rejects control characters before comparing origins.**
    `/\t//evil.example` bypassed an earlier shape-only check. Do not simplify
-   `safeNextPath()` back to string inspection.
+   `safeNextPath()` back to string inspection. Its one cross-origin exception is
+   the API origin's exact `/oauth/authorize` path, so the claude.ai flow can
+   resume after sign-in.
+
+8. **A host the tenant typed is fetched only through `public_request()`**
+   (`connectors/shims/http.py`). It refuses private/reserved addresses on every
+   redirect hop, pins the connection to the checked IP and caps the body.
+   WordPress uses it; any future connector with a user-supplied URL must too.
+
+9. **Write tools are opt-in per connection.** `registry.tool_enabled()` is the
+   only rule: a `write: True` tool runs only if it is in `enabled_write_tools`
+   (and not in `disabled_tools`), so a write tool shipped later starts off
+   everywhere. Do not test `disabled_tools` directly.
+
+10. **OAuth auto-approve is narrow on purpose.** Silent approval happens only
+    for a redirect URI in `HONEYCOMB_OAUTH_TRUSTED_REDIRECTS` (claude.ai's
+    callback by default) and only for owners/admins; everyone else gets the
+    consent screen. Refresh tokens rotate with reuse detection and a 90-day
+    family lifetime. Owners can disconnect OAuth clients on a connection's
+    Access tab.
 
 ---
 
 ## Architecture decisions worth knowing
+
+**MCP database work goes through `mcp/db.run_db()`.** FastAPI requests get no
+Django request context, so the async ORM ran every MCP query on one shared
+thread per worker (~100 req/s for two workers). `run_db` uses the thread pool
+(~3x the throughput locally), recycles connections every 5 minutes and retries
+once on a connection Postgres dropped. Activity rows are written after the
+response is sent; `last_used_at` is updated at most once a minute;
+tool calls are capped at `HONEYCOMB_MCP_CALLS_PER_MINUTE` per credential and
+bodies at `HONEYCOMB_MCP_MAX_BODY_BYTES`. `prune_mcp` runs at container start.
 
 **Why Django and not Next.js API routes.** The intended product direction is
 data-platform shaped (Databricks/Snowflake/Fabric territory), which means heavy

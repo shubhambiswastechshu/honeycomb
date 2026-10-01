@@ -160,10 +160,29 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(connector=connector)
         return queryset
 
+    def _require_admin(self):
+        # Connecting, re-pointing or deleting a data source, and switching on
+        # tools, are administrative acts -- the same rule as starting an OAuth
+        # connect (CONNECT_ADMIN_ROLES) and minting keys. A member could
+        # otherwise swap a connection's credentials or site URL under a key an
+        # admin already handed to an AI client, or switch on its write tools.
+        from .oauth import CONNECT_ADMIN_ROLES
+        if self.request.user.role not in CONNECT_ADMIN_ROLES:
+            raise PermissionDenied('Only an owner or admin can change connections.')
+
     def perform_create(self, serializer):
+        self._require_admin()
         # The mixin stamps the tenant; created_by is stamped from the session
         # for the same reason -- neither is ever read from the request body.
         serializer.save(tenant=self.get_tenant(), created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        self._require_admin()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._require_admin()
+        instance.delete()
 
     @action(detail=True, methods=['get', 'post'], url_path='tools')
     def tools(self, request, pk=None):
@@ -175,6 +194,7 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         """
         connection = self.get_object()
         if request.method == 'POST':
+            self._require_admin()
             serializer = ToolToggleSerializer(
                 data=request.data, context={'connection': connection, 'request': request}
             )
@@ -184,8 +204,15 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             disabled = [name for name in (connection.disabled_tools or []) if name not in names]
             if not enabled:
                 disabled.extend(names)
+            # Write tools are opt-in (see registry.tool_enabled), so switching
+            # one on has to record it, not merely take it off the deny-list.
+            writes = set(getattr(registry.get(connection.connector), 'write_tools', ()) or ())
+            allowed = [name for name in (connection.enabled_write_tools or []) if name not in names]
+            if enabled:
+                allowed.extend(name for name in names if name in writes)
             connection.disabled_tools = disabled
-            connection.save(update_fields=['disabled_tools', 'updated_at'])
+            connection.enabled_write_tools = allowed
+            connection.save(update_fields=['disabled_tools', 'enabled_write_tools', 'updated_at'])
         return Response(self._tool_rows(connection), status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='run')
@@ -244,7 +271,7 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             McpActivity.objects.create(
                 tenant=connection.tenant, connection=connection,
                 connector=connection.connector, tool_name=name, status=row_status,
-                duration_ms=elapsed_ms(), error_message=message[:500],
+                duration_ms=elapsed_ms(), error_message=message[:300],
                 detail=detail or {'via': 'portal'},
             )
 
@@ -356,9 +383,8 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         connector = registry.get(connection.connector)
         if connector is None:
             return []
-        disabled = set(connection.disabled_tools or [])
         return [
-            dict(tool, enabled=tool['name'] not in disabled)
+            dict(tool, enabled=registry.tool_enabled(connection, tool['name'], connector))
             for tool in catalog_tools(connector)
         ]
 

@@ -1040,6 +1040,34 @@ export async function revokeKey(id: number, keyId: number): Promise<void> {
 }
 
 /**
+ * An AI client (claude.ai, usually) connected to this connection through the
+ * OAuth sign-in popup rather than a pasted key. One row per client, however
+ * many times it has refreshed its token.
+ */
+export interface OAuthAuthorizationRow {
+  id: number;
+  client_name: string;
+  approved_by: string;
+  approved_at: string;
+  last_used_at: string | null;
+}
+
+export function listAuthorizations(id: number): Promise<OAuthAuthorizationRow[]> {
+  return request<OAuthAuthorizationRow[]>("/connections/" + id + "/authorizations/", {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+/** Disconnect one AI client: every token it holds here, refresh included, dies. */
+export async function revokeAuthorization(id: number, clientId: number): Promise<void> {
+  await request<null>("/connections/" + id + "/authorizations/" + clientId + "/", {
+    method: "DELETE",
+    authenticated: true,
+  });
+}
+
+/**
  * Recent tools/call rows for a connection, newest first.
  *
  * limit is sent only when the caller asked for one, so the server's own default

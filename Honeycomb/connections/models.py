@@ -95,6 +95,16 @@ class Connection(TenantOwnedModel):
                   'gains a tool exposes it by default instead of silently '
                   'hiding it from every existing connection.',
     )
+    # Write tools are the exception to that default, and the reason this field
+    # exists: a release that adds a tool which changes data must not hand that
+    # power to every connection made before it. A write tool is usable only
+    # when it is named here (and not in disabled_tools) -- see
+    # connectors.registry.tool_enabled, the one place the rule is applied.
+    enabled_write_tools = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Write tools a person has switched on for this instance.',
+    )
     # Live MCP URLs embed this slug: an AI client is configured once with
     # /mcp/<connector>/<endpoint_slug>/ and never asks again. Regenerating it
     # therefore breaks every client already pointed at this connection, with no

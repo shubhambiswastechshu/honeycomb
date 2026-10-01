@@ -17,6 +17,15 @@ import { getSitemapAudit } from "@/lib/crawlWorkspace";
 import type { SitemapAudit as Audit } from "@/lib/crawlWorkspace";
 import { num, pathOf } from "@/components/crawl/format";
 
+/**
+ * A sitemap's <loc> is whatever the crawled site wrote, so it is only made a
+ * link when it is http(s). A javascript: URL here would run on this origin
+ * with the visitor's session the moment it was clicked.
+ */
+function isWebUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 type View = "missing_from_crawl" | "missing_from_sitemap" | "problems";
 
 const VIEWS: { key: View; label: string; blurb: string; empty: string }[] = [
@@ -124,9 +133,13 @@ export default function SitemapAudit({ jobId }: { jobId: number }) {
           {rows.map(function row(r) {
             return (
               <li key={r.url} className="sma-item">
-                <a href={r.url} target="_blank" rel="noreferrer noopener" title={r.url}>
-                  {pathOf(r.url)}
-                </a>
+                {isWebUrl(r.url) ? (
+                  <a href={r.url} target="_blank" rel="noreferrer noopener" title={r.url}>
+                    {pathOf(r.url)}
+                  </a>
+                ) : (
+                  <span title={r.url}>{r.url}</span>
+                )}
                 {r.note ? <span className="sma-note">{r.note}</span> : null}
               </li>
             );

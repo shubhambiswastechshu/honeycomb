@@ -8,6 +8,8 @@ from .views import (
     ActivitySummaryView,
     McpKeyDetailView,
     McpKeyListCreateView,
+    OAuthAuthorizationDetailView,
+    OAuthAuthorizationListView,
 )
 
 app_name = 'mcp'
@@ -25,4 +27,8 @@ urlpatterns = [
          McpKeyListCreateView.as_view(), name='keys'),
     path('connections/<int:connection_id>/keys/<int:key_id>/',
          McpKeyDetailView.as_view(), name='key-detail'),
+    path('connections/<int:connection_id>/authorizations/',
+         OAuthAuthorizationListView.as_view(), name='authorizations'),
+    path('connections/<int:connection_id>/authorizations/<int:client_id>/',
+         OAuthAuthorizationDetailView.as_view(), name='authorization-detail'),
 ]

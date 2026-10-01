@@ -22,7 +22,7 @@ from accounts.models import User
 from connections.models import Connection
 from connectors import registry
 
-from .models import McpActivity, McpKey
+from .models import McpActivity, McpKey, OAuthToken
 from .serializers import (
     ActivityQuerySerializer,
     ActivitySummaryQuerySerializer,
@@ -108,6 +108,58 @@ class McpKeyDetailView(ConnectionScopedView):
             # AI client is explainable. Re-revoking is a no-op, not an error.
             key.revoked_at = timezone.now()
             key.save(update_fields=['revoked_at'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OAuthAuthorizationListView(ConnectionScopedView):
+    """GET /api/connections/<id>/authorizations/ -> AI clients connected by OAuth.
+
+    The claude.ai side of the keys list. A client authorized through
+    /oauth/authorize holds a chain of tokens (each refresh mints the next), so
+    rows are grouped by client: one entry per AI client still holding a live
+    token, which is what an owner deciding what to revoke needs to see.
+    """
+
+    def get(self, request, connection_id):
+        connection = self.get_connection(connection_id)
+        tokens = (
+            OAuthToken.objects
+            .filter(connection=connection, revoked_at__isnull=True)
+            .select_related('client', 'user')
+            .order_by('created_at')
+        )
+        clients = {}
+        for token in tokens:
+            approved = token.family_started_at or token.created_at
+            entry = clients.get(token.client_id)
+            if entry is None:
+                clients[token.client_id] = entry = {
+                    'id': token.client_id,
+                    'client_name': token.client.client_name or 'AI client',
+                    'approved_by': getattr(token.user, 'email', ''),
+                    'approved_at': approved,
+                    'last_used_at': token.last_used_at,
+                }
+            entry['approved_at'] = min(entry['approved_at'], approved)
+            if token.last_used_at and (entry['last_used_at'] is None
+                                       or token.last_used_at > entry['last_used_at']):
+                entry['last_used_at'] = token.last_used_at
+        return Response(sorted(clients.values(), key=lambda e: e['approved_at'], reverse=True))
+
+
+class OAuthAuthorizationDetailView(ConnectionScopedView):
+    """DELETE /api/connections/<id>/authorizations/<client_id>/ -> disconnect it.
+
+    Revokes every live token that client holds on this connection, refresh
+    tokens included, so it cannot quietly renew itself afterwards.
+    """
+
+    def delete(self, request, connection_id, client_id):
+        connection = self.get_connection(connection_id)
+        self.require_key_admin()
+        OAuthToken.objects.filter(
+            connection=connection, client_id=client_id, revoked_at__isnull=True,
+        ).update(revoked_at=timezone.now())
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

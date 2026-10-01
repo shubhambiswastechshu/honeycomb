@@ -295,26 +295,55 @@ def _region(args: dict) -> str:
     return str((args or {}).get("region") or "us").strip().lower()
 
 
-# Comments are stripped before the check so that `-- SELECT` or a /* */ block
-# cannot be used to push the real verb out of view.
-_LINE_COMMENT = re.compile(r"--[^\n]*")
-_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+def _strip_sql(text: str) -> str:
+    """The SQL with comments removed and every quoted literal emptied.
+
+    A real tokenizer, because the regex version this replaces stripped comments
+    without knowing about strings: in ``SELECT '--'; DROP TABLE t`` the ``--``
+    inside the literal was read as a comment that swallowed the rest of the
+    line, the semicolon vanished with it, and the DROP sailed through as part
+    of "one SELECT". Handles '...', "...", `...`, the triple-quoted forms,
+    backslash escapes, and --, # and /* */ comments.
+    """
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in ("'", '"', "`"):
+            quote = text[i:i + 3] if text[i:i + 3] in ("'''", '"""') else ch
+            i += len(quote)
+            while i < n and text[i:i + len(quote)] != quote:
+                i += 2 if text[i] == "\\" else 1
+            i += len(quote)
+            out.append("''")
+            continue
+        if text.startswith("--", i) or ch == "#":
+            while i < n and text[i] != "\n":
+                i += 1
+            out.append(" ")
+            continue
+        if text.startswith("/*", i):
+            close = text.find("*/", i + 2)
+            i = n if close < 0 else close + 2
+            out.append(" ")
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def _require_readonly_sql(sql: str) -> str:
     """Allow a single SELECT (or WITH ... SELECT) and nothing else.
 
-    This is the real boundary, not the OAuth scope: the token can write, so a
-    DML or DDL statement would otherwise succeed. Deliberately strict --
-    multiple statements are refused outright rather than parsed, because
-    telling "SELECT 1; DROP TABLE t" from a semicolon inside a string literal
-    needs a real SQL parser, and a half-parser here would be a false sense of
-    safety.
+    The first of two checks. This one is local and free; run_query adds a dry
+    run that asks BigQuery itself what kind of statement it is (see
+    _assert_select), because the OAuth token can write and a missed DML or
+    DDL statement would otherwise succeed.
     """
     text = (sql or "").strip()
     if not text:
         raise ConnectorError("sql is required.")
-    bare = _BLOCK_COMMENT.sub(" ", _LINE_COMMENT.sub(" ", text)).strip()
+    bare = _strip_sql(text).strip()
     if bare.endswith(";"):
         bare = bare[:-1].strip()
     if ";" in bare:
@@ -914,6 +943,25 @@ async def dry_run_query(conn: Connection, db, args: dict) -> dict:
     )
 
 
+async def _assert_select(conn: Connection, db, project: str, sql: str) -> None:
+    """Ask BigQuery what the statement is before running it. Costs nothing.
+
+    A dry-run job reports statementType, and only "SELECT" is let through: a
+    script, DML or DDL is refused here whatever the text looked like to the
+    local check. jobs.insert rather than jobs.query, because only a job
+    carries the statement type.
+    """
+    body = {"configuration": {"dryRun": True,
+                              "query": {"query": sql, "useLegacySql": False}}}
+    job = await _post(conn, db, f"/projects/{project}/jobs", body)
+    kind = (((job or {}).get("statistics") or {}).get("query") or {}).get("statementType")
+    if kind != "SELECT":
+        raise ConnectorError(
+            f"Only a single read-only SELECT can run here; BigQuery reads this as "
+            f"'{kind or 'unknown'}'. This connector never writes to BigQuery."
+        )
+
+
 async def run_query(conn: Connection, db, args: dict) -> dict:
     """Run read-only SQL under a hard bytes-billed ceiling."""
     project = _project(conn, args)
@@ -922,6 +970,7 @@ async def run_query(conn: Connection, db, args: dict) -> dict:
     cap = _max_bytes(args)
 
     async def _load():
+        await _assert_select(conn, db, project, sql)
         out = await _sql(conn, db, project, sql, limit=limit, cap=cap)
         out["project_id"] = project
         out["bytes_billed_cap"] = cap

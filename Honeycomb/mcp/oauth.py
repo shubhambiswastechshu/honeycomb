@@ -32,10 +32,14 @@ import base64
 import hashlib
 import json
 import logging
+import re
 import secrets
+import time
+from datetime import timedelta
 from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
@@ -58,16 +62,54 @@ logger = logging.getLogger(__name__)
 
 
 def auto_approve():
-    """Whether /authorize completes without showing the consent screen.
+    """Whether /authorize may complete without showing the consent screen.
 
     On by default: claude.ai's connector UI accepts a URL and nothing else, so
     OAuth is the only way in there, and a consent screen between pasting that
     URL and the connector working is the whole of the setup friction.
 
-    The cost is real and is spelled out at the call site. Turn it off with
+    It only ever applies to a redirect_uri in trusted_redirects(); every other
+    client sees the consent screen. Turn it off entirely with
     HONEYCOMB_OAUTH_AUTO_APPROVE=0.
     """
     return bool(getattr(settings, 'HONEYCOMB_OAUTH_AUTO_APPROVE', True))
+
+
+#: claude.ai's OAuth callback, under both of its domains.
+DEFAULT_TRUSTED_REDIRECTS = (
+    'https://claude.ai/api/mcp/auth_callback',
+    'https://claude.com/api/mcp/auth_callback',
+)
+
+
+def trusted_redirects():
+    """Redirect URIs whose codes may be issued without a consent click.
+
+    Why a list at all: registration is open, so anyone can register a client
+    whose redirect_uri is their own server. With auto-approval for every
+    client, one link opened by a signed-in user handed that server a code for
+    the user's connection -- no prompt, no trace in the UI. Restricting silent
+    approval to the AI client we actually serve keeps the one-paste setup for
+    claude.ai and puts a human back in the loop for everyone else.
+    """
+    configured = getattr(settings, 'HONEYCOMB_OAUTH_TRUSTED_REDIRECTS', None)
+    return tuple(configured) if configured else DEFAULT_TRUSTED_REDIRECTS
+
+
+#: Roles that may hand an AI client a credential. Mirrors mcp.views.KEY_ADMIN_ROLES:
+#: a member who cannot mint an hc_ key must not get the same power through OAuth.
+def _may_authorize(user):
+    from .views import KEY_ADMIN_ROLES
+    return getattr(user, 'role', None) in KEY_ADMIN_ROLES
+
+
+# --- registration limits -----------------------------------------------------
+REGISTER_PER_HOUR = 30
+MAX_REDIRECT_URIS = 5
+MAX_REDIRECT_URI_LENGTH = 512
+
+#: RFC 7636 section 4.1: 43-128 characters from the unreserved set.
+_VERIFIER = re.compile(r'^[A-Za-z0-9._~-]{43,128}$')
 
 
 def public_base():
@@ -170,18 +212,30 @@ def register(request):
     """
     if request.method == 'OPTIONS':
         return _cors_preflight()
+    if not _register_allowed(request):
+        return _json({'error': 'slow_down',
+                      'error_description': 'Too many registrations from this address.'},
+                     status=429)
     try:
         payload = json.loads(request.body or b'{}')
-    except json.JSONDecodeError:
+    except (ValueError, RecursionError):
         return _json({'error': 'invalid_client_metadata',
                       'error_description': 'Body must be JSON.'}, status=400)
 
+    if not isinstance(payload, dict):
+        return _json({'error': 'invalid_client_metadata',
+                      'error_description': 'Body must be a JSON object.'}, status=400)
     redirect_uris = payload.get('redirect_uris') or []
     if not isinstance(redirect_uris, list) or not redirect_uris:
         return _json({'error': 'invalid_redirect_uri',
                       'error_description': 'redirect_uris is required.'}, status=400)
+    if len(redirect_uris) > MAX_REDIRECT_URIS:
+        return _json({'error': 'invalid_redirect_uri',
+                      'error_description': 'At most {0} redirect_uris.'.format(MAX_REDIRECT_URIS)},
+                     status=400)
     for uri in redirect_uris:
-        if not isinstance(uri, str) or not _redirect_uri_is_sane(uri):
+        if not isinstance(uri, str) or len(uri) > MAX_REDIRECT_URI_LENGTH \
+                or not _redirect_uri_is_sane(uri):
             return _json({'error': 'invalid_redirect_uri',
                           'error_description': 'Unsupported redirect_uri: {0}'.format(uri)},
                          status=400)
@@ -205,17 +259,43 @@ def register(request):
 
 
 def _redirect_uri_is_sane(uri):
-    """Allow https anywhere, and http only on loopback (for desktop clients)."""
+    """Allow https anywhere, and http only on loopback (for desktop clients).
+
+    Custom schemes (claude://, cursor://) used to be accepted here, but Django's
+    redirect refuses any scheme other than http, https and ftp, so such a client
+    registered fine and then failed at the last step with a 400. Refusing them
+    at registration says so up front.
+    """
     try:
         parsed = urlparse(uri)
     except ValueError:
         return False
+    if parsed.fragment:
+        return False
     if parsed.scheme == 'https':
-        return bool(parsed.netloc)
+        return bool(parsed.hostname)
     if parsed.scheme == 'http':
         return parsed.hostname in ('127.0.0.1', 'localhost', '::1')
-    # Custom schemes (claude://, cursor://) are how native clients come back.
-    return bool(parsed.scheme) and '://' in uri
+    return False
+
+
+def _client_ip(request):
+    return request.META.get('REMOTE_ADDR', '') or 'unknown'
+
+
+def _register_allowed(request):
+    """A per-address hourly budget for /oauth/register. Fails open.
+
+    Registration is deliberately open (claude.ai has no account here to
+    pre-register with), so without a budget a script could fill the client
+    table without limit.
+    """
+    key = 'oauth:register:{0}:{1}'.format(_client_ip(request), int(time.time() // 3600))
+    try:
+        cache.add(key, 0, 3700)
+        return cache.incr(key) <= REGISTER_PER_HOUR
+    except Exception:  # noqa: BLE001 - a cache outage must not block a real client
+        return True
 
 
 def _cors_preflight():
@@ -259,14 +339,16 @@ def authorize(request):
         return _deny(request, 'This client asked to be sent back to an address it '
                               'did not register. Nothing was approved.')
 
+    # Shown as pages, not redirected. Anyone can register a client, so a
+    # redirect here -- before anyone has signed in -- made this host a
+    # trusted-looking bounce to whatever address that client named.
     if params.get('response_type', 'code') != 'code':
-        return _error_redirect(redirect_uri, state, 'unsupported_response_type',
-                               'Only the authorization code flow is supported.')
+        return _deny(request, 'This client asked for an unsupported response type. '
+                              'Nothing was approved.')
     # PKCE is mandatory, not negotiated. These clients are public: without a
     # verifier, anyone who intercepts the code can redeem it.
     if not challenge or method != 'S256':
-        return _error_redirect(redirect_uri, state, 'invalid_request',
-                               'PKCE with code_challenge_method=S256 is required.')
+        return _deny(request, 'This client did not use PKCE (S256). Nothing was approved.')
 
     user = _signed_in_user(request)
     if user is None:
@@ -277,10 +359,15 @@ def authorize(request):
         return HttpResponseRedirect('{0}/signin?{1}'.format(
             frontend, urlencode({'next': back})))
 
+    if not _may_authorize(user):
+        return _deny(request, 'Only an owner or admin of your Honeycomb organization can '
+                              'connect an AI client. Ask one of them to add it.')
+
     connection = _connection_for(user, resource)
     choices = list(_connections_for(user))
 
-    if request.method == 'GET' and auto_approve() and connection is not None:
+    if (request.method == 'GET' and auto_approve() and connection is not None
+            and redirect_uri in trusted_redirects()):
         # Approval without a human, by explicit choice of the account holder.
         #
         # Be clear about what this gives up. The consent screen is what stops a
@@ -291,10 +378,11 @@ def authorize(request):
         #
         # It is on because the alternative -- a screen between "paste the URL"
         # and "it works" -- was judged the bigger cost for this product's users.
-        # Two things keep it from being worse than it needs to be: the client
-        # still only reaches its own registered redirect_uri, so the code cannot
-        # be steered somewhere new, and every silent approval is logged below so
-        # there is a record to read afterwards.
+        # What keeps it narrow: it only happens for a redirect_uri on the
+        # trusted list (claude.ai's own callback), so a code can only ever land
+        # with the AI client we serve, never on a server an attacker registered;
+        # only owners and admins get here at all; and every silent approval is
+        # logged below so there is a record to read afterwards.
         #
         # Set HONEYCOMB_OAUTH_AUTO_APPROVE=0 to put the screen back without a
         # code change.
@@ -491,21 +579,51 @@ def _token_from_code(request):
 def _token_from_refresh(request):
     presented = request.POST.get('refresh_token', '')
     client_id = request.POST.get('client_id', '')
+    invalid = _json({'error': 'invalid_grant',
+                     'error_description': 'Unknown, expired or revoked refresh token.'}, status=400)
+    if not presented or not client_id:
+        return invalid
     existing = (OAuthToken.objects
                 .select_related('client', 'connection', 'user')
-                .filter(refresh_hash=OAuthToken.hash_token(presented), revoked_at__isnull=True)
+                .filter(refresh_hash=OAuthToken.hash_token(presented))
                 .first())
-    if existing is None or (client_id and existing.client.client_id != client_id):
-        return _json({'error': 'invalid_grant',
-                      'error_description': 'Unknown or revoked refresh token.'}, status=400)
+    if existing is None or existing.client.client_id != client_id:
+        return invalid
+    if existing.revoked_at is not None:
+        # A refresh token that was already rotated away is being replayed:
+        # either the client lost track, or someone else holds a copy. Assume the
+        # second, and end every live token this client holds on this connection
+        # so a thief who refreshed first does not keep access.
+        _revoke_family(existing)
+        logger.warning('oauth: refresh token reuse; revoked client=%s connection=%s',
+                       existing.client.client_id, existing.connection_id)
+        return invalid
+    started = existing.family_started_at or existing.created_at
+    if timezone.now() - started > timedelta(seconds=OAuthToken.FAMILY_LIFETIME_SECONDS):
+        return invalid
+    user = existing.user
+    if (user is None or not user.is_active or user.tenant_id != existing.connection.tenant_id
+            or not _may_authorize(user)):
+        return invalid
     with transaction.atomic():
         # Rotate: the presented refresh token dies with the access token it
-        # renewed, so a captured one is useful only until its owner next refreshes.
-        OAuthToken.objects.filter(pk=existing.pk).update(revoked_at=timezone.now())
-        return _issue(existing.client, existing.user, existing.connection)
+        # renewed. Conditional, so two racing refreshes cannot both succeed and
+        # fork the chain.
+        spent = (OAuthToken.objects
+                 .filter(pk=existing.pk, revoked_at__isnull=True)
+                 .update(revoked_at=timezone.now()))
+        if not spent:
+            return invalid
+        return _issue(existing.client, user, existing.connection, family_started_at=started)
 
 
-def _issue(client, user, connection):
+def _revoke_family(token):
+    OAuthToken.objects.filter(
+        client_id=token.client_id, connection_id=token.connection_id, revoked_at__isnull=True,
+    ).update(revoked_at=timezone.now())
+
+
+def _issue(client, user, connection, family_started_at=None):
     access = OAuthToken.PREFIX + secrets.token_urlsafe(32)
     refresh = OAuthToken.PREFIX + 'r_' + secrets.token_urlsafe(32)
     expires_at = timezone.now() + timezone.timedelta(seconds=OAuthToken.LIFETIME_SECONDS)
@@ -514,6 +632,7 @@ def _issue(client, user, connection):
         token_hash=OAuthToken.hash_token(access),
         refresh_hash=OAuthToken.hash_token(refresh),
         expires_at=expires_at,
+        family_started_at=family_started_at or timezone.now(),
     )
     OAuthClient.objects.filter(pk=client.pk).update(last_used_at=timezone.now())
     response = _json({
@@ -530,7 +649,9 @@ def _issue(client, user, connection):
 
 
 def _pkce_ok(verifier, challenge):
-    if not verifier or not challenge:
+    # Validated before hashing: a non-ASCII verifier used to raise
+    # UnicodeEncodeError and surface as a 500.
+    if not verifier or not challenge or not _VERIFIER.match(verifier):
         return False
     digest = hashlib.sha256(verifier.encode('ascii')).digest()
     expected = base64.urlsafe_b64encode(digest).rstrip(b'=').decode('ascii')

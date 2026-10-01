@@ -323,6 +323,8 @@ class GoogleOAuthCallbackView(APIView):
         if state is None:
             return self.stale_state_message, ''
         slug = state.connector
+        if not self._same_person(request, state):
+            return self.wrong_browser_message, slug
 
         if denied:
             return 'Google did not grant access ({0}).'.format(
@@ -406,6 +408,27 @@ class GoogleOAuthCallbackView(APIView):
         })
         connection.save()
         return '', slug
+
+    wrong_browser_message = (
+        'This sign-in was started by a different Honeycomb account, or in a different '
+        'browser. Sign in to Honeycomb here as the person who clicked Connect, and '
+        'start again.'
+    )
+
+    def _same_person(self, request, state) -> bool:
+        """Whether the browser finishing the flow belongs to whoever started it.
+
+        The nonce alone said which tenant to file the account under, so a
+        Connect link started by one person could be finished by anyone: an
+        attacker could start a connect in their own organization, send the
+        provider's consent link to a victim, and have the victim's Google or
+        LinkedIn account land in the attacker's tenant. The portal's own cookies
+        (SameSite=Lax, so they ride along on this top-level return from the
+        provider) must name the same user the nonce was issued to.
+        """
+        from mcp.oauth import _signed_in_user
+        user = _signed_in_user(request)
+        return user is not None and user.pk == state.user_id
 
     def _claim_state(self, state_value: str):
         """Burn the nonce and return it, or None if it was not redeemable.
@@ -491,6 +514,8 @@ class LinkedInOAuthCallbackView(GoogleOAuthCallbackView):
         if state is None:
             return self.stale_state_message, ''
         slug = state.connector
+        if not self._same_person(request, state):
+            return self.wrong_browser_message, slug
 
         if denied:
             # user_cancelled_authorize and friends. LinkedIn's description is

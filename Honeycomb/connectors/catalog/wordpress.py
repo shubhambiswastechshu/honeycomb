@@ -26,7 +26,12 @@ from connectors.registry import Connector
 from connectors.shims.cache import TTL_SHORT, cached
 from connectors.shims.concurrency import limit_for
 from connectors.shims.errors import ConnectorError
-from connectors.shims.http import UpstreamUnavailable, request as http_request
+from connectors.shims.http import (
+    UnsafeUpstream,
+    UpstreamUnavailable,
+    public_request,
+    request as http_request,
+)
 from connections.models import Connection
 
 
@@ -40,8 +45,14 @@ def _conf(conn: Connection) -> tuple[str, str]:
         raise ConnectorError("Not connected: missing api_token (from the TechShu SEO Bridge plugin settings).")
     if not site.startswith(("http://", "https://")):
         site = "https://" + site
-    if not urlparse(site).netloc:
+    parsed = urlparse(site)
+    if not parsed.netloc:
         raise ConnectorError(f"Invalid site_url: {site}")
+    # The site root and nothing else. A query or fragment here used to swallow
+    # the /wp-json/... suffix appended below, so the request went to whatever
+    # path the tenant typed -- on whatever host.
+    if parsed.query or parsed.fragment or parsed.params:
+        raise ConnectorError("site_url must be the site's root address, without ? or #.")
     return f"{site}/wp-json/falcon/v1", token
 
 
@@ -51,7 +62,9 @@ async def _call(conn: Connection, method: str, path: str, *, params: dict | None
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     try:
         async with limit_for(url):
-            res = await http_request(method, url, headers=headers, params=params or None, json=json)
+            res = await public_request(method, url, headers=headers, params=params or None, json=json)
+    except UnsafeUpstream as e:
+        raise ConnectorError(str(e))
     except UpstreamUnavailable as e:
         raise ConnectorError(str(e))
     if res.status_code in (401, 403):
@@ -1670,7 +1683,9 @@ async def security_headers_check(conn: Connection, db, args: dict) -> dict:
     origin = _site_origin(conn)
     try:
         async with limit_for(origin):
-            res = await http_request("GET", origin + "/")
+            res = await public_request("GET", origin + "/")
+    except UnsafeUpstream as e:
+        raise ConnectorError(str(e))
     except UpstreamUnavailable as e:
         raise ConnectorError(str(e))
     h = {k.lower(): v for k, v in dict(res.headers).items()}

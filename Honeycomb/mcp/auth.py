@@ -19,13 +19,50 @@ ends up in browser history, shared chats and proxy logs, and a leaked URL would
 then be full tenant access. The slug *identifies* a connection; it does not
 authorize one.
 
-Every ORM call below is awaited (afirst/aupdate) because this module runs inside
-FastAPI's event loop -- a plain queryset evaluation there raises
-SynchronousOnlyOperation.
+The ORM work runs through mcp.db.run_db, which puts it on the thread pool
+instead of asgiref's single shared thread -- see that module for why.
 """
+from datetime import timedelta
+
 from django.utils import timezone
 
+from .db import run_db
 from .models import McpKey, OAuthToken
+
+# last_used_at is a "roughly when" for the dashboard, not an audit record (the
+# activity log is that). Writing it on every request doubled the database
+# work of tools/list; writing it at most this often costs nothing anyone reads.
+LAST_USED_GRANULARITY = timedelta(seconds=60)
+
+
+def _touch(model, row):
+    now = timezone.now()
+    if row.last_used_at is None or now - row.last_used_at > LAST_USED_GRANULARITY:
+        model.objects.filter(pk=row.pk).update(last_used_at=now)
+
+
+def _load_key(plain):
+    key = (
+        McpKey.objects
+        .select_related('connection', 'connection__tenant')
+        .filter(key_hash=McpKey.hash_token(plain), revoked_at__isnull=True)
+        .first()
+    )
+    if key is not None and key.connection is not None:
+        _touch(McpKey, key)
+    return key
+
+
+def _load_token(plain):
+    token = (
+        OAuthToken.objects
+        .select_related('connection', 'connection__tenant', 'user')
+        .filter(token_hash=OAuthToken.hash_token(plain), revoked_at__isnull=True)
+        .first()
+    )
+    if token is not None and token.connection is not None:
+        _touch(OAuthToken, token)
+    return token
 
 
 class AuthError(Exception):
@@ -89,12 +126,7 @@ async def resolve_bearer(authorization, connector, slug):
 
     # select_related pulls the connection (and its tenant) in the same query, so
     # nothing downstream touches a lazy FK descriptor from async code.
-    key = await (
-        McpKey.objects
-        .select_related('connection', 'connection__tenant')
-        .filter(key_hash=McpKey.hash_token(plain), revoked_at__isnull=True)
-        .afirst()
-    )
+    key = await run_db(_load_key, plain)
     if key is None:
         raise AuthError(_DENIED, 'invalid_key')
 
@@ -107,8 +139,6 @@ async def resolve_bearer(authorization, connector, slug):
     # one connector can never be spent on another.
     if connection.connector != connector or connection.endpoint_slug != slug:
         raise AuthError(_DENIED, 'connection_mismatch')
-
-    await McpKey.objects.filter(pk=key.pk).aupdate(last_used_at=timezone.now())
     return connection, key
 
 
@@ -119,12 +149,7 @@ async def _resolve_oauth_token(plain, connector, slug):
     above: one connection per credential, the connector and slug in the URL
     must match the row, and every failure says the same thing.
     """
-    token = await (
-        OAuthToken.objects
-        .select_related('connection', 'connection__tenant')
-        .filter(token_hash=OAuthToken.hash_token(plain), revoked_at__isnull=True)
-        .afirst()
-    )
+    token = await run_db(_load_token, plain)
     if token is None:
         raise AuthError(_DENIED, 'invalid_key')
     # Expiry is enforced here rather than by a cleanup job: a row that outlives
@@ -139,6 +164,10 @@ async def _resolve_oauth_token(plain, connector, slug):
         raise AuthError(_DENIED, 'orphan_key')
     if connection.connector != connector or connection.endpoint_slug != slug:
         raise AuthError(_DENIED, 'connection_mismatch')
-
-    await OAuthToken.objects.filter(pk=token.pk).aupdate(last_used_at=timezone.now())
+    # The person who approved this token must still be someone who could
+    # approve it now: an account that was deactivated, or moved out of the
+    # organization, stops working at once rather than when the token expires.
+    user = token.user
+    if user is None or not user.is_active or user.tenant_id != connection.tenant_id:
+        raise AuthError(_DENIED, 'user_inactive')
     return connection, token

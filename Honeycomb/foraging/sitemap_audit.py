@@ -83,18 +83,47 @@ def _normalise(url):
     url = str(url or '').strip()
     if not url:
         return ''
+    # A <loc> is attacker-controlled text that ends up as a link in the
+    # dashboard; anything but http(s) -- javascript: above all -- is dropped.
+    if urlsplit(url).scheme.lower() not in ('http', 'https'):
+        return ''
     return url.split('#', 1)[0]
 
 
+MAX_REDIRECTS = 5
+
+
 def _fetch(client, url):
-    """(text, error) for one sitemap file, gunzipped when it needs to be."""
-    try:
-        response = client.get(url)
-    except httpx.HTTPError as exc:
-        return None, '{0}: {1}'.format(type(exc).__name__, str(exc)[:120])
-    if response.status_code >= 400:
-        return None, 'HTTP {0}'.format(response.status_code)
-    body = response.content[:MAX_BYTES]
+    """(text, error) for one sitemap file, gunzipped when it needs to be.
+
+    Redirects are followed by hand, and every hop's host is checked with
+    _is_public again. The client used to follow them itself, so the check at
+    the top of collect() covered only the first URL: a public site answering
+    /robots.txt with a 302 to http://169.254.169.254/ had this server fetch
+    cloud metadata and report what it found.
+    """
+    for _hop in range(MAX_REDIRECTS + 1):
+        parts = urlsplit(url)
+        if parts.scheme not in ('http', 'https') or not _is_public(parts.hostname or ''):
+            return None, 'Refused to fetch a non-public address.'
+        try:
+            with client.stream('GET', url) as response:
+                if response.is_redirect and response.headers.get('location'):
+                    url = urljoin(url, response.headers['location'])
+                    continue
+                if response.status_code >= 400:
+                    return None, 'HTTP {0}'.format(response.status_code)
+                body = b''
+                for chunk in response.iter_bytes():
+                    body += chunk
+                    if len(body) >= MAX_BYTES:
+                        break
+        except httpx.HTTPError as exc:
+            return None, '{0}: {1}'.format(type(exc).__name__, str(exc)[:120])
+        break
+    else:
+        return None, 'Too many redirects.'
+    body = body[:MAX_BYTES]
     if url.endswith('.gz') or body[:2] == b'\x1f\x8b':
         try:
             body = gzip.decompress(body)[:MAX_BYTES]
@@ -116,7 +145,7 @@ def collect(seed_url, client=None):
 
     owned = client is None
     if owned:
-        client = httpx.Client(timeout=FETCH_TIMEOUT, follow_redirects=True,
+        client = httpx.Client(timeout=FETCH_TIMEOUT, follow_redirects=False,
                               headers={'User-Agent': USER_AGENT})
     started = time.monotonic()
     files, errors, urls = [], [], []

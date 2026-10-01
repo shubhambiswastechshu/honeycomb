@@ -59,7 +59,9 @@ def _env_flag(name, default):
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = _env_flag('DJANGO_DEBUG', 'True')
+# Off unless asked for: a forgotten variable must fail closed, not serve
+# tracebacks and relax every production setting below.
+DEBUG = _env_flag('DJANGO_DEBUG', 'False')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # No usable default: a committed literal lets anyone holding the source forge a
@@ -242,7 +244,13 @@ else:
             # Reuse connections instead of opening one per request. Postgres
             # forks a backend process per connection, so per-request connects
             # are the single most expensive thing a small Django app does.
-            'CONN_MAX_AGE': int(os.environ.get('DJANGO_DB_CONN_MAX_AGE', '60')),
+            # 0, not 60: under ASGI, Django 4.2 runs each request in a fresh
+            # thread context, so a persistent connection is never reused by the
+            # next request -- it just lingers, open, until garbage collection
+            # (Django ticket #33497), creeping toward max_connections under the
+            # dashboard's polling. The MCP data plane manages its own
+            # long-lived connections in mcp/db.py.
+            'CONN_MAX_AGE': int(os.environ.get('DJANGO_DB_CONN_MAX_AGE', '0')),
             # Persistent connections can outlive the server on the other end
             # (deploy, failover, idle timeout). Without this the first request
             # after that hits a dead socket and 500s.
@@ -298,6 +306,9 @@ if _REDIS_URL:
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
             'LOCATION': _REDIS_URL,
             'KEY_PREFIX': 'honeycomb',
+            # Every API request touches the throttle counters here. Without a
+            # timeout a hung Redis hangs every request with it.
+            'OPTIONS': {'socket_connect_timeout': 1, 'socket_timeout': 1},
         }
     }
 else:
@@ -813,11 +824,29 @@ GOOGLE_ADS_API_VERSION = os.environ.get('GOOGLE_ADS_API_VERSION', 'v23')
 # nothing else, so OAuth is the only route in there, and the screen sat between
 # pasting the URL and a working connector.
 #
-# What it costs: any client registered through /oauth/register that gets a
-# signed-in browser to load /oauth/authorize is handed a code with no prompt.
-# The client still only reaches its own registered redirect_uri, and every
-# silent approval is logged, but the human check is gone. Set to 0 to restore it.
+# It only ever applies to a redirect_uri listed in
+# HONEYCOMB_OAUTH_TRUSTED_REDIRECTS (claude.ai's own callback by default), and
+# only for an owner or admin. Any other client registered through
+# /oauth/register gets the consent screen, so a link to /oauth/authorize can
+# no longer hand a code to a server an attacker registered. Every silent
+# approval is logged. Set to 0 to show the screen to everyone.
 HONEYCOMB_OAUTH_AUTO_APPROVE = _env_flag('HONEYCOMB_OAUTH_AUTO_APPROVE', 'True')
+# Comma-separated, exact match. Empty means the default in mcp/oauth.py.
+HONEYCOMB_OAUTH_TRUSTED_REDIRECTS = [
+    uri.strip() for uri in
+    os.environ.get('HONEYCOMB_OAUTH_TRUSTED_REDIRECTS', '').split(',') if uri.strip()
+]
+
+# Tool calls one MCP credential may make per minute (0 = unlimited), and the
+# largest request body the MCP endpoint will read.
+HONEYCOMB_MCP_CALLS_PER_MINUTE = int(os.environ.get('HONEYCOMB_MCP_CALLS_PER_MINUTE', '120'))
+HONEYCOMB_MCP_MAX_BODY_BYTES = int(os.environ.get('HONEYCOMB_MCP_MAX_BODY_BYTES', str(1024 * 1024)))
+
+# Whether connectors that fetch a tenant-chosen host (WordPress) may reach
+# private and reserved addresses. Only ever for local development, where the
+# site under test is on localhost; in production it would be SSRF.
+HONEYCOMB_ALLOW_PRIVATE_UPSTREAMS = _env_flag(
+    'HONEYCOMB_ALLOW_PRIVATE_UPSTREAMS', 'True' if DEBUG else 'False')
 
 # The public crawler (foraging/public.py): a page where anyone can watch crawls
 # and start one without an account. Off unless this names the organization whose

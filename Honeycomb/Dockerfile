@@ -53,4 +53,4 @@ EXPOSE 8000
 # EVERY ACCOUNT before creating one. It is meant to be switched on for a
 # single deploy and switched off again; left on, it wipes the user table on
 # every container start.
-CMD ["sh", "-c", "python manage.py migrate --noinput && { [ -n \"$DJANGO_SUPERUSER_EMAIL\" ] && python manage.py createsuperuser --noinput || true; } && { [ -n \"$HONEYCOMB_RESET_ADMIN\" ] && python manage.py reset_admin || true; } && gunicorn Honeycomb.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --forwarded-allow-ips='*' --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && { python manage.py prune_mcp || true; } && { [ -n \"$DJANGO_SUPERUSER_EMAIL\" ] && python manage.py createsuperuser --noinput || true; } && { [ -n \"$HONEYCOMB_RESET_ADMIN\" ] && python manage.py reset_admin || true; } && gunicorn Honeycomb.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --forwarded-allow-ips='*' --access-logfile -"]

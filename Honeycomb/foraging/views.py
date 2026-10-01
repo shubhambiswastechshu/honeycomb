@@ -635,7 +635,13 @@ def job_pages(request, job_id):
 @permission_classes([IsAuthenticated])
 def workers(request):
     if request.method == 'POST':
-        name = (request.data.get('name') or 'Workstation').strip()
+        # A worker token lets a machine claim the tenant's crawl jobs, so it is
+        # minted by the same people who mint MCP keys -- as the console says.
+        from mcp.views import KEY_ADMIN_ROLES
+        if request.user.role not in KEY_ADMIN_ROLES:
+            return Response({'detail': 'Only an owner or admin can add a worker.'},
+                            status=http.HTTP_403_FORBIDDEN)
+        name = (request.data.get('name') or 'Workstation').strip()[:80]
         row, plain = Worker.mint(request.user.tenant, name, request.user)
         data = WorkerSerializer(row).data
         # The only time the plaintext ever exists in a response.

@@ -36,12 +36,15 @@ import time
 from django.conf import settings
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from connectors import registry
 from connectors.shims.errors import ConnectorError, redact_exc, redact_text
 
+from . import ratelimit
 from .auth import AuthError, resolve_bearer
+from .db import run_db
 from .models import McpActivity
 
 logger = logging.getLogger(__name__)
@@ -55,6 +58,46 @@ SUPPORTED_PROTOCOL_VERSIONS = ('2025-06-18', '2025-03-26', '2024-11-05')
 DEFAULT_TOOL_TIMEOUT = 45.0
 
 _ALLOW = {'Allow': 'POST, DELETE'}
+
+# A JSON-RPC request from an AI client is a few kilobytes. The cap is read
+# BEFORE authentication -- it has to be, the body is what we would parse -- so
+# without it anyone could stream gigabytes at a worker and exhaust its memory.
+DEFAULT_MAX_BODY_BYTES = 1024 * 1024
+
+
+def _max_body():
+    return int(getattr(settings, 'HONEYCOMB_MCP_MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES))
+
+
+class BodyTooLarge(Exception):
+    pass
+
+
+async def _read_body(request):
+    """The request body, refusing anything over the cap without buffering it."""
+    limit = _max_body()
+    declared = request.headers.get('content-length')
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise BodyTooLarge()
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise BodyTooLarge()
+        chunks.append(chunk)
+    return b''.join(chunks)
+
+
+def _parse(raw):
+    """json.loads that turns every malformed input into None, never a 500.
+
+    RecursionError is the one that got through before: a body of a hundred
+    thousand nested brackets blew Python's stack and surfaced as a bare 500.
+    """
+    try:
+        return json.loads(raw or b'{}')
+    except (ValueError, RecursionError):
+        return None
 
 
 def _tool_timeout():
@@ -147,7 +190,8 @@ async def _log_activity(connection, connector, tool, status, duration_ms,
     watching, so this swallows and logs instead of propagating.
     """
     try:
-        await McpActivity.objects.acreate(
+        await run_db(
+            McpActivity.objects.create,
             tenant_id=connection.tenant_id,
             connection=connection,
             connector=connector[:48],
@@ -159,6 +203,19 @@ async def _log_activity(connection, connector, tool, status, duration_ms,
         )
     except Exception:  # noqa: BLE001 -- the audit trail is best-effort, the call is not
         logger.exception('Failed to record McpActivity for %s.%s', connector, tool)
+
+
+def _logged(response, connection, connector, tool, status, duration_ms,
+            error_message='', detail=None):
+    """Attach the audit-row write to ``response``, to run after it is sent.
+
+    The caller already has its answer; making it wait on an INSERT it does not
+    care about added a database round trip to every tool call.
+    """
+    response.background = BackgroundTask(
+        _log_activity, connection, connector, tool, status, duration_ms,
+        error_message, detail)
+    return response
 
 
 def build_app():
@@ -222,8 +279,13 @@ def build_app():
         # never asked for.
         tail = _tail_of(request.url.path, connector, slug)
         try:
-            body = json.loads(await request.body() or b'{}')
-        except json.JSONDecodeError:
+            raw = await _read_body(request)
+        except BodyTooLarge:
+            response = _err(None, -32600, 'Request body too large.')
+            response.status_code = 413
+            return response
+        body = _parse(raw)
+        if body is None:
             return _err(None, -32700, 'Parse error')
         if not isinstance(body, dict):
             # JSON-RPC batches (arrays) are not used by these clients; reject
@@ -233,6 +295,8 @@ def build_app():
         rid = body.get('id')
         method = body.get('method')
         params = body.get('params') or {}
+        if not isinstance(params, dict):
+            return _err(rid, -32602, 'Invalid params: expected an object.')
 
         # No reply body is owed for: a notification (no "id"), an explicit
         # notifications/*, or a client->server response object (has "id" but no
@@ -257,7 +321,7 @@ def build_app():
         # holds no key at all, so here the credential is the only thing that can
         # turn a slug into a connection.
         try:
-            connection, _key = await resolve_bearer(
+            connection, credential = await resolve_bearer(
                 request.headers.get('authorization'), connector, slug)
         except AuthError as exc:
             return _unauthorized(rid, connector, slug, exc, tail)
@@ -276,10 +340,9 @@ def build_app():
             })
 
         if method == 'tools/list':
-            disabled = set(connection.disabled_tools or [])
             tools = []
             for name, entry in spec.catalog.items():
-                if name in disabled:
+                if not registry.tool_enabled(connection, name, spec):
                     continue
                 # The [WRITE] marker is the only warning the user gets inside the
                 # AI client about a tool that changes their upstream data.
@@ -294,6 +357,16 @@ def build_app():
         if method == 'tools/call':
             name = params.get('name')
             args = params.get('arguments') or {}
+            if not isinstance(name, str) or not isinstance(args, dict):
+                return _err(rid, -32602, 'Invalid params: name must be a string and '
+                                         'arguments an object.')
+            if not await ratelimit.allow(credential):
+                return _tool_result(
+                    rid,
+                    'Rate limit reached: at most {0} tool calls a minute per key. '
+                    'Wait a moment and try again.'.format(ratelimit.calls_per_minute()),
+                    True,
+                )
             entry = spec.catalog.get(name)
             started = time.monotonic()
 
@@ -307,23 +380,26 @@ def build_app():
             # tool name it can think of is the shape of a stolen one -- which is
             # invisible if only the calls that reached a handler are recorded.
             if entry is None:
-                await _log_activity(connection, connector, name or '', McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), 'Unknown tool')
-                return _tool_result(rid, 'Unknown tool: {0}'.format(name), True)
-            if name in set(connection.disabled_tools or []):
-                await _log_activity(connection, connector, name, McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), 'Tool switched off')
-                return _tool_result(
-                    rid,
-                    "Tool '{0}' is switched off for this connection in the Honeycomb "
-                    'dashboard.'.format(name),
-                    True,
-                )
+                return _logged(
+                    _tool_result(rid, 'Unknown tool: {0}'.format(name), True),
+                    connection, connector, name, McpActivity.STATUS_ERROR,
+                    _elapsed_ms(started), 'Unknown tool')
+            if not registry.tool_enabled(connection, name, spec):
+                return _logged(
+                    _tool_result(
+                        rid,
+                        "Tool '{0}' is switched off for this connection in the Honeycomb "
+                        'dashboard.'.format(name),
+                        True,
+                    ),
+                    connection, connector, name, McpActivity.STATUS_ERROR,
+                    _elapsed_ms(started), 'Tool switched off')
             handler = spec.handlers.get(name)
             if handler is None:
-                await _log_activity(connection, connector, name, McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), 'Tool has no handler')
-                return _tool_result(rid, "Tool '{0}' has no handler.".format(name), True)
+                return _logged(
+                    _tool_result(rid, "Tool '{0}' has no handler.".format(name), True),
+                    connection, connector, name, McpActivity.STATUS_ERROR,
+                    _elapsed_ms(started), 'Tool has no handler')
 
             try:
                 # The second argument is the falcon handlers' `db` session, which
@@ -337,24 +413,24 @@ def build_app():
             # used for both the client-visible text and the activity log.
             except asyncio.TimeoutError:
                 message = "Tool '{0}' timed out after {1:.0f}s.".format(name, _tool_timeout())
-                await _log_activity(connection, connector, name, McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), message)
-                return _tool_result(rid, message, True)
+                return _logged(_tool_result(rid, message, True), connection, connector, name,
+                               McpActivity.STATUS_ERROR, _elapsed_ms(started), message)
             except ConnectorError as exc:
                 message = redact_text(str(exc))
-                await _log_activity(connection, connector, name, McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), message)
-                return _tool_result(rid, message, True)
+                return _logged(_tool_result(rid, message, True), connection, connector, name,
+                               McpActivity.STATUS_ERROR, _elapsed_ms(started), message)
             except Exception as exc:  # noqa: BLE001 -- a clean MCP error, never a raw 500
                 message = redact_exc(exc)
-                logger.exception('MCP tool %s.%s failed', connector, name)
-                await _log_activity(connection, connector, name, McpActivity.STATUS_ERROR,
-                                    _elapsed_ms(started), message)
-                return _tool_result(rid, message, True)
+                # The traceback goes to the server log only, but it is redacted
+                # all the same: an exception's text can quote the URL it failed on.
+                logger.error('MCP tool %s.%s failed: %s', connector, name, message)
+                return _logged(_tool_result(rid, message, True), connection, connector, name,
+                               McpActivity.STATUS_ERROR, _elapsed_ms(started), message)
 
-            await _log_activity(connection, connector, name, McpActivity.STATUS_OK,
-                                _elapsed_ms(started), detail={'via': 'mcp'})
-            return _tool_result(rid, json.dumps(payload, default=str, indent=2), False)
+            return _logged(
+                _tool_result(rid, json.dumps(payload, default=str, indent=2), False),
+                connection, connector, name, McpActivity.STATUS_OK,
+                _elapsed_ms(started), detail={'via': 'mcp'})
 
         return _err(rid, -32601, 'Method not found: {0}'.format(method))
 
@@ -371,11 +447,11 @@ def build_app():
             return Response(status_code=405, headers=_ALLOW)
         rid = None
         try:
-            body = json.loads(await request.body() or b'{}')
-            if isinstance(body, dict):
-                rid = body.get('id')
-        except json.JSONDecodeError:
-            pass
+            body = _parse(await _read_body(request))
+        except BodyTooLarge:
+            body = None
+        if isinstance(body, dict):
+            rid = body.get('id')
         return _err(rid, -32001,
                     'No Honeycomb MCP endpoint at this URL. Copy the connection URL again '
                     'from the Honeycomb dashboard.')
