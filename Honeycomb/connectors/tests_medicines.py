@@ -62,3 +62,25 @@ class IndiaDataTests(SimpleTestCase):
             run('get_clinical_trial', {'nct_id': 'not-an-id'})
         with self.assertRaises(ConnectorError):
             run('search_clinical_trials', {})
+
+
+class ReferenceToolTests(SimpleTestCase):
+    def test_inputs_are_validated_before_any_request(self):
+        for name, args in (('europe_pmc_full_text', {'pmcid': '12345'}),
+                           ('europe_pmc_search', {}),
+                           ('ema_medicines', {}),
+                           ('fda_approval_history', {})):
+            with self.subTest(tool=name), self.assertRaises(ConnectorError):
+                run(name, args)
+
+    def test_orange_book_tables_are_parsed(self):
+        page = ('<table><tr><th>Product No</th><th>Patent No</th><th>Patent Expiration</th>'
+                '<th>Drug Substance</th><th>Drug Product</th><th>Patent Use Code</th>'
+                '<th>Delist Requested</th><th>Submission Date</th></tr>'
+                '<tr><td>001</td><td>8129343</td><td>12/05/2031</td><td>DS</td><td>DP</td>'
+                '<td>U-2202</td><td></td><td>12/20/2017</td></tr></table>')
+        tables = medicines._html_tables(page)
+        self.assertEqual(tables[0][1][1], '8129343')
+        self.assertEqual(medicines._us_date('12/05/2031'), '2031-12-05')
+        self.assertEqual(medicines._eu_date('06/01/2022'), '2022-01-06')
+        self.assertEqual(medicines._fda_date('20190920'), '2019-09-20')

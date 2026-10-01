@@ -36,9 +36,20 @@ own PDFs by build_cdsco.py there:
                              30.09.2020, the latest consolidated list NPPA
                              publishes; every answer says so
   india_drug_profile       : all three for one drug in one call
+
+Regulatory and reference, the rest of the world (all keyless):
+  fda_approval_history : Drugs@FDA applications, products and approval dates
+  orange_book_patents  : patents and exclusivities per FDA application
+  ema_medicines        : EU centrally authorised medicines (EMA's daily file)
+  drug_shortages       : FDA drug shortage list
+  atc_classification   : WHO ATC classes, via NIH RxClass
+  patient_drug_info    : MedlinePlus plain-language drug pages
+  europe_pmc_search / europe_pmc_full_text : open-access papers, full text
 """
+import html
 import json
 import re
+import time
 from functools import lru_cache
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -56,6 +67,10 @@ RXNAV_BASE = "https://rxnav.nlm.nih.gov/REST"
 CTGOV_BASE = "https://clinicaltrials.gov/api/v2"
 EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 DAILYMED_BASE = "https://dailymed.nlm.nih.gov/dailymed/services/v2"
+ORANGE_BOOK = "https://www.accessdata.fda.gov/scripts/cder/ob"
+EMA_JSON = "https://www.ema.europa.eu/en/documents/report/medicines-output-medicines_json-report_en.json"
+MEDLINEPLUS_CONNECT = "https://connect.medlineplus.gov/service"
+EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
 INDIA_DATA = Path(__file__).resolve().parent.parent / "data" / "india"
 
@@ -629,6 +644,396 @@ async def india_drug_profile(conn: Connection, db, args: dict) -> dict:
                "search_clinical_trials with location='India'.",
     }
 
+
+# ============================================================
+# Regulatory & reference: FDA, EMA, WHO ATC, MedlinePlus, Europe PMC
+# ============================================================
+
+def _fda_date(value: str | None) -> str | None:
+    """openFDA's YYYYMMDD as YYYY-MM-DD."""
+    v = str(value or "")
+    return f"{v[:4]}-{v[4:6]}-{v[6:8]}" if len(v) == 8 and v.isdigit() else (v or None)
+
+
+def _plain(text: str | None, limit: int = 1200) -> str | None:
+    if not text:
+        return None
+    flat = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", text))).strip()
+    return flat[:limit] + ("…" if len(flat) > limit else "")
+
+
+async def _drugsfda(name: str, limit: int) -> list[dict]:
+    data = await _get_json(
+        f"{FDA_BASE}/drug/drugsfda.json",
+        {"search": _or_search("openfda.brand_name", "openfda.generic_name", name), "limit": limit},
+    )
+    return data.get("results") or []
+
+
+async def fda_approval_history(conn: Connection, db, args: dict) -> dict:
+    """Drugs@FDA: who holds each US application, its products, and when it was approved."""
+    name = _name(args)
+    limit = _limit(args, 5, 20)
+
+    async def _loader():
+        apps = []
+        for app in await _drugsfda(name, limit):
+            subs = app.get("submissions") or []
+            original = next((x for x in subs if x.get("submission_type") == "ORIG"
+                             and x.get("submission_status") == "AP"), None)
+            recent = sorted(subs, key=lambda x: x.get("submission_status_date") or "", reverse=True)[:8]
+            apps.append({
+                "application_number": app.get("application_number"),
+                "sponsor": app.get("sponsor_name"),
+                "original_approval": _fda_date((original or {}).get("submission_status_date")),
+                "products": [{
+                    "product_number": pr.get("product_number"),
+                    "brand_name": pr.get("brand_name"),
+                    "active_ingredients": pr.get("active_ingredients"),
+                    "dosage_form": pr.get("dosage_form"),
+                    "route": pr.get("route"),
+                    "marketing_status": pr.get("marketing_status"),
+                    "te_code": pr.get("te_code"),
+                } for pr in app.get("products") or []],
+                "recent_actions": [{
+                    "type": x.get("submission_type"),
+                    "class": x.get("submission_class_code_description"),
+                    "status": x.get("submission_status"),
+                    "date": _fda_date(x.get("submission_status_date")),
+                    "documents": [{"type": d.get("type"), "url": d.get("url")}
+                                  for d in x.get("application_docs") or []],
+                } for x in recent],
+            })
+        return {"name": name, "found": bool(apps), "applications": apps, "source": "Drugs@FDA (openFDA)"}
+
+    return await cached("medicines", conn.id, "fda_approval_history", TTL_LONG, _loader,
+                        args={"name": name, "limit": limit})
+
+
+def _html_tables(page: str) -> list[list[list[str]]]:
+    tables = []
+    for table in re.findall(r"<table[^>]*>(.*?)</table>", page, re.S | re.I):
+        rows = []
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.S | re.I):
+            cells = [" ".join(html.unescape(re.sub(r"<[^>]+>", " ", c)).split())
+                     for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S | re.I)]
+            if cells:
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+    return tables
+
+
+async def _orange_book_product(app_type: str, app_no: str, product_no: str) -> dict:
+    url = f"{ORANGE_BOOK}/patent_info.cfm"
+    params = {"Product_No": product_no, "Appl_No": app_no, "Appl_type": app_type}
+    try:
+        async with limit_for(url):
+            res = await http_get(url, headers={"User-Agent": "Mozilla/5.0"}, params=params)
+    except UpstreamUnavailable as e:
+        raise ConnectorError(str(e))
+    if res.status_code >= 400:
+        raise ConnectorError(f"Orange Book returned {res.status_code}.")
+    patents, exclusivities = [], []
+    for rows in _html_tables(res.text):
+        header = [h.lower() for h in rows[0]]
+        records = [dict(zip(rows[0], r)) for r in rows[1:] if len(r) == len(rows[0])]
+        if "patent no" in header:
+            patents += [{
+                "patent": r.get("Patent No"),
+                "expires": r.get("Patent Expiration"),
+                "drug_substance": r.get("Drug Substance") == "DS",
+                "drug_product": r.get("Drug Product") == "DP",
+                "use_code": r.get("Patent Use Code") or None,
+                "delist_requested": r.get("Delist Requested") == "Y",
+            } for r in records]
+        elif "exclusivity code" in header:
+            exclusivities += [{"code": r.get("Exclusivity Code"), "expires": r.get("Exclusivity Expiration")}
+                              for r in records]
+    return {"patents": patents, "exclusivities": exclusivities}
+
+
+def _us_date(value: str | None) -> str:
+    m = re.match(r"(\d{2})/(\d{2})/(\d{4})", value or "")
+    return f"{m.group(3)}-{m.group(1)}-{m.group(2)}" if m else ""
+
+
+async def orange_book_patents(conn: Connection, db, args: dict) -> dict:
+    """Patents and regulatory exclusivities listed in the FDA Orange Book for a drug."""
+    name = _name(args)
+
+    async def _loader():
+        out = []
+        for app in await _drugsfda(name, 3):
+            number = str(app.get("application_number") or "")
+            m = re.match(r"^(NDA|ANDA|BLA)(\d+)$", number)
+            if not m or m.group(1) == "BLA":
+                continue  # biologics are in the Purple Book, not the Orange Book
+            app_type = "N" if m.group(1) == "NDA" else "A"
+            for product in (app.get("products") or [])[:4]:
+                listing = await _orange_book_product(app_type, m.group(2), product.get("product_number") or "001")
+                out.append({
+                    "application_number": number,
+                    "sponsor": app.get("sponsor_name"),
+                    "product_number": product.get("product_number"),
+                    "brand_name": product.get("brand_name"),
+                    "strength": ", ".join(f"{i.get('name')} {i.get('strength')}" for i in product.get("active_ingredients") or []),
+                    **listing,
+                })
+        expiries = sorted(_us_date(p["expires"]) for row in out for p in row["patents"] if _us_date(p["expires"]))
+        return {
+            "name": name,
+            "found": bool(out),
+            "latest_patent_expiry": expiries[-1] if expiries else None,
+            "products": out,
+            "source": "FDA Orange Book",
+            "note": "Listed patents and exclusivities only -- generic entry timing is a legal question, "
+                    "not something this list settles. Biologics are in the FDA Purple Book instead.",
+        }
+
+    return await cached("medicines", conn.id, "orange_book_patents", TTL_LONG, _loader, args={"name": name})
+
+
+_EMA_CACHE: dict = {"at": 0.0, "rows": None}
+_EMA_TTL = 24 * 60 * 60
+
+
+async def _ema_rows() -> list[dict]:
+    """EMA's full medicines file (~7 MB, refreshed daily), held per process for a day."""
+    if _EMA_CACHE["rows"] is not None and time.time() - _EMA_CACHE["at"] < _EMA_TTL:
+        return _EMA_CACHE["rows"]
+    try:
+        async with limit_for(EMA_JSON):
+            res = await http_get(EMA_JSON, headers={"User-Agent": _HEADERS["User-Agent"]}, timeout=60)
+    except UpstreamUnavailable as e:
+        if _EMA_CACHE["rows"] is not None:
+            return _EMA_CACHE["rows"]  # yesterday's copy beats no answer
+        raise ConnectorError(str(e))
+    if res.status_code >= 400:
+        raise ConnectorError(f"EMA returned {res.status_code}.")
+    try:
+        rows = res.json().get("data") or []
+    except ValueError:
+        raise ConnectorError("EMA returned an unreadable medicines file.")
+    _EMA_CACHE.update(at=time.time(), rows=rows)
+    return rows
+
+
+def _eu_date(value: str | None) -> str | None:
+    m = re.match(r"(\d{2})/(\d{2})/(\d{4})", value or "")
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+
+
+async def ema_medicines(conn: Connection, db, args: dict) -> dict:
+    """EU centrally authorised medicines: status, holder, dates, indication and EMA flags."""
+    query = _query(args)
+    limit = _limit(args, 10, 50)
+    in_indication = bool(args.get("search_indications"))
+    status = str(args.get("status") or "").strip().lower()
+    hits = []
+    for r in await _ema_rows():
+        if r.get("category") != "Human":
+            continue
+        fields = [r.get("name_of_medicine") or "", r.get("active_substance") or "",
+                  r.get("international_non_proprietary_name_common_name") or ""]
+        if in_indication:
+            fields += [r.get("therapeutic_indication") or "", r.get("therapeutic_area_mesh") or ""]
+        if not _matches(query, *fields):
+            continue
+        if status and status not in (r.get("medicine_status") or "").lower():
+            continue
+        hits.append(r)
+    hits.sort(key=lambda r: _eu_date(r.get("marketing_authorisation_date")) or "", reverse=True)
+    flags = ("orphan_medicine", "biosimilar", "generic", "conditional_approval",
+             "accelerated_assessment", "additional_monitoring", "prime_priority_medicine")
+    return {
+        "query": query,
+        "match_count": len(hits),
+        "medicines": [{
+            "name": r.get("name_of_medicine"),
+            "active_substance": r.get("active_substance"),
+            "status": r.get("medicine_status"),
+            "holder": r.get("marketing_authorisation_developer_applicant_holder"),
+            "authorised": _eu_date(r.get("marketing_authorisation_date")),
+            "atc_code": r.get("atc_code_human"),
+            "therapeutic_area": r.get("therapeutic_area_mesh"),
+            "indication": _plain(r.get("therapeutic_indication"), 800),
+            "flags": [f for f in flags if (r.get(f) or "").lower() == "yes"],
+            "url": r.get("medicine_url"),
+        } for r in hits[:limit]],
+        "source": "European Medicines Agency, medicines data file",
+    }
+
+
+async def drug_shortages(conn: Connection, db, args: dict) -> dict:
+    """FDA drug shortage list entries for a drug: status, availability, company, dates."""
+    name = _name(args)
+    limit = _limit(args, 10, 50)
+    status = str(args.get("status") or "").strip().title()
+    clean = name.replace('"', "")
+    search = f'generic_name:"{clean}" OR openfda.brand_name:"{clean}" OR openfda.generic_name:"{clean}"'
+    if status:
+        search = f"({search}) AND status:\"{status}\""
+
+    async def _loader():
+        data = await _get_json(f"{FDA_BASE}/drug/shortages.json", {"search": search, "limit": limit})
+        rows = data.get("results") or []
+        return {
+            "name": name,
+            "in_shortage_list": bool(rows),
+            "entries": [{
+                "generic_name": r.get("generic_name"),
+                "presentation": r.get("presentation"),
+                "status": r.get("status"),
+                "availability": r.get("availability"),
+                "company": r.get("company_name"),
+                "therapeutic_category": r.get("therapeutic_category"),
+                "first_posted": r.get("initial_posting_date"),
+                "updated": r.get("update_date"),
+                "reason": r.get("shortage_reason"),
+                "related_info": r.get("related_info"),
+            } for r in rows],
+            "source": "FDA Drug Shortages (openFDA)",
+        }
+
+    return await cached("medicines", conn.id, "drug_shortages", TTL_MEDIUM, _loader,
+                        args={"q": search, "limit": limit})
+
+
+async def atc_classification(conn: Connection, db, args: dict) -> dict:
+    """WHO ATC therapeutic classes for a drug (via NIH RxClass)."""
+    name = _name(args)
+
+    async def _loader():
+        data = await _get_json(f"{RXNAV_BASE}/rxclass/class/byDrugName.json",
+                               {"drugName": name, "relaSource": "ATC"})
+        seen, classes = set(), []
+        for info in (data.get("rxclassDrugInfoList") or {}).get("rxclassDrugInfo", []) or []:
+            item = info.get("rxclassMinConceptItem") or {}
+            key = item.get("classId")
+            if key and key not in seen:
+                seen.add(key)
+                classes.append({"atc_code": key, "class": item.get("className"),
+                                "level": item.get("classType"),
+                                "via": (info.get("minConcept") or {}).get("name")})
+        classes.sort(key=lambda c: c["atc_code"])
+        return {"name": name, "classes": classes, "source": "WHO ATC via NIH RxClass"}
+
+    return await cached("medicines", conn.id, "atc_classification", TTL_LONG, _loader, args={"name": name})
+
+
+async def patient_drug_info(conn: Connection, db, args: dict) -> dict:
+    """MedlinePlus plain-language drug information pages for a drug name."""
+    name = _name(args)
+    language = "es" if str(args.get("language") or "").lower().startswith("es") else "en"
+
+    async def _loader():
+        ids = ((await _get_json(f"{RXNAV_BASE}/rxcui.json", {"name": name, "search": 2}))
+               .get("idGroup") or {}).get("rxnormId") or []
+        if not ids:
+            return {"name": name, "found": False, "note": "No RxNorm concept for that name; try spelling_suggestions."}
+        data = await _get_json(MEDLINEPLUS_CONNECT, {
+            "mainSearchCriteria.v.cs": "2.16.840.1.113883.6.88",
+            "mainSearchCriteria.v.c": ids[0],
+            "knowledgeResponseType": "application/json",
+            "informationRecipient.languageCode.c": language,
+        })
+        entries = (data.get("feed") or {}).get("entry") or []
+        pages = [{
+            "title": (e.get("title") or {}).get("_value"),
+            "url": next((l.get("href") for l in e.get("link") or []), "").split("?")[0] or None,
+            "summary": _plain((e.get("summary") or {}).get("_value"), 1500),
+        } for e in entries]
+        return {"name": name, "rxcui": ids[0], "found": bool(pages), "pages": pages,
+                "source": "MedlinePlus (US National Library of Medicine)"}
+
+    return await cached("medicines", conn.id, "patient_drug_info", TTL_LONG, _loader,
+                        args={"name": name, "lang": language})
+
+
+async def europe_pmc_search(conn: Connection, db, args: dict) -> dict:
+    """Europe PMC literature search, open-access by default, with citation counts."""
+    query = str(args.get("query") or "").strip()
+    if not query:
+        raise ConnectorError("query is required, e.g. 'dapagliflozin heart failure'.")
+    if args.get("open_access_only", True):
+        query = f"({query}) AND OPEN_ACCESS:y"
+    params = {"query": query, "format": "json", "resultType": "core",
+              "pageSize": _limit(args, 10, 50)}
+    if args.get("sort") == "newest":
+        params["sort"] = "FIRST_PDATE_D desc"
+    elif args.get("sort") == "most_cited":
+        params["sort"] = "CITED desc"
+    if args.get("cursor"):
+        params["cursorMark"] = str(args["cursor"])
+
+    async def _loader():
+        data = await _get_json(f"{EUROPE_PMC}/search", params)
+        rows = [{
+            "id": r.get("id"),
+            "pmid": r.get("pmid"),
+            "pmcid": r.get("pmcid"),
+            "title": r.get("title"),
+            "journal": (((r.get("journalInfo") or {}).get("journal") or {}).get("title")),
+            "year": r.get("pubYear"),
+            "authors": r.get("authorString"),
+            "doi": r.get("doi"),
+            "open_access": r.get("isOpenAccess") == "Y",
+            "cited_by": r.get("citedByCount"),
+            "abstract": _plain(r.get("abstractText"), 1200),
+            "url": f"https://europepmc.org/article/{r.get('source')}/{r.get('id')}",
+        } for r in (data.get("resultList") or {}).get("result") or []]
+        return {"query": query, "total_count": data.get("hitCount"), "articles": rows,
+                "next_cursor": data.get("nextCursorMark"), "source": "Europe PMC"}
+
+    return await cached("medicines", conn.id, "europe_pmc_search", TTL_MEDIUM, _loader, args=params)
+
+
+async def europe_pmc_full_text(conn: Connection, db, args: dict) -> dict:
+    """The full text of an open-access paper, section by section (capped)."""
+    pmcid = str(args.get("pmcid") or "").strip().upper()
+    if not re.fullmatch(r"PMC\d+", pmcid):
+        raise ConnectorError("pmcid must look like PMC1234567 (from europe_pmc_search).")
+    max_chars = _limit({"limit": args.get("max_chars")}, 20000, 60000)
+
+    async def _loader():
+        url = f"{EUROPE_PMC}/{pmcid}/fullTextXML"
+        try:
+            async with limit_for(url):
+                res = await http_get(url, headers={"User-Agent": _HEADERS["User-Agent"]})
+        except UpstreamUnavailable as e:
+            raise ConnectorError(str(e))
+        if res.status_code == 404:
+            return {"pmcid": pmcid, "found": False,
+                    "note": "No open-access full text for that id; the abstract may still be on PubMed."}
+        if res.status_code >= 400:
+            raise ConnectorError(f"Europe PMC returned {res.status_code}.")
+        try:
+            root = ET.fromstring(res.content)
+        except ET.ParseError:
+            raise ConnectorError("Europe PMC returned unreadable XML.")
+        title = " ".join("".join(root.find(".//article-title").itertext()).split()) \
+            if root.find(".//article-title") is not None else None
+        sections, used = [], 0
+        for sec in root.findall(".//body/sec"):
+            head = sec.find("title")
+            text = " ".join(" ".join(p.itertext()) for p in sec.iter("p"))
+            text = " ".join(text.split())
+            if not text:
+                continue
+            room = max_chars - used
+            if room <= 0:
+                break
+            sections.append({"heading": "".join(head.itertext()).strip() if head is not None else None,
+                             "text": text[:room]})
+            used += min(len(text), room)
+        return {"pmcid": pmcid, "found": True, "title": title, "sections": sections,
+                "truncated": used >= max_chars,
+                "url": f"https://europepmc.org/article/PMC/{pmcid}", "source": "Europe PMC"}
+
+    return await cached("medicines", conn.id, "europe_pmc_full_text", TTL_LONG, _loader,
+                        args={"id": pmcid, "max": max_chars})
+
 # ============================================================
 # Catalog
 # ============================================================
@@ -757,6 +1162,75 @@ CATALOG = {
         "input": {"type": "object", "properties": {"query": {"type": "string", "description": "Drug name."}},
                   "required": ["query"], "additionalProperties": False},
     },
+    "fda_approval_history": {
+        "description": "Drugs@FDA: each US application for a drug -- sponsor, original approval date, products with strengths and marketing status, and recent actions with links to labels and approval letters.",
+        "input": {"type": "object", "properties": dict(_NAME_LIMIT), "required": ["name"], "additionalProperties": False},
+    },
+    "orange_book_patents": {
+        "description": "FDA Orange Book: patents (with expiry, substance/product claims, use codes) and regulatory exclusivities per product, plus the latest listed patent expiry.",
+        "input": {"type": "object", "properties": dict(_NAME_PROP), "required": ["name"], "additionalProperties": False},
+    },
+    "ema_medicines": {
+        "description": "EU medicines from the European Medicines Agency: authorisation status and date, holder, ATC code, indication, and flags such as orphan, biosimilar or conditional approval.",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Medicine or active substance; an indication with search_indications."},
+                "search_indications": {"type": "boolean"},
+                "status": {"type": "string", "description": "e.g. Authorised, Withdrawn, Refused."},
+                "limit": {"type": "integer", "description": "1-50. Default 10."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    "drug_shortages": {
+        "description": "FDA drug shortage list: whether a drug is (or was) in shortage, availability, company, reason and dates.",
+        "input": {
+            "type": "object",
+            "properties": {**_NAME_LIMIT, "status": {"type": "string", "enum": ["Current", "Resolved", "To Be Discontinued"]}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    },
+    "atc_classification": {
+        "description": "WHO ATC therapeutic classification codes and class names for a drug.",
+        "input": {"type": "object", "properties": dict(_NAME_PROP), "required": ["name"], "additionalProperties": False},
+    },
+    "patient_drug_info": {
+        "description": "MedlinePlus plain-language drug pages (uses, precautions) for patient-facing content, in English or Spanish.",
+        "input": {
+            "type": "object",
+            "properties": {**_NAME_PROP, "language": {"type": "string", "enum": ["en", "es"]}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    },
+    "europe_pmc_search": {
+        "description": "Europe PMC literature search (open-access only by default): title, journal, year, authors, DOI, citation count, abstract and PMCID for full text.",
+        "input": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "open_access_only": {"type": "boolean", "description": "Default true."},
+                "sort": {"type": "string", "enum": ["relevance", "newest", "most_cited"]},
+                "limit": {"type": "integer", "description": "1-50. Default 10."},
+                "cursor": {"type": "string", "description": "next_cursor from a previous call."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    "europe_pmc_full_text": {
+        "description": "Full text of an open-access paper, section by section, capped at max_chars.",
+        "input": {
+            "type": "object",
+            "properties": {"pmcid": {"type": "string", "description": "e.g. PMC13527552"},
+                           "max_chars": {"type": "integer", "description": "Up to 60000. Default 20000."}},
+            "required": ["pmcid"],
+            "additionalProperties": False,
+        },
+    },
 }
 
 HANDLERS = {
@@ -776,6 +1250,14 @@ HANDLERS = {
     "india_essential_medicines": india_essential_medicines,
     "india_ceiling_prices": india_ceiling_prices,
     "india_drug_profile": india_drug_profile,
+    "fda_approval_history": fda_approval_history,
+    "orange_book_patents": orange_book_patents,
+    "ema_medicines": ema_medicines,
+    "drug_shortages": drug_shortages,
+    "atc_classification": atc_classification,
+    "patient_drug_info": patient_drug_info,
+    "europe_pmc_search": europe_pmc_search,
+    "europe_pmc_full_text": europe_pmc_full_text,
 }
 
 registry.register(
@@ -786,9 +1268,10 @@ registry.register(
         cred_fields=[],
         catalog=CATALOG,
         handlers=HANDLERS,
-        description=('Drug facts and evidence for pharma content: FDA labels, adverse events and recalls, '
-                     'DailyMed, RxNorm names, ClinicalTrials.gov and PubMed, plus India -- CDSCO approvals, '
-                     'the National List of Essential Medicines 2022 and NPPA ceiling prices. No API key.'),
+        description=('Drug facts and evidence for pharma content: FDA labels, approvals, Orange Book '
+                     'patents, shortages, adverse events and recalls; EMA (EU) medicines; WHO ATC classes; '
+                     'MedlinePlus patient pages; ClinicalTrials.gov, PubMed and Europe PMC full text; plus '
+                     'India -- CDSCO approvals, NLEM 2022 and NPPA ceiling prices. No API key.'),
         category='Reference',
     )
 )
