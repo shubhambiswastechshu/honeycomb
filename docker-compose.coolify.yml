@@ -84,6 +84,21 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
       GOOGLE_ADS_API_VERSION: ${GOOGLE_ADS_API_VERSION:-v23}
+      # The LinkedIn developer app behind "Continue with LinkedIn". Its Auth
+      # tab must list <HONEYCOMB_PUBLIC_BASE>/api/connectors/oauth/linkedin/
+      # callback/ byte for byte. Compose only passes the variables named here,
+      # so setting these in Coolify alone is not enough -- without these lines
+      # the container never sees them and the connector answers "LinkedIn
+      # sign-in is not configured on this server".
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      # Carries the same default Django has. It cannot be left empty: settings
+      # reads it with os.environ.get(name, default), and an empty variable is
+      # still present, so the default would never apply and LinkedIn would be
+      # asked for no scopes at all. Override only when the app's products
+      # grant a different set -- every scope asked for must be one the app
+      # actually has, or LinkedIn refuses the whole authorization.
+      LINKEDIN_OAUTH_SCOPES: "${LINKEDIN_OAUTH_SCOPES:-r_ads r_ads_reporting r_basicprofile}"
     depends_on:
       postgres:
         condition: service_healthy
