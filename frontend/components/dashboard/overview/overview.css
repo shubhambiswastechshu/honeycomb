@@ -1,0 +1,544 @@
+/* The Overview's tabs, cards and charts.
+ *
+ * The two data colours below were run through the palette validator rather
+ * than chosen by eye: blue for calls that succeeded, red for calls that failed.
+ * Colour-blind separation 25.6 (target 8), both above 3:1 against the surface.
+ * Green-and-red was rejected because it scores 4.4 for red-green colour
+ * blindness, below the floor of 6 -- the exact readers who most need the
+ * failures to stand out could not see them. */
+
+.dash {
+  --ovc-ok: #3a6fd8;
+  --ovc-bad: #cc3d2f;
+  --ovc-grid: #ececec;
+  --ovc-axis: #c9c9c9;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabs and cards                                                      */
+/* ------------------------------------------------------------------ */
+
+.ov-tabs-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.ov-tabpanel {
+  padding-top: 18px;
+}
+
+.ov-tabpanel:focus-visible {
+  outline: none;
+}
+
+.ov-cards {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1000px) {
+  .ov-cards-2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.ov-card {
+  background: var(--md-surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px 14px;
+  min-width: 0;
+}
+
+.ov-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.ov-card-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ov-card-meta {
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.ov-card-figure {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ov-card-figure strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ov-card-empty {
+  margin: 8px 0 4px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* A row of small figures inside a card, e.g. the response-time percentiles. */
+.ov-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-figure-value {
+  display: block;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.ov-figure-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* The failure report: one row per distinct reason. */
+.ov-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.ov-reason {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.ov-reason-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ov-reason-title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  font-size: 0.875rem;
+}
+
+.ov-reason-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ov-reason-msg {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--error-text, #9b3d22);
+  overflow-wrap: anywhere;
+}
+
+.ov-reason-meta {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* The endpoint table. */
+.ov-endpoint-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ov-endpoint-table th,
+.ov-endpoint-table td {
+  text-align: left;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.ov-endpoint-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ov-endpoint-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ov-endpoint-name {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.ov-endpoint-url {
+  margin-top: 6px;
+}
+
+.ov-scroll-x {
+  overflow-x: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Charts                                                              */
+/* ------------------------------------------------------------------ */
+
+.ovc-chart {
+  min-width: 0;
+}
+
+.ovc-plot {
+  position: relative;
+  width: 100%;
+}
+
+.ovc-svg {
+  display: block;
+  overflow: visible;
+}
+
+.ovc-grid {
+  stroke: var(--ovc-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.ovc-baseline {
+  stroke: var(--ovc-axis);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+/* Axis text: ink, never the series colour, with figures that line up. */
+.ovc-tick {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ovc-hit {
+  fill: transparent;
+}
+
+.ovc-ok {
+  fill: var(--ovc-ok);
+}
+
+.ovc-bad {
+  fill: var(--ovc-bad);
+}
+
+.ovc-col {
+  cursor: default;
+  outline: none;
+}
+
+/* The hovered column lifts slightly so the reader sees it respond. */
+.ovc-col.is-hover .ovc-ok,
+.ovc-col.is-hover .ovc-bad {
+  opacity: 0.78;
+}
+
+.ovc-col.is-hover .ovc-hit {
+  fill: rgba(31, 31, 31, 0.04);
+}
+
+.ovc-col:focus-visible .ovc-hit {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* The tooltip: the value leads, the series name follows. */
+.ovc-tip {
+  position: absolute;
+  transform: translateX(12px);
+  pointer-events: none;
+  z-index: 3;
+  min-width: 140px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.ovc-tip.is-left {
+  transform: translateX(calc(-100% - 12px));
+}
+
+.ovc-tip p {
+  margin: 0;
+}
+
+.ovc-tip-value {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px !important;
+}
+
+.ovc-tip-value span {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ovc-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.ovc-tip-row strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ovc-tip-label {
+  margin-top: 6px !important;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Tooltip keys are short strokes, not boxes. */
+.ovc-line {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.ovc-line-ok {
+  background: var(--ovc-ok);
+}
+
+.ovc-line-bad {
+  background: var(--ovc-bad);
+}
+
+/* Legend keys are rects, because the marks are bars. */
+.ovc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.ovc-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ovc-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ovc-key-ok {
+  background: var(--ovc-ok);
+}
+
+.ovc-key-bad {
+  background: var(--ovc-bad);
+}
+
+/* Horizontal bars. */
+.ovc-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ovc-bar-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 36%) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  outline: none;
+}
+
+/* On a phone the name takes the full width and the bar sits under it,
+   instead of a 120px name column leaving the bar no room at all. */
+@media (max-width: 560px) {
+  .ovc-bar-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+.ovc-bar-row:hover {
+  background: rgba(31, 31, 31, 0.035);
+}
+
+.ovc-bar-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.ovc-bar-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ovc-bar-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ovc-bar-label {
+  font-size: 0.8125rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovc-bar-sub {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The track holds the segments and the value. Segments are separated by a
+   2px gap in the surface colour, never by a stroke. */
+.ovc-bar-track {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ovc-seg {
+  display: block;
+  height: 12px;
+  min-width: 2px;
+  flex: 0 0 auto;
+}
+
+/* Square where the bar starts, a 4px round where the data ends. */
+.ovc-seg.is-end {
+  border-radius: 0 4px 4px 0;
+}
+
+.ovc-ok-bg {
+  background: var(--ovc-ok);
+}
+
+.ovc-bad-bg {
+  background: var(--ovc-bad);
+}
+
+.ovc-measure-bg {
+  background: var(--ovc-ok);
+}
+
+.ovc-bar-value {
+  margin-left: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ovc-bar-fail {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The table behind every chart. */
+.ovc-table {
+  margin-top: 10px;
+  font-size: 0.8125rem;
+}
+
+.ovc-table summary {
+  cursor: pointer;
+  color: var(--muted);
+  width: max-content;
+}
+
+.ovc-table summary:hover {
+  color: var(--text);
+}
+
+.ovc-table-scroll {
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ovc-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ovc-table th,
+.ovc-table td {
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ovc-table th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.ovc-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fafafa;
+  font-weight: 600;
+  color: var(--muted);
+}
