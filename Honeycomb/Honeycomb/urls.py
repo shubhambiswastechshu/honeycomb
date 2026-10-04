@@ -18,7 +18,6 @@ from django.contrib import admin
 from django.urls import include, path
 
 from accounts.urls import tenant_urlpatterns
-from foraging.urls import console_urlpatterns as forager_console_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -41,20 +40,12 @@ urlpatterns = [
     path('api/', include('mcp.urls')),
     # Saved reports: the dashboards people build from their connections' data.
     path('api/', include('reports.urls')),
-    # Forager. The /api/forager/agent/** half is the worker plane -- a machine
-    # elsewhere polling for crawl jobs on a bearer token, with no session and
-    # therefore no CSRF surface. The rest is the console the dashboard reads.
-    path('api/forager/', include('foraging.urls')),
     # The authorization server for /mcp/**, at the ROOT and not under /api/:
     # RFC 9728 and RFC 8414 fix the /.well-known/... paths absolutely, and a
     # client derives them from the origin alone. This is what a browser-only
     # client such as claude.ai uses instead of a pasted hc_ key -- it cannot
     # send a static header, so it has to be walked through a real OAuth flow.
-    # Listed before the forager console, whose patterns are broad.
     path('', include('mcp.oauth_urls')),
-    # The live console page. Server-rendered so it works with no frontend build
-    # -- which is exactly the situation you are in when a crawl is misbehaving.
-    path('', include((forager_console_urlpatterns, 'foraging'), namespace='foraging-console')),
 ]
 
 # /mcp/** is absent from this file on purpose, and adding it would be a

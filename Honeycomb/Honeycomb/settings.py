@@ -127,9 +127,6 @@ INSTALLED_APPS = [
     'connectors',
     'connections',
     'mcp',
-    # Forager: the crawl queue and the results a worker machine streams back.
-    # It owns tables, so unlike `connectors` it is a real app with migrations.
-    'foraging',
     # Saved reports: dashboards of widgets a person composes from their
     # connections' read tools. It owns tables and nothing else -- the data path
     # is connections.runner, the same gate the Google Ads report goes through.
@@ -421,12 +418,6 @@ REST_FRAMEWORK = {
         # because sharing that write ceiling put ordinary navigation over the
         # limit; matched to 'connectors' above, which is the same kind of read.
         'connections_read': '120/min',
-        # The public crawler. Starting a crawl puts load on a real machine and on
-        # somebody's website, with no account behind the request -- so the
-        # ceiling is per client address and low. Reads are the live view
-        # polling every couple of seconds, so they need real headroom.
-        'public_crawl': '6/hour',
-        'public_crawl_read': '240/min',
         # Minting an MCP key is the single most sensitive write in the portal:
         # each one hands out a bearer token with no cookie and no CSRF in front
         # of it. Same ceiling as 'connect', for the same reason -- a human
@@ -847,17 +838,6 @@ HONEYCOMB_MCP_MAX_BODY_BYTES = int(os.environ.get('HONEYCOMB_MCP_MAX_BODY_BYTES'
 # site under test is on localhost; in production it would be SSRF.
 HONEYCOMB_ALLOW_PRIVATE_UPSTREAMS = _env_flag(
     'HONEYCOMB_ALLOW_PRIVATE_UPSTREAMS', 'True' if DEBUG else 'False')
-
-# The public crawler (foraging/public.py): a page where anyone can watch crawls
-# and start one without an account. Off unless this names the organization whose
-# workers should run them. The other three are its hard limits.
-HONEYCOMB_PUBLIC_CRAWL_TENANT = os.environ.get('HONEYCOMB_PUBLIC_CRAWL_TENANT', '').strip()
-HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_PAGES', '500'))
-HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_MAX_ACTIVE', '6'))
-HONEYCOMB_PUBLIC_CRAWL_DAILY = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_DAILY', '100'))
-# Ceiling for a "whole site" crawl. No login and one worker: without a ceiling,
-# a single request could hold the crawler for days on a very large site.
-HONEYCOMB_PUBLIC_CRAWL_WHOLE_SITE_MAX = int(os.environ.get('HONEYCOMB_PUBLIC_CRAWL_WHOLE_SITE_MAX', '50000'))
 
 HONEYCOMB_FRONTEND_BASE = os.environ.get(
     'HONEYCOMB_FRONTEND_BASE', 'http://localhost:3000'

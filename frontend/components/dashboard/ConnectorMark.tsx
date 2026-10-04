@@ -33,7 +33,6 @@
  */
 
 import {
-  Bot,
   BotMessageSquare,
   ChartColumn,
   CreditCard,
@@ -58,7 +57,6 @@ import {
   TrendingUp,
   Users,
   Video,
-  Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -75,9 +73,6 @@ const MARKS: Record<string, LucideIcon> = {
   // falls back to a letter. Five connectors begin with "Google", and a
   // monogram rendered all five as an identical "G".
   awr: TrendingUp,
-  // Waypoints, not a spider or a bug: what Forager returns is a link graph,
-  // and connected nodes say that where an insect would only say "crawler".
-  forager: Waypoints,
   ga4: ChartColumn,
   google_ads: Megaphone,
   google_keywords: Search,
@@ -113,7 +108,6 @@ const MARKS: Record<string, LucideIcon> = {
   // the day it is ported, with no frontend change.
   bigquery: Database,
   coolify: Server,
-  crawl4ai: Bot,
   drive: Folder,
   gmail: Mail,
   image_gen: Sparkles,

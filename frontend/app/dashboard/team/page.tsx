@@ -18,7 +18,7 @@ import { getTeam, inviteTeammate, revokeInvitation } from "@/lib/api";
 import type { Team, TeamInvitation, User } from "@/lib/api";
 
 const ROLES = [
-  { value: "MEMBER", label: "Member", hint: "Can use every connection and run crawls." },
+  { value: "MEMBER", label: "Member", hint: "Can use every connection." },
   { value: "ADMIN", label: "Admin", hint: "Can also invite people and manage the workspace." },
 ];
 

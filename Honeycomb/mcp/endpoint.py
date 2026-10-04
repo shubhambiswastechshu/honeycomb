@@ -236,7 +236,7 @@ def build_app():
     # The suffixes are not decoration. Nearly every public MCP server is
     # addressed as https://host/mcp or https://host/sse, so people append the
     # word out of habit -- and a URL like
-    # /mcp/forager/<slug>/mcp then missed every route, fell to the catch-all,
+    # /mcp/ga4/<slug>/mcp then missed every route, fell to the catch-all,
     # and answered 200 with "no endpoint here". claude.ai reads that as a server
     # with nothing to discover and shows "Couldn't determine the server
     # settings", which is indistinguishable from the endpoint being broken.

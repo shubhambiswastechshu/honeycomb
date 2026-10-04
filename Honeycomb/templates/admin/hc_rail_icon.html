@@ -19,8 +19,8 @@ nine -- a rail of identical cylinders is a rail with no navigation in it. If you
 register a model, add it here in the same commit.
 
 Current branches cover, in `available_apps` order: accounts (Tenant, User),
-auth (Group), connections (Connection, ConnectorOAuthState), foraging (Worker,
-CrawlJob, CrawlPage, CrawlEvent, CrawlSegment) and mcp (McpKey, McpActivity).
+auth (Group), connections (Connection, ConnectorOAuthState) and mcp (McpKey,
+McpActivity).
 {% endcomment %}
 {% if icon == "overview" %}
   {# layout-grid #}
@@ -81,32 +81,6 @@ CrawlJob, CrawlPage, CrawlEvent, CrawlSegment) and mcp (McpKey, McpActivity).
   <path d="M7 2v2"/>
   <rect x="4" y="4" width="16" height="16" rx="2"/>
   <rect x="8" y="8" width="8" height="8" rx="1"/>
-{% elif icon == "crawljob" %}
-  {# radar -- a sweep over a site #}
-  <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/>
-  <path d="M4 6h.01"/>
-  <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/>
-  <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/>
-  <path d="M12 18h.01"/>
-  <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/>
-  <circle cx="12" cy="12" r="2"/>
-  <path d="m13.41 10.59 5.66-5.66"/>
-{% elif icon == "crawlpage" %}
-  {# file-text -- one crawled URL and its columns #}
-  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-  <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
-  <path d="M10 9H8"/>
-  <path d="M16 13H8"/>
-  <path d="M16 17H8"/>
-{% elif icon == "crawlevent" %}
-  {# scroll-text -- the console lines a crawl streams back #}
-  <path d="M15 12h-5"/>
-  <path d="M15 8h-5"/>
-  <path d="M19 17V5a2 2 0 0 0-2-2H4"/>
-  <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>
-{% elif icon == "crawlsegment" %}
-  {# funnel -- a saved rule set that narrows the page table #}
-  <path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/>
 {% elif icon == "mcpkey" %}
   {# key-round -- the bearer token minted against a connection #}
   <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>

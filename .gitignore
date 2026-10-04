@@ -54,8 +54,6 @@ client_secret*.json
 # Sibling projects that live in this working copy but are not part of the
 # Honeycomb app. They carry their own venvs and multi-hundred-megabyte
 # databases; nothing here imports them.
-/crawler/
-/crawler-go/
 /bench/
 
 # Operational reference: contains live production secrets.

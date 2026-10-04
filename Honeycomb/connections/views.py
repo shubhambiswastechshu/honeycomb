@@ -229,7 +229,7 @@ class ConnectionViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         * read-only. A tool the catalog marks ``write`` is refused outright.
           The MCP plane can call those because a human approved that client;
           nothing on a page the browser can be walked into should be able to
-          publish a post or start a crawl.
+          publish a post or change a campaign.
         * respects the connection's own switches. A tool switched off in the
           dashboard is off here too -- one meaning for "off", not two.
         * tenant-scoped by get_object(), like every other detail route here.

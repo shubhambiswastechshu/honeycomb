@@ -20,15 +20,10 @@ function isDashboard(pathname: string): boolean {
   return pathname === "/dashboard" || pathname.indexOf("/dashboard/") === 0;
 }
 
-/** The public crawler is a full-viewport tool too, not a centred auth card. */
-function isCrawler(pathname: string): boolean {
-  return pathname === "/crawl" || pathname.indexOf("/crawl/") === 0;
-}
-
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  if (isDashboard(pathname) || isCrawler(pathname)) {
+  if (isDashboard(pathname)) {
     return <>{children}</>;
   }
 
