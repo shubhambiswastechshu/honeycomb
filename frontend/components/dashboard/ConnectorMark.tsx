@@ -228,6 +228,7 @@ export function hueFor(slug: string): number {
  * on a 2x display without shipping a 512px asset to draw a 34px tile.
  */
 const BRAND_IMAGES: Record<string, string> = {
+  bigquery: "/brand/bigquery.png",
   google_ads: "/brand/google-ads.png",
   google_merchant: "/brand/google-merchant.png",
   gsc: "/brand/google-search-console.png",
@@ -235,8 +236,11 @@ const BRAND_IMAGES: Record<string, string> = {
   meta_ad_library: "/brand/meta.png",
   openai_ads: "/brand/chatgpt.png",
   pinterest: "/brand/pinterest.png",
+  salesforce_commerce: "/brand/salesforce.png",
+  stripe: "/brand/stripe.svg",
   meta_ads: "/brand/meta.png",
   meta_business_suite: "/brand/meta.png",
+  ms_ads: "/brand/ms-advertising.png",
   ms_clarity: "/brand/ms-clarity.png",
   universal_search: "/brand/duckduckgo.png",
   wordpress: "/brand/wordpress.png",
