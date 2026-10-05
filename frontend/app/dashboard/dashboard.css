@@ -4138,8 +4138,10 @@
    connections needed a thousand pixels of scrolling to show three facts each.
    The URL column is the wide one because it is what the page is for. */
 .dash .inv-row {
+  position: relative;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: auto minmax(150px, 0.8fr) minmax(0, 0.95fr) minmax(0, 2.15fr);
+  grid-template-columns: auto minmax(150px, 0.8fr) minmax(0, 0.95fr) minmax(0, 2.15fr) auto;
   align-items: center;
   column-gap: 16px;
   row-gap: 9px;
@@ -4248,9 +4250,107 @@
 
 /* Two lines: identity above, URL below. Below this the four columns are each
    too narrow to read, and the URL is the first thing to become unusable. */
+/* Delete, its countdown and Undo. The delete control matches the Reports
+   list's: quiet until hovered, and only drawn for someone who may use it. */
+.dash .inv-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 30px;
+}
+
+.dash .inv-delete {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dash .inv-delete:hover {
+  border-color: var(--border);
+  color: var(--error-text);
+  background: #fdf3ef;
+}
+
+.dash .inv-undo {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: var(--md-shape-sm);
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash .inv-undo:hover {
+  background: #333;
+}
+
+.dash .inv-delete:focus-visible,
+.dash .inv-undo:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 2px;
+}
+
+/* The countdown in words, beside Undo: the number is the information, the
+   bar along the bottom edge is the at-a-glance version of it. */
+.dash .inv-pending-text {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--error-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row on its way out: dimmed, so it reads as going, but still fully legible
+   so the person can see what they are about to lose. */
+.dash .inv-row.is-pending {
+  border-color: #e6c3b5;
+  background: #fffaf8;
+}
+
+.dash .inv-row.is-pending > :not(.inv-actions):not(.inv-countdown) {
+  opacity: 0.55;
+}
+
+.dash .inv-countdown {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--error-text);
+  transition: width 200ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash .inv-countdown {
+    transition: none;
+  }
+}
+
 @media (max-width: 1080px) {
   .dash .inv-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  /* Delete and Undo stay on the first line, beside the name. */
+  .dash .inv-actions {
+    grid-column: 3;
+    grid-row: 1;
   }
 
   .dash .inv-meta,

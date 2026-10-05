@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -26,6 +26,33 @@ const FILTER_FROM = 6;
 
 export interface DataInventoryProps {
   rows: Connection[];
+  /**
+   * Deleting. All optional, so the inventory still renders read-only against
+   * fixtures and for anyone who may not delete.
+   */
+  deletion?: Deletion;
+}
+
+/**
+ * The delete-with-undo state the page owns and the rows only draw.
+ *
+ * A delete starts as a countdown and nothing reaches the server until it
+ * runs out, so Undo is a real undo rather than a re-create. The page holds
+ * the timers; this component only shows them.
+ */
+export interface Deletion {
+  /** Whether this person may delete at all. Owners and admins only. */
+  allowed: boolean;
+  /** Seconds left before each pending delete is sent, by connection id. */
+  secondsLeft: Record<number, number>;
+  /** The same countdowns as a share of the whole, 1 down to 0, for the bar. */
+  remaining: Record<number, number>;
+  /** Connections whose delete request is in flight right now. */
+  sending: Record<number, boolean>;
+  /** A delete the server refused, by connection id. */
+  errors: Record<number, string>;
+  onDelete: (row: Connection) => void;
+  onUndo: (row: Connection) => void;
 }
 
 function count(n: number, one: string, many: string): string {
@@ -37,11 +64,25 @@ function title(row: Connection): string {
   return name.length > 0 ? name : row.connector_label;
 }
 
-function Row({ row }: { row: Connection }) {
+function Row({ row, deletion }: { row: Connection; deletion?: Deletion }) {
   const failing = row.status === "error";
   const live = row.tool_count - row.disabled_tools.length;
+  const left = deletion !== undefined ? deletion.secondsLeft[row.id] : undefined;
+  const pending = left !== undefined;
+  const sending = deletion !== undefined && deletion.sending[row.id] === true;
+  const refused = deletion !== undefined ? deletion.errors[row.id] : undefined;
+  const share = deletion !== undefined ? deletion.remaining[row.id] : undefined;
+
+  let className = "inv-row";
+  if (failing) {
+    className += " is-failing";
+  }
+  if (pending || sending) {
+    className += " is-pending";
+  }
+
   return (
-    <li className={failing ? "inv-row is-failing" : "inv-row"}>
+    <li className={className}>
       <ConnectorMark slug={row.connector} label={row.connector_label || row.connector} />
 
       <div className="inv-id">
@@ -76,14 +117,69 @@ function Row({ row }: { row: Connection }) {
 
       <McpUrl url={row.mcp_url} label={"Copy the MCP URL for " + title(row)} />
 
+      {deletion !== undefined && deletion.allowed ? (
+        <div className="inv-actions">
+          {sending ? (
+            <span className="inv-pending-text">Deleting&hellip;</span>
+          ) : pending ? (
+            <span className="inv-pending-text">
+              {"Deleting in " + String(left) + "s"}
+            </span>
+          ) : null}
+          {/* One button that changes meaning rather than two that swap: the
+              element stays where it is, so keyboard focus is not dropped when
+              Delete turns into Undo and back. Gone once the request is sent,
+              because by then there is nothing left to undo. */}
+          {!sending ? (
+            <button
+              type="button"
+              className={pending ? "inv-undo" : "inv-delete"}
+              aria-label={pending ? "Undo deleting " + title(row) : "Delete " + title(row)}
+              title={pending ? "Undo" : "Delete this connection"}
+              onClick={function act() {
+                if (pending) {
+                  deletion.onUndo(row);
+                } else {
+                  deletion.onDelete(row);
+                }
+              }}
+            >
+              {pending ? (
+                <>
+                  <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
+                  <span>Undo</span>
+                </>
+              ) : (
+                <Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />
+              )}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {failing && row.last_error.length > 0 ? (
         <p className="inv-error">{row.last_error}</p>
+      ) : null}
+
+      {refused !== undefined ? (
+        <p className="inv-error" role="alert">
+          {"Could not delete: " + refused}
+        </p>
+      ) : null}
+
+      {/* The countdown, as a bar draining along the bottom edge of the row. */}
+      {pending && share !== undefined ? (
+        <span
+          className="inv-countdown"
+          style={{ width: String(Math.max(0, Math.min(1, share)) * 100) + "%" }}
+          aria-hidden="true"
+        />
       ) : null}
     </li>
   );
 }
 
-export default function DataInventory({ rows }: DataInventoryProps) {
+export default function DataInventory({ rows, deletion }: DataInventoryProps) {
   const [query, setQuery] = useState("");
 
   const totals = useMemo(
@@ -178,7 +274,7 @@ export default function DataInventory({ rows }: DataInventoryProps) {
           </h2>
           <ul className="inv-list">
             {failing.map(function each(row) {
-              return <Row row={row} key={row.id} />;
+              return <Row row={row} deletion={deletion} key={row.id} />;
             })}
           </ul>
         </section>
@@ -194,7 +290,7 @@ export default function DataInventory({ rows }: DataInventoryProps) {
           ) : null}
           <ul className="inv-list">
             {healthy.map(function each(row) {
-              return <Row row={row} key={row.id} />;
+              return <Row row={row} deletion={deletion} key={row.id} />;
             })}
           </ul>
         </section>
